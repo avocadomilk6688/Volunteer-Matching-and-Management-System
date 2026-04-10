@@ -12,6 +12,8 @@ import { Interest } from './volunteers/entities/interest.entity';
 import { OrganizationsModule } from './organizations/organizations.module';
 import { OrganizationRegistration } from './organizations/entities/organization-registration.entity';
 import { Organization } from './organizations/entities/organization.entity';
+import { ProgrammesModule } from './programmes/programmes.module';
+import { Schedule } from './programmes/entities/schedule.entity';
 
 @Module({
   imports: [
@@ -30,12 +32,14 @@ import { Organization } from './organizations/entities/organization.entity';
         Interest,
         OrganizationRegistration,
         Organization,
+        Schedule,
       ],
       synchronize: true,
     }),
     UsersModule,
     VolunteersModule,
     OrganizationsModule,
+    ProgrammesModule,
   ],
   controllers: [AppController],
   providers: [AppService],
