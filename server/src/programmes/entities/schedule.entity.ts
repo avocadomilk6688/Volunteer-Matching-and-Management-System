@@ -12,6 +12,6 @@ export class Schedule {
   @Column({ type: 'datetime' })
   end_time!: Date;
 
-//   @OneToOne(() => Programme, (programme) => programme.schedule)
-//   programme!: Programme;
+  @OneToOne(() => Programme, (programme) => programme.schedule)
+  programme!: Programme;
 }

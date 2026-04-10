@@ -14,6 +14,7 @@ import { OrganizationRegistration } from './organizations/entities/organization-
 import { Organization } from './organizations/entities/organization.entity';
 import { ProgrammesModule } from './programmes/programmes.module';
 import { Schedule } from './programmes/entities/schedule.entity';
+import { Programme } from './programmes/entities/programme.entity';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { Schedule } from './programmes/entities/schedule.entity';
         OrganizationRegistration,
         Organization,
         Schedule,
+        Programme,
       ],
       synchronize: true,
     }),

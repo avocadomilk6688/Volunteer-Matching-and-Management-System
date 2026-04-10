@@ -1,5 +1,13 @@
-import { Entity, Column, OneToOne, JoinColumn, PrimaryColumn } from 'typeorm';
+import {
+  Entity,
+  Column,
+  OneToOne,
+  JoinColumn,
+  PrimaryColumn,
+  ManyToMany,
+} from 'typeorm';
 import { User } from '../../users/entities/user.entity';
+import { Programme } from '../../programmes/entities/programme.entity';
 
 @Entity()
 export class Volunteer {
@@ -33,4 +41,7 @@ export class Volunteer {
   @OneToOne(() => User)
   @JoinColumn()
   user!: User;
+
+  @ManyToMany(() => Programme, (programme) => programme.participants)
+  programmes!: Programme[];
 }
