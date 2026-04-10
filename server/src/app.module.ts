@@ -11,6 +11,7 @@ import { Skill } from './volunteers/entities/skill.entity';
 import { Interest } from './volunteers/entities/interest.entity';
 import { OrganizationsModule } from './organizations/organizations.module';
 import { OrganizationRegistration } from './organizations/entities/organization-registration.entity';
+import { Organization } from './organizations/entities/organization.entity';
 
 @Module({
   imports: [
@@ -22,7 +23,14 @@ import { OrganizationRegistration } from './organizations/entities/organization-
       username: process.env.DB_USERNAME,
       password: process.env.DB_PASSWORD,
       database: process.env.DB_NAME,
-      entities: [User, Volunteer, Skill, Interest, OrganizationRegistration],
+      entities: [
+        User,
+        Volunteer,
+        Skill,
+        Interest,
+        OrganizationRegistration,
+        Organization,
+      ],
       synchronize: true,
     }),
     UsersModule,
