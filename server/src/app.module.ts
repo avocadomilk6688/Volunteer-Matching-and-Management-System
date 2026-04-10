@@ -7,6 +7,8 @@ import { UsersModule } from './users/users.module';
 import { User } from './users/entities/user.entity';
 import { VolunteersModule } from './volunteers/volunteers.module';
 import { Volunteer } from './volunteers/entities/volunteer.entity';
+import { Skill } from './volunteers/entities/skill.entity';
+import { Interest } from './volunteers/entities/interest.entity';
 
 @Module({
   imports: [
@@ -18,7 +20,7 @@ import { Volunteer } from './volunteers/entities/volunteer.entity';
       username: process.env.DB_USERNAME,
       password: process.env.DB_PASSWORD,
       database: process.env.DB_NAME,
-      entities: [User, Volunteer],
+      entities: [User, Volunteer, Skill, Interest],
       synchronize: true,
     }),
     UsersModule,
