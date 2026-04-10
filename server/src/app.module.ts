@@ -9,6 +9,8 @@ import { VolunteersModule } from './volunteers/volunteers.module';
 import { Volunteer } from './volunteers/entities/volunteer.entity';
 import { Skill } from './volunteers/entities/skill.entity';
 import { Interest } from './volunteers/entities/interest.entity';
+import { OrganizationsModule } from './organizations/organizations.module';
+import { OrganizationRegistration } from './organizations/entities/organization-registration.entity';
 
 @Module({
   imports: [
@@ -20,11 +22,12 @@ import { Interest } from './volunteers/entities/interest.entity';
       username: process.env.DB_USERNAME,
       password: process.env.DB_PASSWORD,
       database: process.env.DB_NAME,
-      entities: [User, Volunteer, Skill, Interest],
+      entities: [User, Volunteer, Skill, Interest, OrganizationRegistration],
       synchronize: true,
     }),
     UsersModule,
     VolunteersModule,
+    OrganizationsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
