@@ -17,6 +17,7 @@ import { Schedule } from './programmes/entities/schedule.entity';
 import { Programme } from './programmes/entities/programme.entity';
 import { InteractionsModule } from './interactions/interactions.module';
 import { Message } from './interactions/entities/message.entity';
+import { Rating } from './interactions/entities/rating.entity';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { Message } from './interactions/entities/message.entity';
         Schedule,
         Programme,
         Message,
+        Rating,
       ],
       synchronize: true,
     }),
