@@ -15,6 +15,8 @@ import { Organization } from './organizations/entities/organization.entity';
 import { ProgrammesModule } from './programmes/programmes.module';
 import { Schedule } from './programmes/entities/schedule.entity';
 import { Programme } from './programmes/entities/programme.entity';
+import { InteractionsModule } from './interactions/interactions.module';
+import { Message } from './interactions/entities/message.entity';
 
 @Module({
   imports: [
@@ -35,6 +37,7 @@ import { Programme } from './programmes/entities/programme.entity';
         Organization,
         Schedule,
         Programme,
+        Message,
       ],
       synchronize: true,
     }),
@@ -42,6 +45,7 @@ import { Programme } from './programmes/entities/programme.entity';
     VolunteersModule,
     OrganizationsModule,
     ProgrammesModule,
+    InteractionsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
