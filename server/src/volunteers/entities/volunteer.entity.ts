@@ -1,15 +1,9 @@
-import {
-  Entity,
-  PrimaryGeneratedColumn,
-  Column,
-  OneToOne,
-  JoinColumn,
-} from 'typeorm';
+import { Entity, Column, OneToOne, JoinColumn, PrimaryColumn } from 'typeorm';
 import { User } from '../../users/entities/user.entity';
 
 @Entity()
 export class Volunteer {
-  @PrimaryGeneratedColumn('uuid')
+  @PrimaryColumn({ type: 'varchar', length: 10 })
   id!: string;
 
   @Column({ nullable: true })
