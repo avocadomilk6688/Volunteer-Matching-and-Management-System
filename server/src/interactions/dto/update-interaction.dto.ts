@@ -1,4 +1,22 @@
 import { PartialType } from '@nestjs/mapped-types';
-import { CreateInteractionDto } from './create-interaction.dto';
+import {
+  CreateMessageDto,
+  CreateNotificationDto,
+  CreateQuestionAnswerDto,
+  CreateRatingDto,
+  CreateSupportTicketDto,
+} from './create-interaction.dto';
 
-export class UpdateInteractionDto extends PartialType(CreateInteractionDto) {}
+export class UpdateMessageDto extends PartialType(CreateMessageDto) {}
+
+export class UpdateNotificationDto extends PartialType(CreateNotificationDto) {}
+
+export class UpdateQuestionAnswerDto extends PartialType(
+  CreateQuestionAnswerDto,
+) {}
+
+export class UpdateRatingDto extends PartialType(CreateRatingDto) {}
+
+export class UpdateSupportTicketDto extends PartialType(
+  CreateSupportTicketDto,
+) {}
