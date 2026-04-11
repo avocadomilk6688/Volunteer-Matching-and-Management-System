@@ -20,6 +20,7 @@ import { Message } from './interactions/entities/message.entity';
 import { Rating } from './interactions/entities/rating.entity';
 import { Notification } from './interactions/entities/notification.entity';
 import { SupportTicket } from './interactions/entities/support_ticket.entity';
+import { QuestionAnswer } from './interactions/entities/question_answer.entty';
 
 @Module({
   imports: [
@@ -44,6 +45,7 @@ import { SupportTicket } from './interactions/entities/support_ticket.entity';
         Rating,
         Notification,
         SupportTicket,
+        QuestionAnswer,
       ],
       synchronize: true,
     }),
