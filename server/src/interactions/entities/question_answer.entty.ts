@@ -1,5 +1,5 @@
-import { Entity, Column, PrimaryColumn } from 'typeorm';
-// import { Admin } from '../../users/entities/admin.entity'; // Adjust path based on your folder
+import { Entity, Column, PrimaryColumn, ManyToOne } from 'typeorm';
+import { Admin } from '../../users/entities/admin.entity';
 
 @Entity()
 export class QuestionAnswer {
@@ -15,6 +15,6 @@ export class QuestionAnswer {
   @Column()
   category!: string;
 
-  //   @ManyToOne(() => Admin)
-  //   admin!: Admin;
+  @ManyToOne(() => Admin)
+  admin!: Admin;
 }

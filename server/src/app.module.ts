@@ -21,6 +21,7 @@ import { Rating } from './interactions/entities/rating.entity';
 import { Notification } from './interactions/entities/notification.entity';
 import { SupportTicket } from './interactions/entities/support_ticket.entity';
 import { QuestionAnswer } from './interactions/entities/question_answer.entty';
+import { Admin } from './users/entities/admin.entity';
 
 @Module({
   imports: [
@@ -46,6 +47,7 @@ import { QuestionAnswer } from './interactions/entities/question_answer.entty';
         Notification,
         SupportTicket,
         QuestionAnswer,
+        Admin,
       ],
       synchronize: true,
     }),
