@@ -20,7 +20,7 @@ import { Message } from './interactions/entities/message.entity';
 import { Rating } from './interactions/entities/rating.entity';
 import { Notification } from './interactions/entities/notification.entity';
 import { SupportTicket } from './interactions/entities/support_ticket.entity';
-import { QuestionAnswer } from './interactions/entities/question_answer.entty';
+import { QuestionAnswer } from './interactions/entities/question_answer.entity';
 import { Admin } from './users/entities/admin.entity';
 
 @Module({
