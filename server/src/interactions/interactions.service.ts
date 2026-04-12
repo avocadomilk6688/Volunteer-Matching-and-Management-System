@@ -1,26 +1,40 @@
 import { Injectable } from '@nestjs/common';
-import { CreateInteractionDto } from './dto/create-interaction.dto';
-import { UpdateInteractionDto } from './dto/update-interaction.dto';
+import {
+  CreateMessageDto,
+  CreateNotificationDto,
+  CreateQuestionAnswerDto,
+  CreateRatingDto,
+  CreateSupportTicketDto,
+} from './dto/create-interaction.dto';
 
 @Injectable()
 export class InteractionsService {
-  create(createInteractionDto: CreateInteractionDto) {
-    return 'This action adds a new interaction';
+  createMessage(createMessageDto: CreateMessageDto): string {
+    console.log(createMessageDto);
+    return 'Message sent';
   }
 
-  findAll() {
-    return `This action returns all interactions`;
+  createRating(createRatingDto: CreateRatingDto): string {
+    console.log(createRatingDto);
+    return 'Rating submitted';
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} interaction`;
+  createNotification(createNotificationDto: CreateNotificationDto): string {
+    console.log(createNotificationDto);
+    return 'Notification created';
   }
 
-  update(id: number, updateInteractionDto: UpdateInteractionDto) {
-    return `This action updates a #${id} interaction`;
+  createSupportTicket(createSupportTicketDto: CreateSupportTicketDto): string {
+    console.log(createSupportTicketDto);
+    return 'Ticket submitted';
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} interaction`;
+  createQA(createQuestionAnswerDto: CreateQuestionAnswerDto): string {
+    console.log(createQuestionAnswerDto);
+    return 'QA added';
+  }
+
+  findAll(): string {
+    return 'All interactions';
   }
 }
