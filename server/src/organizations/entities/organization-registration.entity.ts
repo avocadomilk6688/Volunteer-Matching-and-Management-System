@@ -8,7 +8,7 @@ export class OrganizationRegistration {
   @Column({ nullable: true })
   name!: string;
 
-  @Column({ type: 'char', length: 1 })
+  @Column({ type: 'varchar', length: 500 })
   description!: string;
 
   @Column('simple-array')
