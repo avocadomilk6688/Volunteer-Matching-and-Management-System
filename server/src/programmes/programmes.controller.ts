@@ -1,4 +1,12 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+} from '@nestjs/common';
 import { ProgrammesService } from './programmes.service';
 import { CreateProgrammeDto } from './dto/create-programme.dto';
 import { UpdateProgrammeDto } from './dto/update-programme.dto';
@@ -8,27 +16,27 @@ export class ProgrammesController {
   constructor(private readonly programmesService: ProgrammesService) {}
 
   @Post()
-  create(@Body() createProgrammeDto: CreateProgrammeDto) {
-    return this.programmesService.create(createProgrammeDto);
+  async create(@Body() createProgrammeDto: CreateProgrammeDto) {
+    return await this.programmesService.create(createProgrammeDto);
   }
 
   @Get()
-  findAll() {
-    return this.programmesService.findAll();
+  async findAll() {
+    return await this.programmesService.findAll();
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.programmesService.findOne(+id);
+  async findOne(@Param('id') id: string) {
+    return await this.programmesService.findOne(id);
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateProgrammeDto: UpdateProgrammeDto) {
-    return this.programmesService.update(+id, updateProgrammeDto);
+  async update(@Param('id') id: string, @Body() updateDto: UpdateProgrammeDto) {
+    return await this.programmesService.update(id, updateDto);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.programmesService.remove(+id);
+  async remove(@Param('id') id: string) {
+    return await this.programmesService.remove(id);
   }
 }
