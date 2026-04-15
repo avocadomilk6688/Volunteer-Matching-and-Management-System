@@ -1,15 +1,36 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+} from '@nestjs/common';
 import { VolunteersService } from './volunteers.service';
-import { CreateVolunteerDto } from './dto/create-volunteer.dto';
-import { UpdateVolunteerDto } from './dto/update-volunteer.dto';
 
 @Controller('volunteers')
 export class VolunteersController {
   constructor(private readonly volunteersService: VolunteersService) {}
 
-  @Post()
-  create(@Body() createVolunteerDto: CreateVolunteerDto) {
-    return this.volunteersService.create(createVolunteerDto);
+  @Post('skills')
+  createSkill(@Body('name') name: string) {
+    return this.volunteersService.createSkill(name);
+  }
+
+  @Get('skills')
+  findAllSkills() {
+    return this.volunteersService.findAllSkills();
+  }
+
+  @Post('interests')
+  createInterest(@Body('name') name: string) {
+    return this.volunteersService.createInterest(name);
+  }
+
+  @Get('interests')
+  findAllInterests() {
+    return this.volunteersService.findAllInterests();
   }
 
   @Get()
@@ -19,16 +40,16 @@ export class VolunteersController {
 
   @Get(':id')
   findOne(@Param('id') id: string) {
-    return this.volunteersService.findOne(+id);
+    return this.volunteersService.findOne(id);
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateVolunteerDto: UpdateVolunteerDto) {
-    return this.volunteersService.update(+id, updateVolunteerDto);
+  update(@Param('id') id: string, @Body() updateDto: any) {
+    return this.volunteersService.update(id, updateDto);
   }
 
   @Delete(':id')
   remove(@Param('id') id: string) {
-    return this.volunteersService.remove(+id);
+    return this.volunteersService.remove(id);
   }
 }

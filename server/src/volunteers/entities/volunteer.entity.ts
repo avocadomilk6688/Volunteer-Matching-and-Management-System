@@ -5,9 +5,12 @@ import {
   JoinColumn,
   PrimaryColumn,
   ManyToMany,
+  JoinTable,
 } from 'typeorm';
 import { User } from '../../users/entities/user.entity';
 import { Programme } from '../../programmes/entities/programme.entity';
+import { Skill } from './skill.entity';
+import { Interest } from './interest.entity';
 
 @Entity()
 export class Volunteer {
@@ -26,11 +29,13 @@ export class Volunteer {
   @Column()
   location!: string;
 
-  @Column('simple-array', { nullable: true })
-  skills!: string[];
+  @ManyToMany(() => Skill, (skill) => skill.volunteers)
+  @JoinTable()
+  skills!: Skill[];
 
-  @Column('simple-array', { nullable: true })
-  interests!: string[];
+  @ManyToMany(() => Interest, (interest) => interest.volunteers)
+  @JoinTable()
+  interests!: Interest[];
 
   @Column()
   participant_score!: number;
