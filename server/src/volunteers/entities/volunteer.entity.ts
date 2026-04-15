@@ -39,7 +39,7 @@ export class Volunteer {
   rating!: number;
 
   @OneToOne(() => User)
-  @JoinColumn()
+  @JoinColumn({ name: 'id' })
   user!: User;
 
   @ManyToMany(() => Programme, (programme) => programme.participants)
