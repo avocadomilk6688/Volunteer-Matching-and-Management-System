@@ -61,4 +61,30 @@ export class VolunteersService {
     const result = await this.volRepo.delete(id);
     return { deleted: (result.affected ?? 0) > 0 };
   }
+
+  async updateSkill(id: string, newName: string) {
+    await this.skillRepo.update(id, { skill_name: newName });
+    return { message: `Skill ${id} updated to ${newName}` };
+  }
+
+  async updateInterest(id: string, newName: string) {
+    await this.interestRepo.update(id, { interest_name: newName });
+    return { message: `Interest ${id} updated to ${newName}` };
+  }
+
+  async removeSkill(id: string) {
+    const result = await this.skillRepo.delete(id);
+    return {
+      deleted: (result.affected ?? 0) > 0,
+      message: `Skill ${id} removed`,
+    };
+  }
+
+  async removeInterest(id: string) {
+    const result = await this.interestRepo.delete(id);
+    return {
+      deleted: (result.affected ?? 0) > 0,
+      message: `Interest ${id} removed`,
+    };
+  }
 }

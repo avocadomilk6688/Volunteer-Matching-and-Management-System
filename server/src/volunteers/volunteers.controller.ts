@@ -23,6 +23,16 @@ export class VolunteersController {
     return this.volunteersService.findAllSkills();
   }
 
+  @Patch('skills/:id')
+  updateSkill(@Param('id') id: string, @Body('name') name: string) {
+    return this.volunteersService.updateSkill(id, name);
+  }
+
+  @Delete('skills/:id')
+  removeSkill(@Param('id') id: string) {
+    return this.volunteersService.removeSkill(id);
+  }
+
   @Post('interests')
   createInterest(@Body('name') name: string) {
     return this.volunteersService.createInterest(name);
@@ -31,6 +41,16 @@ export class VolunteersController {
   @Get('interests')
   findAllInterests() {
     return this.volunteersService.findAllInterests();
+  }
+
+  @Patch('interests/:id')
+  updateInterest(@Param('id') id: string, @Body('name') name: string) {
+    return this.volunteersService.updateInterest(id, name);
+  }
+
+  @Delete('interests/:id')
+  removeInterest(@Param('id') id: string) {
+    return this.volunteersService.removeInterest(id);
   }
 
   @Get()

@@ -9,6 +9,6 @@ export class Interest {
   @Column({ unique: true })
   interest_name!: string;
 
-  @ManyToMany(() => Volunteer, (volunteer) => volunteer.skills)
+  @ManyToMany(() => Volunteer, (volunteer) => volunteer.interests)
   volunteers!: Volunteer[];
 }
