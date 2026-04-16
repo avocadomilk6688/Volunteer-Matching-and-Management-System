@@ -5,7 +5,7 @@ export class User {
   @PrimaryColumn({ type: 'varchar', length: 10 })
   id!: string;
 
-  @Column()
+  @Column({ nullable: true })
   username!: string;
 
   @Column({ unique: true })

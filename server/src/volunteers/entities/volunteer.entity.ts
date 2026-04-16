@@ -20,13 +20,13 @@ export class Volunteer {
   @Column({ nullable: true })
   profilePictureUrl!: string;
 
-  @Column({ type: 'char', length: 1 })
+  @Column({ type: 'char', length: 1, nullable: true })
   gender!: string;
 
-  @Column()
+  @Column({ nullable: true })
   contactNumber!: string;
 
-  @Column()
+  @Column({ nullable: true })
   location!: string;
 
   @ManyToMany(() => Skill, (skill) => skill.volunteers)
@@ -37,10 +37,16 @@ export class Volunteer {
   @JoinTable()
   interests!: Interest[];
 
-  @Column()
+  @Column({ nullable: true })
   participant_score!: number;
 
-  @Column({ type: 'double', precision: 3, scale: 2, default: 0 })
+  @Column({
+    type: 'double',
+    precision: 3,
+    scale: 2,
+    default: 0,
+    nullable: true,
+  })
   rating!: number;
 
   @OneToOne(() => User)
