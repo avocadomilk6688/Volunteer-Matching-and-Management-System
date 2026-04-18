@@ -1,4 +1,6 @@
-import { Entity, Column, PrimaryColumn } from 'typeorm';
+import { Entity, Column, PrimaryColumn, OneToOne } from 'typeorm';
+import { Volunteer } from '../../volunteers/entities/volunteer.entity';
+import { Admin } from './admin.entity';
 
 @Entity()
 export class User {
@@ -20,4 +22,10 @@ export class User {
     default: 'volunteer',
   })
   role!: string;
+
+  @OneToOne(() => Volunteer, (volunteer) => volunteer.user)
+  volunteer?: Volunteer;
+
+  @OneToOne(() => Admin, (admin) => admin.user)
+  admin?: Admin;
 }

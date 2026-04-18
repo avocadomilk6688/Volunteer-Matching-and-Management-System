@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, FindOptionsWhere } from 'typeorm';
+import { Repository } from 'typeorm';
 import { User } from './entities/user.entity';
 import { Volunteer } from '../volunteers/entities/volunteer.entity';
 import { Admin } from './entities/admin.entity';
@@ -33,7 +33,6 @@ export class UsersService {
     const savedUser = await this.userRepo.save(newUser);
 
     const newVolunteer = this.volunteerRepo.create({
-      id: sharedId,
       user: savedUser,
     });
 
@@ -41,8 +40,7 @@ export class UsersService {
 
     return {
       id: sharedId,
-      message:
-        'Volunteer account and profile created successfully with shared ID',
+      message: 'Volunteer account and profile created successfully',
     };
   }
 
@@ -54,13 +52,23 @@ export class UsersService {
 
   async findOne(id: string) {
     return await this.userRepo.findOne({
-      where: { id: id as unknown as string } as FindOptionsWhere<User>,
+      where: { id },
       relations: ['volunteer', 'admin'],
     });
   }
 
+  async update(id: string, updateDto: any) {
+    await this.userRepo.update(id, updateDto);
+    return this.findOne(id);
+  }
+
   async remove(id: string) {
+    await this.volunteerRepo.delete(id);
+
+    await this.adminRepo.delete(id);
+
     const result = await this.userRepo.delete(id);
+
     return { deleted: (result.affected ?? 0) > 0 };
   }
 }
