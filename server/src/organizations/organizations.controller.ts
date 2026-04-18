@@ -25,6 +25,21 @@ export class OrganizationsController {
     return await this.organizationsService.createRegistration(createRegDto);
   }
 
+  @Get('registration')
+  async findAllRegistrations() {
+    return await this.organizationsService.findAllRegistrations();
+  }
+
+  @Patch('registration/:id')
+  async updateRegistration(@Param('id') id: string, @Body() updateDto: any) {
+    return await this.organizationsService.updateRegistration(id, updateDto);
+  }
+
+  @Delete('registration/:id')
+  async removeRegistration(@Param('id') id: string) {
+    return await this.organizationsService.removeRegistration(id);
+  }
+
   @Post()
   async create(@Body() createOrganizationDto: CreateOrganizationDto) {
     return await this.organizationsService.create(createOrganizationDto);

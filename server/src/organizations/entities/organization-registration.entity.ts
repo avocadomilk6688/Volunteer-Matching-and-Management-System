@@ -5,7 +5,7 @@ export class OrganizationRegistration {
   @PrimaryColumn({ type: 'varchar', length: 10 })
   id!: string;
 
-  @Column({ nullable: true })
+  @Column()
   name!: string;
 
   @Column({ type: 'varchar', length: 500 })
