@@ -28,7 +28,9 @@ export class Programme {
   @ManyToOne(() => Organization)
   organization!: Organization;
 
-  @OneToOne(() => Schedule, (schedule) => schedule.programme)
+  @OneToOne(() => Schedule, (schedule) => schedule.programme, {
+    cascade: true,
+  })
   @JoinColumn()
   schedule!: Schedule;
 

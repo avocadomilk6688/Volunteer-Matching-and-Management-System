@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, FindOptionsWhere } from 'typeorm';
+import { Repository } from 'typeorm';
 import { Programme } from './entities/programme.entity';
 import { Schedule } from './entities/schedule.entity';
 import { Organization } from '../organizations/entities/organization.entity';
@@ -21,20 +21,18 @@ export class ProgrammesService {
   ) {}
 
   async create(dto: CreateProgrammeDto) {
-    const schId = await generateCustomId(this.scheduleRepo, 'SCH');
-    const newSchedule = this.scheduleRepo.create({
-      id: schId,
-      start_time: new Date(dto.start_time),
-      end_time: new Date(dto.end_time),
-    });
-    const savedSchedule = await this.scheduleRepo.save(newSchedule);
-
     const pId = await generateCustomId(this.programmeRepo, 'P');
+    const schId = await generateCustomId(this.scheduleRepo, 'SCH');
+
     const newProgramme = this.programmeRepo.create({
       id: pId,
       title: dto.title,
       description: dto.description,
-      schedule: savedSchedule,
+      schedule: {
+        id: schId,
+        start_time: new Date(dto.start_time),
+        end_time: new Date(dto.end_time),
+      },
       organization: { id: dto.organizationId } as Organization,
       related_skills: dto.skillIds?.map((id) => ({ id }) as Skill),
       related_interests: dto.interestIds?.map((id) => ({ id }) as Interest),
@@ -56,7 +54,7 @@ export class ProgrammesService {
 
   async findOne(id: string) {
     return await this.programmeRepo.findOne({
-      where: { id: id as unknown as string } as FindOptionsWhere<Programme>,
+      where: { id },
       relations: [
         'schedule',
         'organization',
@@ -67,9 +65,31 @@ export class ProgrammesService {
   }
 
   async update(id: string, updateDto: UpdateProgrammeDto) {
-    const updateData = updateDto as unknown as Partial<Programme>;
-    await this.programmeRepo.update(id, updateData);
-    return this.findOne(id);
+    const programme = await this.findOne(id);
+    if (!programme) return null;
+
+    const updatedProgramme = this.programmeRepo.merge(programme, {
+      title: updateDto.title,
+      description: updateDto.description,
+      schedule:
+        updateDto.start_time || updateDto.end_time
+          ? {
+              ...programme.schedule,
+              start_time: updateDto.start_time
+                ? new Date(updateDto.start_time)
+                : programme.schedule.start_time,
+              end_time: updateDto.end_time
+                ? new Date(updateDto.end_time)
+                : programme.schedule.end_time,
+            }
+          : programme.schedule,
+      related_skills: updateDto.skillIds?.map((id) => ({ id }) as Skill),
+      related_interests: updateDto.interestIds?.map(
+        (id) => ({ id }) as Interest,
+      ),
+    });
+
+    return await this.programmeRepo.save(updatedProgramme);
   }
 
   async remove(id: string) {
