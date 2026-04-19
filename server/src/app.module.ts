@@ -22,6 +22,7 @@ import { Notification } from './interactions/entities/notification.entity';
 import { SupportTicket } from './interactions/entities/support_ticket.entity';
 import { QuestionAnswer } from './interactions/entities/question_answer.entity';
 import { Admin } from './users/entities/admin.entity';
+import { ApplicationsModule } from './applications/applications.module';
 
 @Module({
   imports: [
@@ -56,6 +57,7 @@ import { Admin } from './users/entities/admin.entity';
     OrganizationsModule,
     ProgrammesModule,
     InteractionsModule,
+    ApplicationsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

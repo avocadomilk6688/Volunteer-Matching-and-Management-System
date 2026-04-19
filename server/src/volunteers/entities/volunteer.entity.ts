@@ -6,11 +6,12 @@ import {
   PrimaryColumn,
   ManyToMany,
   JoinTable,
+  OneToMany,
 } from 'typeorm';
 import { User } from '../../users/entities/user.entity';
-import { Programme } from '../../programmes/entities/programme.entity';
 import { Skill } from './skill.entity';
 import { Interest } from './interest.entity';
+import { Application } from '../../applications/entities/application.entity';
 
 @Entity()
 export class Volunteer {
@@ -53,6 +54,6 @@ export class Volunteer {
   @JoinColumn({ name: 'id' })
   user!: User;
 
-  @ManyToMany(() => Programme, (programme) => programme.participants)
-  programmes!: Programme[];
+  @OneToMany(() => Application, (application) => application.volunteer)
+  applications!: Application[];
 }

@@ -7,12 +7,13 @@ import {
   JoinColumn,
   ManyToMany,
   JoinTable,
+  OneToMany,
 } from 'typeorm';
 import { Organization } from '../../organizations/entities/organization.entity';
 import { Schedule } from './schedule.entity';
 import { Skill } from '../../volunteers/entities/skill.entity';
-import { Interest } from '../../volunteers/entities/interest.entity'; // Assuming you have/will create this
-import { Volunteer } from '../../volunteers/entities/volunteer.entity';
+import { Interest } from '../../volunteers/entities/interest.entity';
+import { Application } from '../../applications/entities/application.entity';
 
 @Entity()
 export class Programme {
@@ -42,7 +43,6 @@ export class Programme {
   @JoinTable({ name: 'programme_interests' })
   related_interests!: Interest[];
 
-  @ManyToMany(() => Volunteer, (volunteer) => volunteer.programmes)
-  @JoinTable({ name: 'programme_participants' })
-  participants!: Volunteer[];
+  @OneToMany(() => Application, (application) => application.programme)
+  applications!: Application[];
 }
