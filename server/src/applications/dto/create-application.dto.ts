@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsString, IsOptional } from 'class-validator';
+import { IsNotEmpty, IsString } from 'class-validator';
 
 export class CreateApplicationDto {
   @IsString()
@@ -8,8 +8,4 @@ export class CreateApplicationDto {
   @IsString()
   @IsNotEmpty()
   programmeId!: string;
-
-  @IsString()
-  @IsOptional()
-  message!: string;
 }

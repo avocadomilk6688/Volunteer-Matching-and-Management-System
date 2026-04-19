@@ -15,18 +15,13 @@ export class ApplicationsService {
     private readonly appRepo: Repository<Application>,
   ) {}
 
-  async applyToProgramme(dto: {
-    volunteerId: string;
-    programmeId: string;
-    message: string;
-  }) {
+  async applyToProgramme(dto: { volunteerId: string; programmeId: string }) {
     const id = await generateCustomId(this.appRepo, 'APP');
 
     const newApplication = this.appRepo.create({
       id,
       volunteer: { id: dto.volunteerId } as Volunteer,
       programme: { id: dto.programmeId } as Programme,
-      volunteer_message: dto.message,
       applied_at: new Date(),
       status: 'pending',
     });
@@ -38,7 +33,6 @@ export class ApplicationsService {
     return await this.applyToProgramme({
       volunteerId: createApplicationDto.volunteerId,
       programmeId: createApplicationDto.programmeId,
-      message: createApplicationDto.message,
     });
   }
 

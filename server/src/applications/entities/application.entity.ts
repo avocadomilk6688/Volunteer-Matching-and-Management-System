@@ -13,8 +13,6 @@ export class Application {
   @Column({ type: 'datetime' })
   applied_at!: Date;
 
-  @Column({ type: 'text', nullable: true })
-  volunteer_message!: string;
   @ManyToOne(() => Volunteer, (volunteer) => volunteer.applications)
   volunteer!: Volunteer;
 
