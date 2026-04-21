@@ -20,7 +20,7 @@ export function SignUpPage() {
                         </div>
                         <div className="comfirm-password-input">
                             <label htmlFor="comfirm-password">Comfirm password:</label><br />
-                            <input type="comfirm-password" id="password" />
+                            <input type="password" id="password" />
                         </div>
                         <div className="role-selection">
                             <p>Role:</p>

@@ -1,8 +1,16 @@
+import { useNavigate } from 'react-router';
 import { Link } from 'react-router';
 import { Header } from './Header';
 import './login_page.css';
 
 export function LoginPage() {
+    const navigate = useNavigate();
+
+    const handleLoginShortcut = (e: React.FormEvent) => {
+        e.preventDefault();
+        navigate('/volunteer-home');
+    };
+
     return (
         <div className="login-page-wrapper">
             <Header />
@@ -27,7 +35,7 @@ export function LoginPage() {
                             <input type="radio" id="admin" />
                             <label htmlFor="admin">Admin</label>
                         </div>
-                        <button className="login-button">Login</button>
+                        <button className="login-button" onClick={handleLoginShortcut}>Login</button>
                     </form>
                     <a className="forgot-password" href="#">Forgot password</a>
                     <p className="sign-up">Don't have an account? <Link to="/sign-up">Sign Up</Link></p>
