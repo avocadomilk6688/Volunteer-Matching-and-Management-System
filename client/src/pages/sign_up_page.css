@@ -1,28 +1,28 @@
-.login-page-wrapper {
+.sign-up-page-wrapper {
     display: flex;
     flex-direction: column;
     min-height: 100vh;
 }
 
 .page-body {
-    flex: 1;
+    flex: 1; 
     display: flex;
     align-items: center;
     justify-content: center;
 }
 
-.login-container {
+.sign-up-container {
     display: flex;
     flex-direction: column;
     align-items: center;
     padding: 24px 52px;
-    height: 500px;
+    height: 540px;
     width: 460px;
     border: 1px solid black;
     font-family: Inter;
 }
 
-.login-container h2 {
+.sign-up-container h2 {
     margin-bottom: 38px;
     text-align: center;
 }
@@ -33,7 +33,7 @@ form {
     align-items: center;
 }
 
-.email-input input, .password-input input {
+.email-input input, .password-input input, .comfirm-password-input input {
     margin-top: 12px;
     margin-bottom: 30px;
     border: 1px solid black;
@@ -50,7 +50,7 @@ form {
     width: 100%;
 }
 
-.login-button {
+.sign-up-button {
     margin-bottom: 24px;
     background-color: #FF8C42;
     height: 50px;
