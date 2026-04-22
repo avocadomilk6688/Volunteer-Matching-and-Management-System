@@ -5,6 +5,7 @@ import { GoTriangleLeft, GoTriangleRight, GoChevronDown } from 'react-icons/go';
 import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
 import { useState, forwardRef } from 'react';
+import { useNavigate } from 'react-router';
 
 interface DateBoxInputProps {
     value?: string;
@@ -24,6 +25,7 @@ const DateBox = forwardRef<HTMLDivElement, DateBoxInputProps>(
 export function VolunteerHomePage() {
     const [startDate, setStartDate] = useState<Date | null>(null);
     const [endDate, setEndDate] = useState<Date | null>(null);
+    const navigate = useNavigate();
 
     return (
         <div className="volunteer-home-page-wrapper">
@@ -76,7 +78,7 @@ export function VolunteerHomePage() {
                     </select>
                 </div>
                 <div className="programmes-container">
-                    <div className="programme">
+                    <div className="programme" onClick={() => navigate(`/programme-details`)}>
                         <div className="programme-image"></div>
                         <div className="programme-info">
                             <div className="programme-name">Green Earth Clean-Up Drive</div>
@@ -90,7 +92,7 @@ export function VolunteerHomePage() {
                             </div>
                         </div>
                     </div>
-                    <div className="programme">
+                    <div className="programme" onClick={() => navigate(`/programme-details`)}>
                         <div className="programme-image"></div>
                         <div className="programme-info">
                             <div className="programme-name">Bright Minds Tutoring Sessions</div>
@@ -104,7 +106,7 @@ export function VolunteerHomePage() {
                             </div>
                         </div>
                     </div>
-                    <div className="programme">
+                    <div className="programme" onClick={() => navigate(`/programme-details`)}>
                         <div className="programme-image"></div>
                         <div className="programme-info">
                             <div className="programme-name">Healthy Living Awareness Campaign</div>
@@ -118,7 +120,7 @@ export function VolunteerHomePage() {
                             </div>
                         </div>
                     </div>
-                    <div className="programme">
+                    <div className="programme" onClick={() => navigate(`/programme-details`)}>
                         <div className="programme-image"></div>
                         <div className="programme-info">
                             <div className="programme-name">Paws & Care Animal Shelter Support</div>
@@ -132,7 +134,7 @@ export function VolunteerHomePage() {
                             </div>
                         </div>
                     </div>
-                    <div className="programme">
+                    <div className="programme" onClick={() => navigate(`/programme-details`)}>
                         <div className="programme-image"></div>
                         <div className="programme-info">
                             <div className="programme-name">Golden Years Creative Arts Workshop</div>
@@ -147,7 +149,7 @@ export function VolunteerHomePage() {
                         </div>
 
                     </div>
-                    <div className="programme">
+                    <div className="programme" onClick={() => navigate(`/programme-details`)}>
                         <div className="programme-image"></div>
                         <div className="programme-info">
                             <div className="programme-name">Future Skills Digital Training Bootcamp</div>
