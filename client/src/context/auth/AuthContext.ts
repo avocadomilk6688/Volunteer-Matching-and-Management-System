@@ -1,12 +1,21 @@
-import { createContext } from 'react';
+import { createContext } from "react";
 
-
-// Define the structural contract for the authentication state and its associated methods.
-interface AuthContextType {
-    isLoggedIn: boolean;
-    userName: string | null;
-    login: (token: string, name?: string | null) => void;
-    logout: () => void;
+// Defines the shape of the User object to store credentials and role information
+interface User {
+  id: string;
+  email: string;
+  role: string;
+  name?: string | null;
 }
 
-export const AuthContext = createContext<AuthContextType | undefined>(undefined);
+// Defines the structural contract for the authentication state and its associated methods
+interface AuthContextType {
+  isAuthenticated: boolean;
+  user: User | null;
+  login: (token: string, userData: User) => void;
+  logout: () => void;
+}
+
+export const AuthContext = createContext<AuthContextType | undefined>(
+  undefined,
+);

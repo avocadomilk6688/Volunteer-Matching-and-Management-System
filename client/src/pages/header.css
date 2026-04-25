@@ -6,6 +6,10 @@
     background-color: #FF8C42;
 }
 
+.header-container .header-logo {
+    text-decoration: none;
+}
+
 .header-container h1 {
     color: white;
     font-size: 24px;
