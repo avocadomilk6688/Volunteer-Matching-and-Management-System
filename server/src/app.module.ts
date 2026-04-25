@@ -24,6 +24,7 @@ import { QuestionAnswer } from './interactions/entities/question_answer.entity';
 import { Admin } from './users/entities/admin.entity';
 import { ApplicationsModule } from './applications/applications.module';
 import { Application } from './applications/entities/application.entity';
+import { AuthModule } from './auth/auth.module';
 
 @Module({
   imports: [
@@ -60,6 +61,7 @@ import { Application } from './applications/entities/application.entity';
     ProgrammesModule,
     InteractionsModule,
     ApplicationsModule,
+    AuthModule,
   ],
   controllers: [AppController],
   providers: [AppService],

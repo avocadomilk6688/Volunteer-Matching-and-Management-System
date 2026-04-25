@@ -25,8 +25,25 @@ export function SignUpPage() {
         try {
             console.log("Registering user:", { email, password, role });
 
-            const mockToken = "mock_jwt_token_123";
-            login(mockToken);
+            const response = await fetch('http://localhost:3000/auth/register', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    email,
+                    password,
+                    role,
+                }),
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.message || "Registration failed");
+            }
+
+            login(data.access_token || 'session_active', data.email);
 
             if (role === "volunteer") {
                 navigate('/volunteer-home');
@@ -35,7 +52,8 @@ export function SignUpPage() {
             }
         } catch (error) {
             console.error("Registration failed:", error);
-            alert("An error occurred during registration. Please try again.");
+            const message = error instanceof Error ? error.message : "An error occurred during registration.";
+            alert(message);
         }
     }
 
@@ -48,40 +66,60 @@ export function SignUpPage() {
                     <form onSubmit={handleSignUp}>
                         <div className="email-input">
                             <label htmlFor="email">Email address:</label><br />
-                            <input type="email" id="email" value={email}
+                            <input
+                                type="email"
+                                id="email"
+                                value={email}
                                 onChange={(e) => setEmail(e.target.value)}
-                                required />
+                                required
+                            />
                         </div>
                         <div className="password-input">
                             <label htmlFor="password">Password:</label><br />
-                            <input type="password" id="password" value={password}
+                            <input
+                                type="password"
+                                id="password"
+                                value={password}
                                 onChange={(e) => setPassword(e.target.value)}
-                                required />
+                                required
+                            />
                         </div>
                         <div className="confirm-password-input">
                             <label htmlFor="confirm-password">Confirm password:</label><br />
-                            <input type="password" id="password" value={confirmPassword}
+                            <input
+                                type="password"
+                                id="confirm-password"
+                                value={confirmPassword}
                                 onChange={(e) => setConfirmPassword(e.target.value)}
-                                required />
+                                required
+                            />
                         </div>
                         <div className="role-selection">
                             <p>Role:</p>
-                            <input type="radio" id="volunteer" name="role"
+                            <input
+                                type="radio"
+                                id="volunteer"
+                                name="role"
                                 value="volunteer"
                                 checked={role === "volunteer"}
-                                onChange={() => setRole("volunteer")} />
+                                onChange={() => setRole("volunteer")}
+                            />
                             <label htmlFor="volunteer">Volunteer</label>
-                            <input type="radio" id="organization" name="role"
+                            <input
+                                type="radio"
+                                id="organization"
+                                name="role"
                                 value="organization"
                                 checked={role === "organization"}
-                                onChange={() => setRole("organization")} />
+                                onChange={() => setRole("organization")}
+                            />
                             <label htmlFor="organization">Organization</label>
                         </div>
-                        <button className="sign-up-button">Sign Up</button>
+                        <button type="submit" className="sign-up-button">Sign Up</button>
                     </form>
                     <p className="sign-up">Already have an account? <Link to="/login">Login</Link></p>
                 </div>
             </div>
         </div>
-    )
+    );
 }
