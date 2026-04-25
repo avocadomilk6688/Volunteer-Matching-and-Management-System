@@ -43,9 +43,13 @@ export function LoginPage() {
             } else {
                 alert('Organization dashboard coming soon!');
             }
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error("Login error:", error);
-            alert(error.message || "An error occurred during login.");
+            if (error instanceof Error) {
+                alert(error.message);
+            } else {
+                alert("An error occurred during login.");
+            }
         }
     };
 

@@ -1,38 +1,41 @@
 import { useState } from "react";
 import { AuthContext } from "./AuthContext";
 
+interface User {
+    id: string;
+    email: string;
+    role: string;
+    name?: string | null;
+}
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => {
+    const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
         // Returns true if a token exists to restore the previous session
         return !!localStorage.getItem('token');
     });
 
-    const [userName, setUserName] = useState<string | null>(() => {
+    const [user, setUser] = useState<User | null>(() => {
         // Retrieves the stored username from localStorage if available
-        return localStorage.getItem('userName');
+        const savedUser = localStorage.getItem('user');
+        return savedUser ? JSON.parse(savedUser) : null;
     });
 
-    const login = (token: string, name?: string | null) => {
+    const login = (token: string, userData: User) => {
         localStorage.setItem('token', token);
-        if (name) {
-            localStorage.setItem('userName', name);
-            setUserName(name);
-        } else {
-            localStorage.removeItem('userName');
-            setUserName(null);
-        }
-        setIsLoggedIn(true);
+        localStorage.setItem('user', JSON.stringify(userData));
+        setUser(userData);
+        setIsAuthenticated(true);
     };
 
     const logout = () => {
         localStorage.clear();
-        setIsLoggedIn(false);
-        setUserName(null);
+        setIsAuthenticated(false);
+        setUser(null);
     };
 
     return (
         // Supplies the authentication context value to all nested consumer components
-        <AuthContext.Provider value={{ isLoggedIn, userName, login, logout }}>
+        <AuthContext.Provider value={{ isAuthenticated, user, login, logout }}>
             {children}
         </AuthContext.Provider>
     );

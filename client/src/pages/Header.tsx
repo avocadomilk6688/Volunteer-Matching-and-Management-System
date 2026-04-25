@@ -2,9 +2,11 @@ import './header.css';
 import { useAuth } from '../context/auth/useAuth';
 import { Link } from 'react-router';
 import { MdAccountCircle, MdNotifications } from 'react-icons/md';
+import { useState } from 'react';
 
 export function Header() {
     const { user, isAuthenticated } = useAuth();
+    const [showProfileOptions, isShowProfileOptions] = useState(false);
 
     return (
         <div className="header-container">
@@ -23,14 +25,23 @@ export function Header() {
                                 Hi, {user?.name ? user.name : 'Volunteer'}!
                             </span>
 
-                            <Link to="/manage-profile" className="profile-icon">
-                                <MdAccountCircle size={35} color="white" />
-                            </Link>
+                            <button className="profile-icon" onClick={() => isShowProfileOptions(!showProfileOptions)}>
+                                <MdAccountCircle color="white" />
+                            </button>
                             <button className="notif-icon">
-                                <MdNotifications size={35} color="white" />
+                                <MdNotifications color="white" />
                             </button>
                         </div>
                     </div>
+                </div>
+            )}
+            {showProfileOptions && (
+                <div className="profile-options">
+                    <div className="view-volunteering-history">View volunteering <br /> history</div>
+                    <hr />
+                    <div className="manage-profile">Manage profile</div>
+                    <hr />
+                    <div className="log-out">Log out</div>
                 </div>
             )}
         </div>
