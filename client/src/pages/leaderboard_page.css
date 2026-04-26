@@ -1,0 +1,112 @@
+.leaderboard-wrapper {
+    background-color: white;
+    height: 100vh;
+    overflow: hidden;
+    font-family: 'Inter';
+}
+
+.leaderboard-content {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 20px; 
+}
+
+.leaderboard-header {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+    margin-bottom: 20px; 
+}
+
+.leaderboard-header h1 {
+    font-size: 28px; 
+    font-weight: bold;
+    margin: 0;
+}
+
+.month-selector {
+    position: absolute;
+    right: 0;
+    padding: 5px 10px; 
+    border: 1px solid black;
+    background: white;
+    font-size: 16px; 
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.podium-container {
+    display: flex;
+    justify-content: center;
+    align-items: flex-end;
+    margin-bottom: 30px;
+}
+
+.podium-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 90px;
+}
+
+.avatar-circle {
+    width: 40px;
+    height: 40px;
+    background-color: #D9D9D9;
+    border-radius: 50%;
+    margin-bottom: 5px;
+}
+
+.podium-info {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-bottom: 5px;
+}
+
+.podium-info .name { font-size: 15px; font-weight: 500; }
+.podium-info .score { font-size: 13px; color: #555; }
+
+.rank-box {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 40px; 
+    font-weight: bold;
+    color: white;
+}
+
+.first .rank-box { height: 110px; background-color: #FFF2A0; }
+.first .avatar-circle { width: 55px; height: 55px; }
+
+.second .rank-box { height: 80px; background-color: #C2E7FF; }
+
+.third .rank-box { height: 60px; background-color: #F3E5F5; }
+
+.leaderboard-list {
+    max-width: 300px;
+    margin: 0 auto;
+}
+
+.list-row {
+    display: flex;
+    align-items: center;
+    padding: 8px 0; 
+    font-size: 16px; 
+    border-bottom: 1px solid #f0f0f0; 
+}
+
+.list-rank { width: 40px; }
+.list-avatar {
+    width: 30px;
+    height: 30px;
+    background-color: #D9D9D9;
+    border-radius: 50%;
+    margin: 0 20px;
+}
+.list-name { flex-grow: 1; }
+.list-score { width: 50px; text-align: right; }

@@ -4,6 +4,7 @@ import { SignUpPage } from "./pages/SignUpPage"
 import { VolunteerHomePage } from './pages/VolunteerHomePage';
 import { ProgrammeDetailsPage } from './pages/ProgrammeDetailsPage';
 import { AuthProvider } from './context/auth/AuthProvider';
+import { LeaderboardPage } from './pages/LeaderboardPage';
 
 function App() {
   return (
@@ -14,6 +15,7 @@ function App() {
         <Route path="sign-up" element={<SignUpPage />}></Route>
         <Route path="volunteer-home" element={<VolunteerHomePage />}></Route>
         <Route path="programme-details" element={<ProgrammeDetailsPage />}></Route>
+        <Route path="leaderboard" element={<LeaderboardPage />}></Route>
       </Routes>
     </AuthProvider>
   )
