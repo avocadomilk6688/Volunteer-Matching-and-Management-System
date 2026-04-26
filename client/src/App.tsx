@@ -5,6 +5,7 @@ import { VolunteerHomePage } from './pages/VolunteerHomePage';
 import { ProgrammeDetailsPage } from './pages/ProgrammeDetailsPage';
 import { AuthProvider } from './context/auth/AuthProvider';
 import { LeaderboardPage } from './pages/LeaderboardPage';
+import { QAPage } from './pages/QAPage';
 
 function App() {
   return (
@@ -16,6 +17,7 @@ function App() {
         <Route path="volunteer-home" element={<VolunteerHomePage />}></Route>
         <Route path="programme-details" element={<ProgrammeDetailsPage />}></Route>
         <Route path="leaderboard" element={<LeaderboardPage />}></Route>
+        <Route path="qa" element={<QAPage />}></Route>
       </Routes>
     </AuthProvider>
   )
