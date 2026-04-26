@@ -7,6 +7,7 @@ import { AuthProvider } from './context/auth/AuthProvider';
 import { LeaderboardPage } from './pages/LeaderboardPage';
 import { QAPage } from './pages/QAPage';
 import { VolunteeringHistoryPage } from './pages/VolunteeringHistoryPage';
+import { ManageProfilePage } from './pages/ManageProfilePage';
 
 function App() {
   return (
@@ -20,6 +21,7 @@ function App() {
         <Route path="leaderboard" element={<LeaderboardPage />}></Route>
         <Route path="qa" element={<QAPage />}></Route>
         <Route path="volunteering-history" element={<VolunteeringHistoryPage />}></Route>
+        <Route path="manage-profile" element={<ManageProfilePage />}></Route>
       </Routes>
     </AuthProvider>
   )
