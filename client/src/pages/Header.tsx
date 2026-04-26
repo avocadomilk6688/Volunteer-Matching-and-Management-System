@@ -44,11 +44,29 @@ export function Header() {
             )}
             {showProfileOptions && (
                 <div className="profile-options">
-                    <div className="view-volunteering-history">View volunteering <br /> history</div>
+                    <Link
+                        to="/volunteering-history"
+                        className="view-volunteering-history"
+                        onClick={() => isShowProfileOptions(false)}
+                    >
+                        View volunteering <br /> history
+                    </Link>
+
                     <hr />
-                    <div className="manage-profile">Manage profile</div>
+
+                    <Link
+                        to="/manage-profile"
+                        className="manage-profile"
+                        onClick={() => isShowProfileOptions(false)}
+                    >
+                        Manage profile
+                    </Link>
+
                     <hr />
-                    <div className="log-out" onClick={handleLogout}>Log out</div>
+
+                    <div className="log-out" onClick={handleLogout}>
+                        Log out
+                    </div>
                 </div>
             )}
         </div>

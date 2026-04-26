@@ -1,0 +1,75 @@
+.history-wrapper {
+    background-color: white;
+    min-height: 100vh;
+    font-family: 'Inter', sans-serif;
+}
+
+.history-content {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px 40px;
+}
+
+.history-title {
+    text-align: center;
+    font-size: 36px;
+    font-weight: bold;
+    margin: 40px 0;
+}
+
+.history-stats {
+    margin-bottom: 30px;
+    font-size: 16px;
+}
+
+.star {
+    color: #FF8C42;
+}
+
+/* Reusable Table Styling */
+.custom-table-container {
+    width: 100%;
+    overflow-x: auto;
+}
+
+.custom-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.custom-table thead tr {
+    background-color: #FF8C42;
+    color: white;
+    text-align: left;
+}
+
+.custom-table th,
+.custom-table td {
+    padding: 15px 20px;
+    font-size: 16px;
+}
+
+.custom-table tbody tr {
+    border-bottom: 1px solid #eee;
+}
+
+/* Pill/Badge Styling */
+.pill {
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 14px;
+    display: inline-block;
+    color: white;
+}
+
+.schedule-pill {
+    background-color: #FF8C42;
+}
+
+.status-pill.upcoming {
+    background-color: #FF8C42;
+}
+
+.status-pill.completed {
+    background-color: #BDBDBD;
+}
