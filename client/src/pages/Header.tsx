@@ -1,12 +1,19 @@
 import './header.css';
 import { useAuth } from '../context/auth/useAuth';
-import { Link } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 import { MdAccountCircle, MdNotifications } from 'react-icons/md';
 import { useState } from 'react';
 
 export function Header() {
-    const { user, isAuthenticated } = useAuth();
+    const { user, isAuthenticated, logout } = useAuth();
+    const navigate = useNavigate();
     const [showProfileOptions, isShowProfileOptions] = useState(false);
+
+    const handleLogout = () => {
+        logout(); // This clears localStorage and resets state
+        isShowProfileOptions(false); // Close the menu
+        navigate('/'); // Redirect to landing page or login
+    };
 
     return (
         <div className="header-container">
@@ -41,7 +48,7 @@ export function Header() {
                     <hr />
                     <div className="manage-profile">Manage profile</div>
                     <hr />
-                    <div className="log-out">Log out</div>
+                    <div className="log-out" onClick={handleLogout}>Log out</div>
                 </div>
             )}
         </div>
