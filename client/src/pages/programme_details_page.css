@@ -1,30 +1,59 @@
 .page-body {
-    padding: 43px 41px;
-    font-family: Inter;
+    padding: 40px 20px;
+    font-family: 'Inter', sans-serif;
+    display: flex;
+    justify-content: center;
+    background-color: #fcfcfc;
+    min-height: 100vh;
+}
+
+.programme-details {
+    width: 100%;
+    max-width: 1000px;
+    display: flex;
+    flex-direction: column;
 }
 
 .programme-image {
-    margin-bottom: 20px;
+    margin-bottom: 30px;
     width: 100%;
-    height: 270px;
+    height: 400px;
     background-color: #D9D9D9;
+    background-size: cover;
+    background-position: center;
+    border-radius: 12px;
+    flex-shrink: 0;
 }
 
 .header-row {
     display: flex;
     justify-content: space-between;
+    align-items: flex-start;
+    gap: 40px;
+    margin-bottom: 25px;
 }
 
 .programme-name {
-    font-size: 20px;
+    font-size: 32px;
     font-weight: bold;
+    flex: 1;
+    line-height: 1.2;
+    margin: 0;
+}
+
+.tool-bar {
+    display: flex;
+    gap: 15px;
+    align-items: center;
+    flex-shrink: 0;
 }
 
 .organization-details {
     display: flex;
     flex-direction: row;
     align-items: center;
-    gap: 10px;
+    gap: 12px;
+    margin-bottom: 25px;
 }
 
 .organization-profile-pic {
@@ -32,61 +61,72 @@
     width: 45px;
     height: 45px;
     border-radius: 100px;
+    background-size: cover;
+    background-position: center;
+}
+
+.organization-name {
+    font-size: 16px;
+    font-weight: 500;
+    color: #555;
 }
 
 .organization-rating {
     display: flex;
     align-items: center;
+    gap: 4px;
 }
 
 .star-icon {
-    height: 30px;
-    width: 30px;
+    height: 24px;
+    width: 24px;
+    color: #FF8C42;
 }
 
-.skills {
+.organization-rating-text {
+    font-weight: bold;
+    margin: 0;
+    font-size: 14px;
+}
+
+.metadata {
     display: flex;
-    margin-top: 15px;
-    margin-bottom: 10px;
-    flex-direction: row;
-    gap: 4px;
-    align-items: center;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 30px;
 }
 
-.skill {
-    padding: 5px 7px;
+.skills, .interests {
+    display: flex;
+    flex-direction: row;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.skill, .interest {
+    padding: 6px 12px;
     background-color: #FF8C42;
     color: white;
-    border-radius: 7px;
-    font-size: 10px;
-}
-
-.interests {
-    display: flex;
-    margin-bottom: 10px;
-    flex-direction: row;
-    gap: 4px;
-    align-items: center;
-}
-
-.interest {
-    padding: 5px 7px;
-    background-color: #FF8C42;
-    color: white;
-    border-radius: 7px;
-    font-size: 10px;
-}
-
-.tool-bar {
-    display: flex;
-    gap: 20px;
-    align-items: center;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
 }
 
 .programme-logistics {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 12px;
+    padding: 20px;
+    background-color: #fffaf7;
+    border-radius: 8px;
+    border-left: 4px solid #FF8C42;
+}
+
+.programme-logistics p {
+    margin: 0;
+    font-size: 15px;
+    color: #444;
 }
 
 .chat-button,
@@ -94,36 +134,59 @@
     background-color: #FF8C42;
     color: white;
     height: 50px;
-    width: 150px;
+    width: 140px;
     border: none;
+    border-radius: 8px;
     font-size: 16px;
+    font-weight: bold;
     cursor: pointer;
+    transition: background-color 0.2s;
 }
 
 .chat-button:hover,
 .join-button:hover {
-    background-color: #ff9554;
+    background-color: #ff9d5c;
 }
 
 .save-button,
 .report-button {
     color: #FF8C42;
-    height: 40px;
-    width: 40px;
+    height: 35px;
+    width: 35px;
     cursor: pointer;
+    transition: transform 0.2s;
 }
 
-.programme-description {
-    margin-top: 50px;
-    margin-bottom: 50px;
-}
-
-.programme-description h2,
-.organization-description h2 {
-    margin-bottom: 16px;
+.save-button:hover,
+.report-button:hover {
+    transform: scale(1.1);
 }
 
 .programme-description,
 .organization-description {
-    line-height: 25px;
+    margin-top: 40px;
+    line-height: 1.8;
+}
+
+.programme-description h2,
+.organization-description h2 {
+    font-size: 24px;
+    margin-bottom: 16px;
+    color: #222;
+}
+
+.programme-description p,
+.organization-description p {
+    font-size: 16px;
+    color: #444;
+    margin: 0;
+}
+
+.contact-info {
+    margin-top: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    font-size: 14px;
+    color: #666;
 }

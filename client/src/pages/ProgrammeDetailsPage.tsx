@@ -106,8 +106,6 @@ export function ProgrammeDetailsPage() {
                             backgroundImage: `url(${programme.imageUrl})`,
                             backgroundSize: 'cover',
                             backgroundPosition: 'center',
-                            height: '400px',
-                            width: '100%'
                         }}
                     ></div>
 
