@@ -1,62 +1,185 @@
-import { AiFillStar, AiOutlineStar, AiOutlineFlag } from 'react-icons/ai'
-import { Header } from './Header'
-import './programme_details_page.css'
+import { AiFillStar, AiOutlineStar, AiOutlineFlag } from 'react-icons/ai';
+import { Header } from './Header';
+import './programme_details_page.css';
+import { useParams } from 'react-router';
+import { useState, useEffect } from 'react';
+import axios from 'axios';
+
+interface Skill {
+    id: string;
+    skill_name: string;
+}
+
+interface Interest {
+    id: string;
+    interest_name: string;
+}
+
+interface ProgrammeDetailsData {
+    id: string;
+    title: string;
+    description: string;
+    imageUrl: string;
+    related_skills: Skill[];
+    related_interests: Interest[];
+    schedule: {
+        mode: string;
+        start_time: string;
+        end_time: string;
+        location: string;
+    };
+    organization: {
+        id: string;
+        description: string;
+        rating: number;
+        profile_picture_url: string;
+        contact_number: string;
+        user: {
+            username: string;
+            email: string;
+        }
+    };
+}
 
 export function ProgrammeDetailsPage() {
+    const { id } = useParams<{ id: string }>();
+    const [programme, setProgramme] = useState<ProgrammeDetailsData | null>(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchProgrammeDetails = async () => {
+            try {
+                setLoading(true);
+                const response = await axios.get(`http://localhost:3000/programmes/${id}`);
+                setProgramme(response.data);
+            } catch (error) {
+                console.error("Error fetching programme details:", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        if (id) {
+            fetchProgrammeDetails();
+        }
+    }, [id]);
+
+    if (loading) {
+        return (
+            <div className="sign-up-page-wrapper">
+                <Header />
+                <div className="page-body">Loading programme details...</div>
+            </div>
+        );
+    }
+
+    if (!programme) {
+        return (
+            <div className="sign-up-page-wrapper">
+                <Header />
+                <div className="page-body">Programme not found.</div>
+            </div>
+        );
+    }
+
+    // Helper to format the date and time
+    const formatDateTime = (isoString: string) => {
+        const date = new Date(isoString);
+        return date.toLocaleString('en-GB', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true
+        });
+    };
+
     return (
         <div className="sign-up-page-wrapper">
             <Header />
             <div className="page-body">
                 <div className="programme-details">
-                    <div className="programme-image"></div>
+                    <div
+                        className="programme-image"
+                        style={{
+                            backgroundImage: `url(${programme.imageUrl})`,
+                            backgroundSize: 'cover',
+                            backgroundPosition: 'center',
+                            height: '400px',
+                            width: '100%'
+                        }}
+                    ></div>
+
                     <div className="header-row">
-                        <div className="programme-name">Green Earth Clean-Up Drive</div>
+                        <div className="programme-name">{programme.title}</div>
                         <div className="tool-bar">
                             <button className="chat-button">Chat</button>
                             <button className="join-button">Join</button>
-                            <AiOutlineStar className="save-button"></AiOutlineStar>
-                            <AiOutlineFlag className="report-button"></AiOutlineFlag>
+                            <AiOutlineStar className="save-button" />
+                            <AiOutlineFlag className="report-button" />
                         </div>
                     </div>
+
                     <div className="organization-details">
-                        <div className="organization-profile-pic"></div>
-                        <div className="organization-name">EcoGuardians Malaysia</div>
+                        <div
+                            className="organization-profile-pic"
+                            style={{
+                                backgroundImage: `url(${programme.organization.profile_picture_url})`,
+                                backgroundSize: 'cover',
+                                backgroundPosition: 'center'
+                            }}
+                        ></div>
+                        <div className="organization-name">
+                            {programme.organization.user.username}
+                        </div>
                         <div className="organization-rating">
                             <AiFillStar className="star-icon" />
-                            <p className="organization-rating-text">4.9</p>
+                            <p className="organization-rating-text">
+                                {programme.organization.rating.toFixed(1)}
+                            </p>
                         </div>
                     </div>
+
                     <div className="metadata">
                         <div className="skills">
                             Skills:
-                            <div className="skill">Teamwork</div>
-                            <div className="skill">Waste management</div>
-                            <div className="skill">Event coordination</div>
+                            {programme.related_skills?.map(skill => (
+                                <div key={skill.id} className="skill">{skill.skill_name}</div>
+                            ))}
                         </div>
                         <div className="interests">
                             Interests:
-                            <div className="interest">Sustainability</div>
-                            <div className="interest">Community service</div>
+                            {programme.related_interests?.map(interest => (
+                                <div key={interest.id} className="interest">{interest.interest_name}</div>
+                            ))}
                         </div>
                     </div>
+
                     <div className="programme-logistics">
-                        <p>Mode: Physical</p>
-                        <p>Schedule: 20/11/2025 9:00am - 11:00am</p>
-                        <p>Location: Pantai Kelanang, Selangor</p>
+                        <p>Mode: {programme.schedule?.mode || 'N/A'}</p>
+                        <p>
+                            Schedule: {formatDateTime(programme.schedule?.start_time)} - {formatDateTime(programme.schedule?.end_time)}
+                        </p>
+                        <p>Location: {programme.schedule?.location || 'N/A'}</p>
                     </div>
+
                     <div className="programme-description">
                         <h2>Programme Description</h2>
-                        <p>The Green Earth Clean‑Up Drive is a community‑based initiative aimed at promoting environmental responsibility and sustainable living. Volunteers work together to collect litter from parks, riversides, and residential areas while raising awareness about recycling and proper waste management. The programme not only improves the cleanliness of shared spaces but also fosters teamwork, civic pride, and a stronger connection to nature. Participants gain practical skills in organizing eco‑friendly activities and inspire others to adopt greener habits for a healthier planet.</p>
+                        <p>{programme.description}</p>
                     </div>
+
                     <div className="organization-description">
                         <h2>Organization Description</h2>
-                        <p>EcoGuardians Malaysia is a non‑profit community organization dedicated to promoting environmental sustainability and civic responsibility. Established to empower local residents, the group organizes clean‑up drives, recycling campaigns, and educational workshops that encourage greener habits. By fostering collaboration between volunteers, schools, and local councils, EcoGuardians Malaysia aims to create healthier public spaces and inspire long‑term environmental stewardship. The organization values teamwork, awareness, and practical action, making it a trusted partner in community‑based eco initiatives.
-                            Address: Lot 12, Jalan Hijau Indah, Taman Bukit Ampang, 68000 Ampang, Selangor
-                            Contact number: 03-12345678
-                            Email address: contact@ecoguardians.my</p>
+                        <p>{programme.organization.description}</p>
+                        <div className="contact-info">
+                            <p>Address: {programme.schedule?.location}</p>
+                            <p>Contact number: {programme.organization.contact_number}</p>
+                            <p>Email address: {programme.organization.user.email}</p>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
-    )
+    );
 }

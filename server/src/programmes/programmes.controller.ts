@@ -27,6 +27,8 @@ export class ProgrammesController {
 
   @Get(':id')
   async findOne(@Param('id') id: string) {
+    // This endpoint is critical for loading specific data
+    // into your ProgrammeDetailsPage.tsx
     return await this.programmesService.findOne(id);
   }
 

@@ -17,7 +17,7 @@ function App() {
         <Route path="login" index element={<LoginPage />}></Route>
         <Route path="sign-up" element={<SignUpPage />}></Route>
         <Route path="volunteer-home" element={<VolunteerHomePage />}></Route>
-        <Route path="programme-details" element={<ProgrammeDetailsPage />}></Route>
+        <Route path="programme-details/:id" element={<ProgrammeDetailsPage />}></Route>
         <Route path="leaderboard" element={<LeaderboardPage />}></Route>
         <Route path="qa" element={<QAPage />}></Route>
         <Route path="volunteering-history" element={<VolunteeringHistoryPage />}></Route>

@@ -19,6 +19,10 @@ export class CreateProgrammeDto {
   @IsNotEmpty()
   organizationId!: string;
 
+  @IsString()
+  @IsOptional()
+  imageUrl?: string;
+
   @IsDateString()
   @IsNotEmpty()
   start_time!: string;
@@ -26,6 +30,14 @@ export class CreateProgrammeDto {
   @IsDateString()
   @IsNotEmpty()
   end_time!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  location!: string;
+
+  @IsString()
+  @IsOptional()
+  mode?: string;
 
   @IsArray()
   @IsString({ each: true })

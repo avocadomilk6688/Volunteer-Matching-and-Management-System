@@ -12,6 +12,12 @@ export class Schedule {
   @Column({ type: 'datetime' })
   end_time!: Date;
 
+  @Column({ type: 'varchar', default: 'Physical' })
+  mode!: string;
+
+  @Column({ type: 'text' })
+  location!: string;
+
   @OneToOne(() => Programme, (programme) => programme.schedule)
   programme!: Programme;
 }
