@@ -1,6 +1,10 @@
 .page-body {
-    padding: 43px 41px;
     font-family: Inter;
+}
+
+.programme-details {
+    width: 100%;
+    padding: 43px 41px;
 }
 
 .programme-image {
