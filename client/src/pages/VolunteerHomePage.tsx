@@ -40,6 +40,11 @@ export function VolunteerHomePage() {
     const [programmes, setProgrammes] = useState<Programme[]>([]);
     const [loading, setLoading] = useState(true);
 
+    // Pagination State
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 6;
+
+    // Filter States
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedLocation, setSelectedLocation] = useState('');
     const [selectedSkill, setSelectedSkill] = useState('');
@@ -49,6 +54,12 @@ export function VolunteerHomePage() {
     const [saveStatus, setSaveStatus] = useState('all');
 
     const navigate = useNavigate();
+
+    // Logic to calculate displayed items
+    const indexOfLastItem = currentPage * itemsPerPage;
+    const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+    const currentProgrammes = programmes.slice(indexOfFirstItem, indexOfLastItem);
+    const totalPages = Math.ceil(programmes.length / itemsPerPage);
 
     useEffect(() => {
         const fetchProgrammes = async () => {
@@ -66,8 +77,9 @@ export function VolunteerHomePage() {
                     }
                 });
                 setProgrammes(response.data);
+                setCurrentPage(1); // Reset to page 1 on new search/filter
             } catch (error) {
-                console.error("Nyeah! API Error:", error);
+                console.error("API Error:", error);
             } finally {
                 setLoading(false);
             }
@@ -75,6 +87,14 @@ export function VolunteerHomePage() {
 
         fetchProgrammes();
     }, [searchTerm, selectedLocation, selectedSkill, selectedInterest, startDate, endDate, saveStatus]);
+
+    const handleNextPage = () => {
+        if (currentPage < totalPages) setCurrentPage(prev => prev + 1);
+    };
+
+    const handlePrevPage = () => {
+        if (currentPage > 1) setCurrentPage(prev => prev - 1);
+    };
 
     return (
         <div className="volunteer-home-page-wrapper">
@@ -144,9 +164,9 @@ export function VolunteerHomePage() {
 
                 <div className="programmes-container">
                     {loading ? (
-                        <div className="loading-state">Fetching amazing opportunities for you... Nyeah!</div>
-                    ) : programmes.length > 0 ? (
-                        programmes.map((prog) => (
+                        <div className="loading-state">Loading opportunities...</div>
+                    ) : currentProgrammes.length > 0 ? (
+                        currentProgrammes.map((prog) => (
                             <div
                                 key={prog.id}
                                 className="programme"
@@ -183,14 +203,20 @@ export function VolunteerHomePage() {
                             </div>
                         ))
                     ) : (
-                        <div className="no-results">No programmes found matching your filters. Try something else!</div>
+                        <div className="no-results">No programmes found matching your filters.</div>
                     )}
                 </div>
 
                 <div className="pagination-container">
-                    <GoTriangleLeft className="pagination-arrow" />
-                    <div className="page-number-box">1</div>
-                    <GoTriangleRight className="pagination-arrow" />
+                    <GoTriangleLeft 
+                        className={`pagination-arrow ${currentPage === 1 ? 'disabled' : ''}`} 
+                        onClick={handlePrevPage}
+                    />
+                    <div className="page-number-box">{currentPage}</div>
+                    <GoTriangleRight 
+                        className={`pagination-arrow ${currentPage === totalPages || totalPages === 0 ? 'disabled' : ''}`} 
+                        onClick={handleNextPage}
+                    />
                 </div>
             </div>
         </div>
