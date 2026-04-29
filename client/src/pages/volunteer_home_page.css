@@ -1,7 +1,7 @@
 .page-body {
     display: flex;
     flex-direction: column;
-    font-family: Inter;
+    font-family: 'Inter', sans-serif;
     padding: 24px 52px;
 }
 
@@ -9,6 +9,7 @@
     display: flex;
     justify-content: flex-start;
     gap: 12px;
+    flex-wrap: wrap;
 }
 
 .search-input-container {
@@ -20,11 +21,12 @@
     height: 45px;
     padding: 4px 10px;
     font-size: 16px;
+    border: 1px solid #767676;
 }
 
 .search-icon {
     position: absolute;
-    top: 6px;
+    top: 7px;
     right: 10px;
     width: 30px;
     height: 30px;
@@ -34,6 +36,8 @@
 .search-filter-bar select {
     font-size: 16px;
     padding: 4px 10px;
+    height: 45px;
+    border: 1px solid #767676;
 }
 
 .date-box {
@@ -51,13 +55,15 @@
 
 .select-arrow-icon {
     font-size: 18px;
-    color: black; 
+    color: black;
     flex-shrink: 0;
 }
 
 .date-text {
     font-size: 16px;
     color: black;
+    white-space: nowrap;
+    overflow: hidden;
 }
 
 .react-datepicker-wrapper {
@@ -68,38 +74,46 @@
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 30px;
-    padding: 24px 52px;
+    padding: 40px 0;
 }
 
 .programme {
     width: 400px;
     height: 250px;
-    border: 1px solid black;
+    border: 1px solid #E0E0E0;
     display: flex;
     flex-direction: column;
     background-color: white;
     cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.programme:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
 }
 
 .programme .programme-image {
-    width: 400px;
+    width: 100%;
     height: 180px;
     background-color: #D9D9D9;
 }
 
 .programme .programme-info {
-    padding: 17px 13px;
+    padding: 12px 13px;
 }
 
 .programme .programme-name {
     font-weight: bold;
+    font-size: 16px;
+    margin-bottom: 4px;
 }
 
 .organization-info {
-    margin-top: 12px;
+    margin-top: 8px;
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
 }
 
 .organization-info .organization-profile-pic {
@@ -109,23 +123,39 @@
     border-radius: 100px;
 }
 
+.organization-name {
+    font-size: 14px;
+    color: #555;
+    flex-grow: 1;
+}
+
 .organization-rating {
     display: flex;
+    align-items: center;
+    gap: 2px;
 }
 
 .organization-rating .star-icon {
     color: #FF8C42;
 }
 
+.organization-rating-text {
+    font-size: 14px;
+    font-weight: bold;
+    margin: 0;
+}
+
 .pagination-container {
     display: flex;
     align-items: center;
+    justify-content: center;
+    margin-top: 20px;
 }
 
 .pagination-container .pagination-arrow {
     color: #FF8C42;
-    height: 60px;
-    width: 60px;
+    height: 50px;
+    width: 50px;
     cursor: pointer;
 }
 
@@ -135,4 +165,14 @@
     width: 32px;
     text-align: center;
     line-height: 32px;
+    font-weight: bold;
+}
+
+.loading-state,
+.no-results {
+    grid-column: span 3;
+    text-align: center;
+    font-size: 18px;
+    padding: 50px;
+    color: #777;
 }

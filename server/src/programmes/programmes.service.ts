@@ -46,6 +46,7 @@ export class ProgrammesService {
       relations: [
         'schedule',
         'organization',
+        'organization.user',
         'related_skills',
         'related_interests',
       ],

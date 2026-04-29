@@ -33,7 +33,7 @@ form {
     align-items: center;
 }
 
-.email-input input, .password-input input, .comfirm-password-input input {
+.email-input input, .password-input input, .confirm-password-input input {
     margin-top: 12px;
     margin-bottom: 30px;
     padding: 4px 10px;

@@ -26,6 +26,9 @@ export class Programme {
   @Column({ type: 'text' })
   description!: string;
 
+  @Column({ nullable: true })
+  imageUrl!: string;
+
   @ManyToOne(() => Organization)
   organization!: Organization;
 
