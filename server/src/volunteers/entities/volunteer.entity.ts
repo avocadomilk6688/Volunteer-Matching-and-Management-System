@@ -18,14 +18,14 @@ export class Volunteer {
   @PrimaryColumn({ type: 'varchar', length: 10 })
   id!: string;
 
-  @Column({ nullable: true })
-  profilePictureUrl!: string;
+  @Column({ name: 'profile_picture_url', nullable: true })
+  profile_picture_url!: string;
 
   @Column({ type: 'char', length: 1, nullable: true })
   gender!: string;
 
-  @Column({ nullable: true })
-  contactNumber!: string;
+  @Column({ name: 'contact_number', nullable: true })
+  contact_number!: string;
 
   @Column({ nullable: true })
   location!: string;
@@ -38,16 +38,10 @@ export class Volunteer {
   @JoinTable()
   interests!: Interest[];
 
-  @Column({ nullable: true })
-  participant_score!: number;
+  @Column({ default: 0 })
+  points!: number;
 
-  @Column({
-    type: 'double',
-    precision: 3,
-    scale: 2,
-    default: 0,
-    nullable: true,
-  })
+  @Column({ type: 'double', precision: 3, scale: 2, default: 0 })
   rating!: number;
 
   @OneToOne(() => User)

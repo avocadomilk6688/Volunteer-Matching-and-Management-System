@@ -8,14 +8,17 @@ import {
   Delete,
 } from '@nestjs/common';
 import { VolunteersService } from './volunteers.service';
+import { Volunteer } from './entities/volunteer.entity';
 
 @Controller('volunteers')
 export class VolunteersController {
   constructor(private readonly volunteersService: VolunteersService) {}
 
-  @Post('skills')
-  createSkill(@Body('name') name: string) {
-    return this.volunteersService.createSkill(name);
+  // --- STATIC ROUTES (Must come before :id) ---
+  @Get('leaderboard')
+  async getLeaderboard(): Promise<Volunteer[]> {
+    const result: Volunteer[] = await this.volunteersService.getLeaderboard();
+    return result;
   }
 
   @Get('skills')
@@ -23,14 +26,14 @@ export class VolunteersController {
     return this.volunteersService.findAllSkills();
   }
 
-  @Patch('skills/:id')
-  updateSkill(@Param('id') id: string, @Body('name') name: string) {
-    return this.volunteersService.updateSkill(id, name);
+  @Get('interests')
+  findAllInterests() {
+    return this.volunteersService.findAllInterests();
   }
 
-  @Delete('skills/:id')
-  removeSkill(@Param('id') id: string) {
-    return this.volunteersService.removeSkill(id);
+  @Post('skills')
+  createSkill(@Body('name') name: string) {
+    return this.volunteersService.createSkill(name);
   }
 
   @Post('interests')
@@ -38,21 +41,7 @@ export class VolunteersController {
     return this.volunteersService.createInterest(name);
   }
 
-  @Get('interests')
-  findAllInterests() {
-    return this.volunteersService.findAllInterests();
-  }
-
-  @Patch('interests/:id')
-  updateInterest(@Param('id') id: string, @Body('name') name: string) {
-    return this.volunteersService.updateInterest(id, name);
-  }
-
-  @Delete('interests/:id')
-  removeInterest(@Param('id') id: string) {
-    return this.volunteersService.removeInterest(id);
-  }
-
+  // --- DYNAMIC ROUTES (Must come last) ---
   @Get()
   findAll() {
     return this.volunteersService.findAll();

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, FindOptionsWhere } from 'typeorm';
+import { Repository } from 'typeorm';
 import { Volunteer } from './entities/volunteer.entity';
 import { Skill } from './entities/skill.entity';
 import { Interest } from './entities/interest.entity';
@@ -19,49 +19,61 @@ export class VolunteersService {
     private readonly interestRepo: Repository<Interest>,
   ) {}
 
-  async createSkill(name: string) {
+  async getLeaderboard(): Promise<Volunteer[]> {
+    const result: Volunteer[] = await this.volRepo.find({
+      relations: ['user'],
+      order: {
+        points: 'DESC',
+      },
+      take: 10,
+    });
+    return result;
+  }
+
+  async createSkill(name: string): Promise<Skill> {
     const id = await generateCustomId(this.skillRepo, 'S');
     const newSkill = this.skillRepo.create({ id, skill_name: name });
     return await this.skillRepo.save(newSkill);
   }
 
-  async createInterest(name: string) {
+  async createInterest(name: string): Promise<Interest> {
     const id = await generateCustomId(this.interestRepo, 'I');
     const newInterest = this.interestRepo.create({ id, interest_name: name });
     return await this.interestRepo.save(newInterest);
   }
 
-  async findOne(id: string) {
+  async findOne(id: string): Promise<Volunteer | null> {
     return await this.volRepo.findOne({
-      where: { id: id as unknown as string } as FindOptionsWhere<Volunteer>,
-      relations: ['user', 'skills', 'interests', 'programmes'],
+      where: { id },
+      relations: ['user', 'skills', 'interests'],
     });
   }
 
-  async findAllSkills() {
-    return await this.skillRepo.find({ relations: ['volunteers'] });
-  }
-
-  async findAllInterests() {
-    return await this.interestRepo.find({ relations: ['volunteers'] });
-  }
-
-  async findAll() {
+  async findAll(): Promise<Volunteer[]> {
     return await this.volRepo.find({
       relations: ['user', 'skills', 'interests'],
     });
   }
 
-  async update(id: string, updateDto: any) {
+  async findAllSkills(): Promise<Skill[]> {
+    return await this.skillRepo.find();
+  }
+
+  async findAllInterests(): Promise<Interest[]> {
+    return await this.interestRepo.find();
+  }
+
+  async update(id: string, updateDto: any): Promise<Volunteer | null> {
     await this.volRepo.update(id, updateDto);
     return this.findOne(id);
   }
 
-  async remove(id: string) {
+  async remove(id: string): Promise<{ deleted: boolean }> {
     const result = await this.volRepo.delete(id);
     return { deleted: (result.affected ?? 0) > 0 };
   }
 
+  // Helper methods for skill/interest updates
   async updateSkill(id: string, newName: string) {
     await this.skillRepo.update(id, { skill_name: newName });
     return { message: `Skill ${id} updated to ${newName}` };
@@ -70,21 +82,5 @@ export class VolunteersService {
   async updateInterest(id: string, newName: string) {
     await this.interestRepo.update(id, { interest_name: newName });
     return { message: `Interest ${id} updated to ${newName}` };
-  }
-
-  async removeSkill(id: string) {
-    const result = await this.skillRepo.delete(id);
-    return {
-      deleted: (result.affected ?? 0) > 0,
-      message: `Skill ${id} removed`,
-    };
-  }
-
-  async removeInterest(id: string) {
-    const result = await this.interestRepo.delete(id);
-    return {
-      deleted: (result.affected ?? 0) > 0,
-      message: `Interest ${id} removed`,
-    };
   }
 }
