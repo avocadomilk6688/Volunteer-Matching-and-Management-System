@@ -17,8 +17,7 @@ export class VolunteersController {
   // --- STATIC ROUTES (Must come before :id) ---
   @Get('leaderboard')
   async getLeaderboard(): Promise<Volunteer[]> {
-    const result: Volunteer[] = await this.volunteersService.getLeaderboard();
-    return result;
+    return await this.volunteersService.getLeaderboard();
   }
 
   @Get('skills')
@@ -41,15 +40,29 @@ export class VolunteersController {
     return this.volunteersService.createInterest(name);
   }
 
-  // --- DYNAMIC ROUTES (Must come last) ---
-  @Get()
-  findAll() {
-    return this.volunteersService.findAll();
+  // --- DYNAMIC ROUTES ---
+  @Get(':id/history')
+  async getHistory(@Param('id') id: string) {
+    const historyData = await this.volunteersService.getHistory(id);
+    if (!historyData) {
+      return {
+        message: 'Volunteer history not found',
+        history: [],
+        totalHours: 0,
+        rating: 0,
+      };
+    }
+    return historyData;
   }
 
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.volunteersService.findOne(id);
+  }
+
+  @Get()
+  findAll() {
+    return this.volunteersService.findAll();
   }
 
   @Patch(':id')

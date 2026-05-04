@@ -6,6 +6,11 @@ import { Skill } from './entities/skill.entity';
 import { Interest } from './entities/interest.entity';
 import { generateCustomId } from '../common/utils/id_generator.util';
 
+// 1. Define a local interface to break the circular dependency trap
+interface IRegistrationRecord {
+  name: string;
+}
+
 @Injectable()
 export class VolunteersService {
   constructor(
@@ -20,14 +25,11 @@ export class VolunteersService {
   ) {}
 
   async getLeaderboard(): Promise<Volunteer[]> {
-    const result: Volunteer[] = await this.volRepo.find({
+    return await this.volRepo.find({
       relations: ['user'],
-      order: {
-        points: 'DESC',
-      },
+      order: { points: 'DESC' },
       take: 10,
     });
-    return result;
   }
 
   async createSkill(name: string): Promise<Skill> {
@@ -73,7 +75,6 @@ export class VolunteersService {
     return { deleted: (result.affected ?? 0) > 0 };
   }
 
-  // Helper methods for skill/interest updates
   async updateSkill(id: string, newName: string) {
     await this.skillRepo.update(id, { skill_name: newName });
     return { message: `Skill ${id} updated to ${newName}` };
@@ -82,5 +83,80 @@ export class VolunteersService {
   async updateInterest(id: string, newName: string) {
     await this.interestRepo.update(id, { interest_name: newName });
     return { message: `Interest ${id} updated to ${newName}` };
+  }
+
+  async getHistory(id: string) {
+    const volunteer = await this.volRepo.findOne({
+      where: { id },
+      relations: [
+        'applications',
+        'applications.programme',
+        'applications.programme.organization',
+        'applications.programme.organization.registrationRecord',
+        'applications.programme.schedule',
+      ],
+    });
+
+    if (!volunteer) return null;
+
+    const totalHours: number = (volunteer.applications || [])
+      .filter((app) => app.status?.toLowerCase() === 'completed')
+      .reduce((sum: number, app): number => {
+        const sched = app.programme?.schedule;
+        if (sched?.start_time && sched?.end_time) {
+          const start = new Date(sched.start_time).getTime();
+          const end = new Date(sched.end_time).getTime();
+          const diffHours = (end - start) / (1000 * 60 * 60);
+          return sum + Math.max(0, diffHours);
+        }
+        return sum;
+      }, 0);
+
+    const history = (volunteer.applications || []).map((app) => {
+      const prog = app.programme;
+      const sched = prog?.schedule;
+      const org = prog?.organization;
+
+      // FIX: Use 'as unknown as' to bridge the gap safely without 'any'
+      const regRecord = org?.registrationRecord as unknown as
+        | IRegistrationRecord
+        | undefined;
+
+      let durationStr = '-';
+      if (
+        sched?.start_time &&
+        sched?.end_time &&
+        app.status?.toLowerCase() === 'completed'
+      ) {
+        const diff =
+          (new Date(sched.end_time).getTime() -
+            new Date(sched.start_time).getTime()) /
+          (1000 * 60 * 60);
+        durationStr = `${diff.toFixed(1)}h`;
+      }
+
+      return {
+        id: app.id,
+        programme: prog?.title || 'Unknown Programme',
+        org: regRecord?.name || 'Unknown Organization', // Now linter-safe!
+        schedule: sched?.start_time
+          ? new Date(sched.start_time).toLocaleString('en-GB', {
+              day: '2-digit',
+              month: '2-digit',
+              year: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+            })
+          : 'No date set',
+        hours: durationStr,
+        status: app.status || 'Pending',
+      };
+    });
+
+    return {
+      rating: Number(volunteer.rating) || 0,
+      totalHours: parseFloat(totalHours.toFixed(1)),
+      history,
+    };
   }
 }
