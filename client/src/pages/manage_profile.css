@@ -160,3 +160,50 @@
 .save-changes-btn:hover {
     opacity: 0.9;
 }
+
+.selection-box {
+    position: absolute;
+    top: 40px;
+    left: 0;
+    width: 300px;
+    background: white;
+    border: 1px solid #ccc;
+    border-radius: 12px;
+    padding: 15px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+    z-index: 100;
+}
+
+.selection-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 15px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.selection-item {
+    padding: 8px;
+    border: 1px solid #eee;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    text-align: center;
+    transition: all 0.2s;
+}
+
+.selection-item:hover {
+    background: #f8f9fa;
+}
+
+.selection-item.selected {
+    background: #e7f3ff;
+    border-color: #007bff;
+    color: #007bff;
+    font-weight: bold;
+}
+
+.tags-container {
+    position: relative;
+}

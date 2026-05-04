@@ -31,11 +31,11 @@ export class Volunteer {
   location!: string;
 
   @ManyToMany(() => Skill, (skill) => skill.volunteers)
-  @JoinTable()
+  @JoinTable({ name: 'volunteer_skills' }) // Explicit naming is safer for ManyToMany
   skills!: Skill[];
 
   @ManyToMany(() => Interest, (interest) => interest.volunteers)
-  @JoinTable()
+  @JoinTable({ name: 'volunteer_interests' })
   interests!: Interest[];
 
   @Column({ default: 0 })
@@ -44,7 +44,13 @@ export class Volunteer {
   @Column({ type: 'double', precision: 3, scale: 2, default: 0 })
   rating!: number;
 
-  @OneToOne(() => User)
+  @Column({ name: 'resume_url', nullable: true })
+  resume_url!: string;
+
+  @OneToOne(() => User, (user) => user.volunteer, {
+    cascade: ['update'],
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'id' })
   user!: User;
 

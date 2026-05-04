@@ -6,9 +6,28 @@ import { Skill } from './entities/skill.entity';
 import { Interest } from './entities/interest.entity';
 import { generateCustomId } from '../common/utils/id_generator.util';
 
-// 1. Define a local interface to break the circular dependency trap
+/**
+ * 1. Interfaces for Type Safety
+ */
 interface IRegistrationRecord {
   name: string;
+}
+
+// Local interface to bypass global Express.Multer.File namespace issues
+interface LocalMulterFile {
+  filename: string;
+  path?: string;
+  mimetype?: string;
+  size?: number;
+}
+
+interface UpdateProfileDto {
+  username?: string;
+  gender?: string;
+  location?: string;
+  contact_number?: string;
+  skills?: string | Skill[];
+  interests?: string | Interest[];
 }
 
 @Injectable()
@@ -24,24 +43,15 @@ export class VolunteersService {
     private readonly interestRepo: Repository<Interest>,
   ) {}
 
+  /**
+   * Basic Queries
+   */
   async getLeaderboard(): Promise<Volunteer[]> {
     return await this.volRepo.find({
       relations: ['user'],
       order: { points: 'DESC' },
       take: 10,
     });
-  }
-
-  async createSkill(name: string): Promise<Skill> {
-    const id = await generateCustomId(this.skillRepo, 'S');
-    const newSkill = this.skillRepo.create({ id, skill_name: name });
-    return await this.skillRepo.save(newSkill);
-  }
-
-  async createInterest(name: string): Promise<Interest> {
-    const id = await generateCustomId(this.interestRepo, 'I');
-    const newInterest = this.interestRepo.create({ id, interest_name: name });
-    return await this.interestRepo.save(newInterest);
   }
 
   async findOne(id: string): Promise<Volunteer | null> {
@@ -57,6 +67,9 @@ export class VolunteersService {
     });
   }
 
+  /**
+   * Skill & Interest Management
+   */
   async findAllSkills(): Promise<Skill[]> {
     return await this.skillRepo.find();
   }
@@ -65,14 +78,16 @@ export class VolunteersService {
     return await this.interestRepo.find();
   }
 
-  async update(id: string, updateDto: any): Promise<Volunteer | null> {
-    await this.volRepo.update(id, updateDto);
-    return this.findOne(id);
+  async createSkill(name: string): Promise<Skill> {
+    const id = await generateCustomId(this.skillRepo, 'S');
+    const newSkill = this.skillRepo.create({ id, skill_name: name });
+    return await this.skillRepo.save(newSkill);
   }
 
-  async remove(id: string): Promise<{ deleted: boolean }> {
-    const result = await this.volRepo.delete(id);
-    return { deleted: (result.affected ?? 0) > 0 };
+  async createInterest(name: string): Promise<Interest> {
+    const id = await generateCustomId(this.interestRepo, 'I');
+    const newInterest = this.interestRepo.create({ id, interest_name: name });
+    return await this.interestRepo.save(newInterest);
   }
 
   async updateSkill(id: string, newName: string) {
@@ -85,6 +100,77 @@ export class VolunteersService {
     return { message: `Interest ${id} updated to ${newName}` };
   }
 
+  /**
+   * THE UPDATE METHOD:
+   * Handles Multipart/FormData, File Uploads, and Many-to-Many Sync
+   */
+  async update(
+    id: string,
+    updateDto: UpdateProfileDto,
+    files?: {
+      profile_picture?: LocalMulterFile[];
+      resume?: LocalMulterFile[];
+    },
+  ): Promise<Volunteer | null> {
+    const volunteer = await this.volRepo.findOne({
+      where: { id },
+      relations: ['user', 'skills', 'interests'],
+    });
+
+    if (!volunteer) return null;
+
+    // 1. Text Fields
+    if (updateDto.gender) volunteer.gender = updateDto.gender;
+    if (updateDto.location) volunteer.location = updateDto.location;
+    if (updateDto.contact_number)
+      volunteer.contact_number = updateDto.contact_number;
+
+    // Update username in linked User entity
+    if (updateDto.username && volunteer.user) {
+      volunteer.user.username = updateDto.username;
+    }
+
+    // 2. Many-to-Many Logic (Parsing JSON strings from FormData)
+    if (updateDto.skills) {
+      volunteer.skills =
+        typeof updateDto.skills === 'string'
+          ? (JSON.parse(updateDto.skills) as Skill[])
+          : updateDto.skills;
+    }
+
+    if (updateDto.interests) {
+      volunteer.interests =
+        typeof updateDto.interests === 'string'
+          ? (JSON.parse(updateDto.interests) as Interest[])
+          : updateDto.interests;
+    }
+
+    // 3. Safe File Handling (Using Type Guarding)
+    if (files?.profile_picture && files.profile_picture.length > 0) {
+      const profileFile = files.profile_picture[0];
+      if (profileFile && 'filename' in profileFile) {
+        volunteer.profile_picture_url = `/uploads/avatars/${profileFile.filename}`;
+      }
+    }
+
+    if (files?.resume && files.resume.length > 0) {
+      const resumeFile = files.resume[0];
+      if (resumeFile && 'filename' in resumeFile) {
+        volunteer.resume_url = `/uploads/resumes/${resumeFile.filename}`;
+      }
+    }
+
+    return await this.volRepo.save(volunteer);
+  }
+
+  async remove(id: string): Promise<{ deleted: boolean }> {
+    const result = await this.volRepo.delete(id);
+    return { deleted: (result.affected ?? 0) > 0 };
+  }
+
+  /**
+   * Volunteer History Logic
+   */
   async getHistory(id: string) {
     const volunteer = await this.volRepo.findOne({
       where: { id },
@@ -116,8 +202,6 @@ export class VolunteersService {
       const prog = app.programme;
       const sched = prog?.schedule;
       const org = prog?.organization;
-
-      // FIX: Use 'as unknown as' to bridge the gap safely without 'any'
       const regRecord = org?.registrationRecord as unknown as
         | IRegistrationRecord
         | undefined;
@@ -138,7 +222,7 @@ export class VolunteersService {
       return {
         id: app.id,
         programme: prog?.title || 'Unknown Programme',
-        org: regRecord?.name || 'Unknown Organization', // Now linter-safe!
+        org: regRecord?.name || 'Unknown Organization',
         schedule: sched?.start_time
           ? new Date(sched.start_time).toLocaleString('en-GB', {
               day: '2-digit',
