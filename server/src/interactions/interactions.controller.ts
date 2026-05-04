@@ -1,5 +1,6 @@
 import { Controller, Get, Post, Body } from '@nestjs/common';
 import { InteractionsService } from './interactions.service';
+import { QuestionAnswer } from './entities/question_answer.entity';
 import {
   CreateMessageDto,
   CreateNotificationDto,
@@ -11,6 +12,17 @@ import {
 @Controller('interactions')
 export class InteractionsController {
   constructor(private readonly interactionsService: InteractionsService) {}
+
+  // Fetch all QAs - Path: GET /interactions/qa
+  @Get('qa')
+  async findAllQA(): Promise<QuestionAnswer[]> {
+    return await this.interactionsService.findAllQA();
+  }
+
+  @Post('qa')
+  createQA(@Body() createQuestionAnswerDto: CreateQuestionAnswerDto) {
+    return this.interactionsService.createQA(createQuestionAnswerDto);
+  }
 
   @Post('message')
   createMessage(@Body() createMessageDto: CreateMessageDto) {
@@ -30,11 +42,6 @@ export class InteractionsController {
   @Post('support-ticket')
   createSupportTicket(@Body() createSupportTicketDto: CreateSupportTicketDto) {
     return this.interactionsService.createSupportTicket(createSupportTicketDto);
-  }
-
-  @Post('qa')
-  createQA(@Body() createQuestionAnswerDto: CreateQuestionAnswerDto) {
-    return this.interactionsService.createQA(createQuestionAnswerDto);
   }
 
   @Get()

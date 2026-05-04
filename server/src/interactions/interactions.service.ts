@@ -40,6 +40,21 @@ export class InteractionsService {
     private readonly ticketRepo: Repository<SupportTicket>,
   ) {}
 
+  // Fetch all QAs for the frontend
+  async findAllQA(): Promise<QuestionAnswer[]> {
+    const result: QuestionAnswer[] = await this.qaRepo.find({
+      order: { id: 'ASC' },
+    });
+    return result;
+  }
+
+  async createQA(dto: CreateQuestionAnswerDto): Promise<string> {
+    const id = await generateCustomId(this.qaRepo, 'QA');
+    const newQA = this.qaRepo.create({ id, ...dto });
+    await this.qaRepo.save(newQA);
+    return `QA ${id} added`;
+  }
+
   async createMessage(dto: CreateMessageDto): Promise<string> {
     const id = await generateCustomId(this.messageRepo, 'M');
     const newMessage = this.messageRepo.create({ id, ...dto });
@@ -68,15 +83,7 @@ export class InteractionsService {
     return `Ticket ${id} submitted`;
   }
 
-  async createQA(dto: CreateQuestionAnswerDto): Promise<string> {
-    const id = await generateCustomId(this.qaRepo, 'QA');
-    const newQA = this.qaRepo.create({ id, ...dto });
-    await this.qaRepo.save(newQA);
-    return `QA ${id} added`;
-  }
-
-  async findAll(): Promise<any[]> {
-    // This is just a placeholder; you might want to fetch all messages or tickets specifically later
+  async findAll(): Promise<Message[]> {
     return await this.messageRepo.find();
   }
 }
