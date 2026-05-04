@@ -186,6 +186,7 @@
 .selection-item {
     padding: 8px;
     border: 1px solid #eee;
+    font-family: Inter;
     border-radius: 6px;
     cursor: pointer;
     font-size: 13px;
@@ -193,17 +194,20 @@
     transition: all 0.2s;
 }
 
-.selection-item:hover {
-    background: #f8f9fa;
-}
-
 .selection-item.selected {
-    background: #e7f3ff;
-    border-color: #007bff;
-    color: #007bff;
+    border-color: #FF8C42;
+    color: #FF8C42;
     font-weight: bold;
 }
 
 .tags-container {
     position: relative;
+}
+
+.done-btn {
+    padding: 2px 5px;
+    background-color: #FF8C42;
+    color: white;
+    border: none;
+    cursor: pointer;
 }

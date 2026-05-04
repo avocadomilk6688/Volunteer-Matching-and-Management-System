@@ -33,7 +33,7 @@ export function LoginPage() {
                 id: data.id,
                 email: data.email,
                 role: data.role,
-                name: data.name
+                username: data.name
             });
 
             if (role === 'volunteer') {

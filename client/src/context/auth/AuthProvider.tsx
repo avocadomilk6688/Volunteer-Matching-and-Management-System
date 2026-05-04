@@ -5,17 +5,15 @@ interface User {
     id: string;
     email: string;
     role: string;
-    name?: string | null;
+    username?: string | null;
 }
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
-        // Returns true if a token exists to restore the previous session
         return !!localStorage.getItem('token');
     });
 
     const [user, setUser] = useState<User | null>(() => {
-        // Retrieves the stored username from localStorage if available
         const savedUser = localStorage.getItem('user');
         return savedUser ? JSON.parse(savedUser) : null;
     });
@@ -34,8 +32,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     return (
-        // Supplies the authentication context value to all nested consumer components
-        <AuthContext.Provider value={{ isAuthenticated, user, login, logout }}>
+        // FIX: Add setUser to the value object below
+        <AuthContext.Provider value={{ isAuthenticated, user, setUser, login, logout }}>
             {children}
         </AuthContext.Provider>
     );

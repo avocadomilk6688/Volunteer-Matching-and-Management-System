@@ -10,10 +10,16 @@ export function Header() {
     const [showProfileOptions, isShowProfileOptions] = useState(false);
 
     const handleLogout = () => {
-        logout(); // This clears localStorage and resets state
-        isShowProfileOptions(false); // Close the menu
-        navigate('/'); // Redirect to landing page or login
+        logout();
+        isShowProfileOptions(false);
+        navigate('/');
     };
+
+    // --- Dynamic Name Logic ---
+    // This checks for username first (from the DB update), then name, then fallback
+    const displayName = user?.username || user?.username || 'Volunteer';
+
+    console.log("Current User in Header:", user);
 
     return (
         <div className="header-container">
@@ -29,19 +35,20 @@ export function Header() {
 
                         <div className="user-controls">
                             <span className="greeting">
-                                Hi, {user?.name ? user.name : 'Volunteer'}!
+                                Hi, {displayName}!
                             </span>
 
                             <button className="profile-icon" onClick={() => isShowProfileOptions(!showProfileOptions)}>
-                                <MdAccountCircle color="white" />
+                                <MdAccountCircle size={32} color="white" />
                             </button>
                             <button className="notif-icon">
-                                <MdNotifications color="white" />
+                                <MdNotifications size={24} color="white" />
                             </button>
                         </div>
                     </div>
                 </div>
             )}
+
             {showProfileOptions && (
                 <div className="profile-options">
                     <Link

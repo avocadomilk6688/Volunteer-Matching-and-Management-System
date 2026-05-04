@@ -26,7 +26,8 @@ interface VolunteerProfileResponse {
 }
 
 export function ManageProfilePage() {
-    const { user } = useAuth();
+    // 1. Destructure 'setUser' from useAuth to refresh global state
+    const { user, setUser } = useAuth();
 
     // Form State
     const [username, setUsername] = useState<string>('');
@@ -100,7 +101,6 @@ export function ManageProfilePage() {
         if (e.target.files && e.target.files[0]) {
             const file = e.target.files[0];
             setSelectedImage(file);
-            // Create local blob preview for immediate UI feedback
             setProfilePicUrl(URL.createObjectURL(file));
         }
     };
@@ -139,6 +139,17 @@ export function ManageProfilePage() {
             await axios.patch(`${API_BASE_URL}/volunteers/${user?.id}`, formData, {
                 headers: { 'Content-Type': 'multipart/form-data' }
             });
+
+            // 2. Refresh the global state and localStorage
+            if (setUser && user) {
+                const updatedUser = {
+                    ...user,
+                    username: username // Now the Header can see the new name!
+                };
+                setUser(updatedUser);
+                localStorage.setItem('user', JSON.stringify(updatedUser));
+            }
+
             alert("Profile updated successfully!");
         } catch (err) {
             console.error(err);
@@ -158,9 +169,9 @@ export function ManageProfilePage() {
                 <div className="avatar-section">
                     <div className="avatar-large" style={{
                         backgroundImage: `url(${profilePicUrl.startsWith('blob:')
-                            ? profilePicUrl // If it's a new preview
+                            ? profilePicUrl
                             : profilePicUrl
-                                ? `${API_BASE_URL}${profilePicUrl}` // If it's saved on the server
+                                ? `${API_BASE_URL}${profilePicUrl}`
                                 : `https://ui-avatars.com/api/?name=${username || 'Volunteer'}&background=random`
                             })`,
                         backgroundSize: 'cover',
