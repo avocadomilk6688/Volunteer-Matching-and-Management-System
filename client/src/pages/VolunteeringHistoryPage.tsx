@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Header } from './Header';
 import { GenericTable } from './Table';
-import { useAuth } from '../context/auth/useAuth'; // Adjust the path based on your file structure
+import { useAuth } from '../context/auth/useAuth';
 import axios from 'axios';
 import './volunteering_history_page.css';
 
@@ -21,13 +21,12 @@ interface VolunteerStats {
 }
 
 export function VolunteeringHistoryPage() {
-    const { user } = useAuth(); // Get the user object from your context
+    const { user } = useAuth();
     const [data, setData] = useState<VolunteerStats | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        // If there is no user or no ID, we stop here
         if (!user?.id) {
             setError("Authentication required. Please log in.");
             setLoading(false);
@@ -37,7 +36,6 @@ export function VolunteeringHistoryPage() {
         const fetchHistory = async () => {
             try {
                 setLoading(true);
-                // Using user.id directly from your AuthContext
                 const response = await axios.get<VolunteerStats>(
                     `http://localhost:3000/volunteers/${user.id}/history`
                 );
@@ -52,13 +50,18 @@ export function VolunteeringHistoryPage() {
         };
 
         fetchHistory();
-    }, [user?.id]); // Re-run if the user ID changes (e.g., login/logout)
+    }, [user?.id]);
 
     const headers = ["Programme", "Organization", "Schedule", "Completed Hours", "Status"];
 
+    // --- FILTER LOGIC ---
+    // We create a filtered list that excludes anything with the 'pending' status
+    const filteredHistory = data?.history?.filter(
+        (item) => item.status.toLowerCase() !== 'pending'
+    ) || [];
+
     if (loading) return <div className="loading-state">Loading your journey...</div>;
 
-    // Show error if user is not logged in or fetch failed
     if (error) return (
         <div className="history-wrapper">
             <Header />
@@ -82,8 +85,9 @@ export function VolunteeringHistoryPage() {
                 </div>
 
                 <GenericTable headers={headers}>
-                    {data?.history && data.history.length > 0 ? (
-                        data.history.map((row) => (
+                    {/* Use filteredHistory instead of data.history */}
+                    {filteredHistory.length > 0 ? (
+                        filteredHistory.map((row) => (
                             <tr key={row.id}>
                                 <td>{row.programme}</td>
                                 <td>{row.org}</td>

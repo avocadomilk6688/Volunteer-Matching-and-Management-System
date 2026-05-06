@@ -6,9 +6,11 @@ import {
   Patch,
   Param,
   Delete,
+  UseInterceptors,
+  UploadedFile,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { ApplicationsService } from './applications.service';
-import { CreateApplicationDto } from './dto/create-application.dto';
 import { UpdateApplicationDto } from './dto/update-application.dto';
 
 @Controller('applications')
@@ -16,8 +18,23 @@ export class ApplicationsController {
   constructor(private readonly applicationsService: ApplicationsService) {}
 
   @Post()
-  async create(@Body() createApplicationDto: CreateApplicationDto) {
-    return await this.applicationsService.create(createApplicationDto);
+  // This interceptor allows NestJS to parse the FormData (text + file)
+  @UseInterceptors(FileInterceptor('resume'))
+  async create(
+    @Body() createApplicationDto: any,
+    @UploadedFile() file?: Express.Multer.File,
+  ) {
+    // We pass both the text fields and the file to the service
+    return await this.applicationsService.create(createApplicationDto, file);
+  }
+
+  // ADD THIS: This handles the GET request from your frontend's useEffect
+  @Get('check/:volunteerId/:programmeId')
+  async checkEnrollment(
+    @Param('volunteerId') volunteerId: string,
+    @Param('programmeId') programmeId: string,
+  ) {
+    return await this.applicationsService.checkStatus(volunteerId, programmeId);
   }
 
   @Get()

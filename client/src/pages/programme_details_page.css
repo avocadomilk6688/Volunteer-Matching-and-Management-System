@@ -131,3 +131,90 @@
 .organization-description {
     line-height: 25px;
 }
+
+.join-button.disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
+    color: #666;
+}
+
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.application-modal {
+    background: white;
+    padding: 30px;
+    border-radius: 12px;
+    width: 500px;
+    max-height: 80vh;
+    overflow-y: auto;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+    font-family: Inter;
+}
+
+.modal-secondary-btn {
+    background: #EFEFEF;
+    border: 1px solid black;
+    padding: 2px 5px;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.modal-cancel-btn,
+.modal-submit-btn {
+    padding: 2px 5px;
+    background-color: #ff9554;
+    color: white;
+    border: none;
+    cursor: pointer;
+}
+
+.modal-secondary-btn,
+.modal-submit-btn {
+    margin-left: 4px;
+}
+
+.modal-section {
+    margin-bottom: 20px;
+}
+
+.tag-pill {
+    background: #e0f2fe;
+    padding: 4px 10px;
+    border-radius: 15px;
+    margin: 3px;
+    display: inline-block;
+}
+
+.selection-box.mini {
+    width: 100%;
+    border: 1px solid #ddd;
+    margin-top: 10px;
+    padding: 10px;
+    border-radius: 8px;
+}
+
+.join-button.applied-disabled {
+    background-color: #a9a9a9 !important;
+    color: white !important;
+    cursor: default !important;
+    pointer-events: none;
+    border: 1px solid #bbbbbb;
+    transform: none !important;
+    box-shadow: none !important;
+}
+
+.join-button.applied-disabled:hover {
+    background-color: #cccccc !important;
+    cursor: default !important;
+}

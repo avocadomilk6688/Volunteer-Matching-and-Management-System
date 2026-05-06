@@ -2,8 +2,12 @@ import { AiFillStar, AiOutlineStar, AiOutlineFlag } from 'react-icons/ai';
 import { Header } from './Header';
 import './programme_details_page.css';
 import { useParams } from 'react-router';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useAuth } from '../context/auth/useAuth';
 import axios from 'axios';
+
+// --- Interfaces ---
+interface TagItem { id: string; name: string; }
 
 interface Skill {
     id: string;
@@ -41,124 +45,206 @@ interface ProgrammeDetailsData {
     };
 }
 
+interface EnrollmentCheckResponse {
+    enrolled: boolean;
+    status: string | null;
+}
+
+interface VolunteerProfileResponse {
+    id: string;
+    skills: Skill[];
+    interests: Interest[];
+    resume_url: string | null;
+}
+
+const API_BASE_URL = "http://localhost:3000";
+
 export function ProgrammeDetailsPage() {
-    const { id } = useParams<{ id: string }>();
+    const { id: programmeId } = useParams<{ id: string }>();
+    const { user } = useAuth();
+
+    // Data States
     const [programme, setProgramme] = useState<ProgrammeDetailsData | null>(null);
     const [loading, setLoading] = useState(true);
+    const [enrollmentStatus, setEnrollmentStatus] = useState<string | null>(null);
+
+    // Modal Application States
+    const [mySkills, setMySkills] = useState<TagItem[]>([]);
+    const [myInterests, setMyInterests] = useState<TagItem[]>([]);
+
+    // Global Options
+    const [allSkills, setAllSkills] = useState<TagItem[]>([]);
+    const [allInterests, setAllInterests] = useState<TagItem[]>([]);
+
+    const [resumeUrl, setResumeUrl] = useState<string>('');
+    const [selectedResume, setSelectedResume] = useState<File | null>(null);
+
+    // UI Logic States
+    const [showModal, setShowModal] = useState(false);
+    const [showSkillBox, setShowSkillBox] = useState(false);
+    const [showInterestBox, setShowInterestBox] = useState(false);
+    const resumeInputRef = useRef<HTMLInputElement>(null);
+
+    const formatFileName = (url: string) => {
+        if (!url) return "No resume uploaded";
+        const parts = url.split('/');
+        const fullName = parts[parts.length - 1];
+        return fullName.replace(/^resume-\d+-/, '');
+    };
 
     useEffect(() => {
-        const fetchProgrammeDetails = async () => {
+        const initLoad = async () => {
+            if (!programmeId) return;
             try {
                 setLoading(true);
-                const response = await axios.get(`http://localhost:3000/programmes/${id}`);
-                setProgramme(response.data);
+
+                // 1. Fetch Global Data (Always needed)
+                const [progRes, skillsRes, interestsRes] = await Promise.all([
+                    axios.get<ProgrammeDetailsData>(`${API_BASE_URL}/programmes/${programmeId}`),
+                    axios.get<Skill[]>(`${API_BASE_URL}/volunteers/skills`),
+                    axios.get<Interest[]>(`${API_BASE_URL}/volunteers/interests`)
+                ]);
+
+                setProgramme(progRes.data);
+                setAllSkills((skillsRes.data || []).map((s) => ({ id: s.id, name: s.skill_name })));
+                setAllInterests((interestsRes.data || []).map((i) => ({ id: i.id, name: i.interest_name })));
+
+                // 2. Fetch User-Specific Info
+                if (user?.id) {
+                    // Isolated Enrollment Check (FIXED URL: changed /enrollments to /applications)
+                    try {
+                        const enrollRes = await axios.get<EnrollmentCheckResponse>(`${API_BASE_URL}/applications/check/${user.id}/${programmeId}`);
+                        if (enrollRes.data && enrollRes.data.status) {
+                            setEnrollmentStatus(enrollRes.data.status);
+                        }
+                    } catch (e) {
+                        console.warn("Enrollment status check failed (usually means not enrolled)." + e);
+                    }
+
+                    // Fetch Volunteer Profile
+                    try {
+                        const volRes = await axios.get<VolunteerProfileResponse>(`${API_BASE_URL}/volunteers/${user.id}`);
+                        if (volRes.data) {
+                            setMySkills((volRes.data.skills || []).map((s) => ({ id: s.id, name: s.skill_name })));
+                            setMyInterests((volRes.data.interests || []).map((i) => ({ id: i.id, name: i.interest_name })));
+                            setResumeUrl(volRes.data.resume_url || '');
+                        }
+                    } catch (e) {
+                        console.error("Failed to load volunteer profile.", e);
+                    }
+                }
+
             } catch (error) {
-                console.error("Error fetching programme details:", error);
+                console.error("Initialization error:", error);
             } finally {
                 setLoading(false);
             }
         };
+        initLoad();
+    }, [programmeId, user?.id]);
 
-        if (id) {
-            fetchProgrammeDetails();
+    const toggleTag = (item: TagItem, type: 'skill' | 'interest') => {
+        if (type === 'skill') {
+            const isExisting = mySkills.find(s => s.id === item.id);
+            setMySkills(isExisting ? mySkills.filter(s => s.id !== item.id) : [...mySkills, item]);
+        } else {
+            const isExisting = myInterests.find(i => i.id === item.id);
+            setMyInterests(isExisting ? myInterests.filter(i => i.id !== item.id) : [...myInterests, item]);
         }
-    }, [id]);
+    };
 
-    if (loading) {
-        return (
-            <div className="sign-up-page-wrapper">
-                <Header />
-                <div className="page-body">Loading programme details...</div>
-            </div>
-        );
-    }
+    const handleApplySubmission = async () => {
+        try {
+            const formData = new FormData();
+            formData.append('volunteerId', user?.id || '');
+            formData.append('programmeId', programmeId || '');
 
-    if (!programme) {
-        return (
-            <div className="sign-up-page-wrapper">
-                <Header />
-                <div className="page-body">Programme not found.</div>
-            </div>
-        );
-    }
+            formData.append('skills', JSON.stringify(mySkills.map(s => ({
+                id: s.id,
+                skill_name: s.name
+            }))));
 
-    // Helper to format the date and time
+            formData.append('interests', JSON.stringify(myInterests.map(i => ({
+                id: i.id,
+                interest_name: i.name
+            }))));
+
+            if (selectedResume) {
+                formData.append('resume', selectedResume);
+            }
+
+            // --- FIX: Changed URL from /enrollments/apply to /applications ---
+            const response = await axios.post(`${API_BASE_URL}/applications`, formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+
+            console.log("Application successful:", response.data);
+            alert("Application submitted! Your enrollment is currently pending.");
+            setEnrollmentStatus('pending');
+            setShowModal(false);
+        } catch (err: unknown) {
+            if (axios.isAxiosError(err)) {
+                console.error("Application error details:", err.response?.data || err.message);
+                const errorMsg = err.response?.data?.message || "Failed to apply.";
+                alert(`Error: ${errorMsg}`);
+            } else {
+                console.error("Unexpected error:", err);
+                alert("An unexpected error occurred.");
+            }
+        }
+    };
+
     const formatDateTime = (isoString: string) => {
-        const date = new Date(isoString);
-        return date.toLocaleString('en-GB', {
-            day: '2-digit',
-            month: '2-digit',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: true
+        if (!isoString) return 'N/A';
+        return new Date(isoString).toLocaleString('en-GB', {
+            day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true
         });
     };
+
+    if (loading) return <div className="sign-up-page-wrapper"><Header /><div className="page-body">Loading...</div></div>;
+    if (!programme) return <div className="page-body">Programme not found.</div>;
 
     return (
         <div className="sign-up-page-wrapper">
             <Header />
             <div className="page-body">
                 <div className="programme-details">
-                    <div
-                        className="programme-image"
-                        style={{
-                            backgroundImage: `url(${programme.imageUrl})`,
-                            backgroundSize: 'cover',
-                            backgroundPosition: 'center',
-                        }}
-                    ></div>
+                    <div className="programme-image" style={{ backgroundImage: `url(${programme.imageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' }}></div>
 
                     <div className="header-row">
                         <div className="programme-name">{programme.title}</div>
                         <div className="tool-bar">
                             <button className="chat-button">Chat</button>
-                            <button className="join-button">Join</button>
+                            <button
+                                className={`join-button ${enrollmentStatus ? 'applied-disabled' : ''}`} // Changed class name for clarity
+                                onClick={() => !enrollmentStatus && setShowModal(true)}
+                                disabled={!!enrollmentStatus}
+                            >
+                                {/* Always show "Applied" if enrollmentStatus exists, otherwise "Join" */}
+                                {enrollmentStatus ? 'Applied' : 'Join'}
+                            </button>
                             <AiOutlineStar className="save-button" />
                             <AiOutlineFlag className="report-button" />
                         </div>
                     </div>
 
                     <div className="organization-details">
-                        <div
-                            className="organization-profile-pic"
-                            style={{
-                                backgroundImage: `url(${programme.organization.profile_picture_url})`,
-                                backgroundSize: 'cover',
-                                backgroundPosition: 'center'
-                            }}
-                        ></div>
-                        <div className="organization-name">
-                            {programme.organization.user.username}
-                        </div>
+                        <div className="organization-profile-pic" style={{ backgroundImage: `url(${programme.organization.profile_picture_url})`, backgroundSize: 'cover' }}></div>
+                        <div className="organization-name">{programme.organization.user.username}</div>
                         <div className="organization-rating">
                             <AiFillStar className="star-icon" />
-                            <p className="organization-rating-text">
-                                {programme.organization.rating.toFixed(1)}
-                            </p>
+                            <p className="organization-rating-text">{programme.organization.rating.toFixed(1)}</p>
                         </div>
                     </div>
 
                     <div className="metadata">
-                        <div className="skills">
-                            Skills:
-                            {programme.related_skills?.map(skill => (
-                                <div key={skill.id} className="skill">{skill.skill_name}</div>
-                            ))}
-                        </div>
-                        <div className="interests">
-                            Interests:
-                            {programme.related_interests?.map(interest => (
-                                <div key={interest.id} className="interest">{interest.interest_name}</div>
-                            ))}
-                        </div>
+                        <div className="skills">Skills: {programme.related_skills?.map(s => <div key={s.id} className="skill">{s.skill_name}</div>)}</div>
+                        <div className="interests">Interests: {programme.related_interests?.map(i => <div key={i.id} className="interest">{i.interest_name}</div>)}</div>
                     </div>
 
                     <div className="programme-logistics">
                         <p>Mode: {programme.schedule?.mode || 'N/A'}</p>
-                        <p>
-                            Schedule: {formatDateTime(programme.schedule?.start_time)} - {formatDateTime(programme.schedule?.end_time)}
-                        </p>
+                        <p>Schedule: {formatDateTime(programme.schedule?.start_time)} - {formatDateTime(programme.schedule?.end_time)}</p>
                         <p>Location: {programme.schedule?.location || 'N/A'}</p>
                     </div>
 
@@ -170,14 +256,82 @@ export function ProgrammeDetailsPage() {
                     <div className="organization-description">
                         <h2>Organization Description</h2>
                         <p>{programme.organization.description}</p>
-                        <div className="contact-info">
-                            <p>Address: {programme.schedule?.location}</p>
-                            <p>Contact number: {programme.organization.contact_number}</p>
-                            <p>Email address: {programme.organization.user.email}</p>
-                        </div>
                     </div>
                 </div>
             </div>
+
+            {showModal && (
+                <div className="modal-overlay">
+                    <div className="application-modal">
+                        <h2>Join Programme</h2>
+                        <p className="modal-subtitle">Confirm your details</p>
+
+                        <div className="modal-section">
+                            <label>Skills:</label>
+                            <div className="tags-container">
+                                {mySkills.map(skill => (
+                                    <span key={skill.id} className="tag-pill">
+                                        {skill.name} <span className="remove-tag" onClick={() => toggleTag(skill, 'skill')}>x</span>
+                                    </span>
+                                ))}
+                                <button className="add-tag-btn" onClick={() => setShowSkillBox(!showSkillBox)}>+</button>
+                                {showSkillBox && (
+                                    <div className="selection-box mini">
+                                        <div className="selection-grid">
+                                            {allSkills.map(s => (
+                                                <div key={s.id} className={`selection-item ${mySkills.find(ms => ms.id === s.id) ? 'selected' : ''}`} onClick={() => toggleTag(s, 'skill')}>
+                                                    {s.name}
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <button className="done-btn" onClick={() => setShowSkillBox(false)}>Done</button>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="modal-section">
+                            <label>Interests:</label>
+                            <div className="tags-container">
+                                {myInterests.map(interest => (
+                                    <span key={interest.id} className="tag-pill">
+                                        {interest.name} <span className="remove-tag" onClick={() => toggleTag(interest, 'interest')}>x</span>
+                                    </span>
+                                ))}
+                                <button className="add-tag-btn" onClick={() => setShowInterestBox(!showInterestBox)}>+</button>
+                                {showInterestBox && (
+                                    <div className="selection-box mini">
+                                        <div className="selection-grid">
+                                            {allInterests.map(i => (
+                                                <div key={i.id} className={`selection-item ${myInterests.find(mi => mi.id === i.id) ? 'selected' : ''}`} onClick={() => toggleTag(i, 'interest')}>
+                                                    {i.name}
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <button className="done-btn" onClick={() => setShowInterestBox(false)}>Done</button>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="modal-section">
+                            <label>Resume:</label>
+                            <div className="resume-upload-row">
+                                <span className="current-resume">
+                                    {selectedResume ? selectedResume.name : formatFileName(resumeUrl)}
+                                </span>
+                                <input type="file" ref={resumeInputRef} style={{ display: 'none' }} accept="application/pdf" onChange={(e) => e.target.files && setSelectedResume(e.target.files[0])} />
+                                <button className="modal-secondary-btn" onClick={() => resumeInputRef.current?.click()}>Update PDF</button>
+                            </div>
+                        </div>
+
+                        <div className="modal-actions">
+                            <button className="modal-cancel-btn" onClick={() => setShowModal(false)}>Cancel</button>
+                            <button className="modal-submit-btn" onClick={handleApplySubmission}>Submit</button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
