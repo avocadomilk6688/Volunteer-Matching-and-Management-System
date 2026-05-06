@@ -25,6 +25,8 @@ export function LoginPage() {
 
             const data = await response.json();
 
+            console.log("DEBUG: Full response from server:", data);
+
             if (!response.ok) {
                 throw new Error(data.message || 'Login failed');
             }
@@ -33,7 +35,7 @@ export function LoginPage() {
                 id: data.id,
                 email: data.email,
                 role: data.role,
-                username: data.name
+                username: data.username
             });
 
             if (role === 'volunteer') {
