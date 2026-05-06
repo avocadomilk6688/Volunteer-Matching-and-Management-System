@@ -6,8 +6,9 @@ import {
   Patch,
   Param,
   Delete,
+  Query,
 } from '@nestjs/common';
-import { ProgrammesService } from './programmes.service';
+import { ProgrammesService, FilterProgrammeParams } from './programmes.service';
 import { CreateProgrammeDto } from './dto/create-programme.dto';
 import { UpdateProgrammeDto } from './dto/update-programme.dto';
 
@@ -21,14 +22,12 @@ export class ProgrammesController {
   }
 
   @Get()
-  async findAll() {
-    return await this.programmesService.findAll();
+  async findAll(@Query() filterDto: FilterProgrammeParams) {
+    return await this.programmesService.findAll(filterDto);
   }
 
   @Get(':id')
   async findOne(@Param('id') id: string) {
-    // This endpoint is critical for loading specific data
-    // into your ProgrammeDetailsPage.tsx
     return await this.programmesService.findOne(id);
   }
 

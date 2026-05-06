@@ -10,6 +10,18 @@ import { CreateProgrammeDto } from './dto/create-programme.dto';
 import { UpdateProgrammeDto } from './dto/update-programme.dto';
 import { generateCustomId } from '../common/utils/id_generator.util';
 
+export class FilterProgrammeParams {
+  keyword?: string;
+  location?: string;
+  skill?: string;
+  interest?: string;
+  start?: string;
+  end?: string;
+  saved?: string;
+  page?: number;
+  limit?: number;
+}
+
 @Injectable()
 export class ProgrammesService {
   constructor(
@@ -44,16 +56,69 @@ export class ProgrammesService {
     return await this.programmeRepo.save(newProgramme);
   }
 
-  async findAll() {
-    return await this.programmeRepo.find({
-      relations: [
-        'schedule',
-        'organization',
-        'organization.user', // Required for organization name in cards
-        'related_skills',
-        'related_interests',
-      ],
-    });
+  /**
+   * FULL IMPLEMENTATION: Filtering + Server-Side Pagination
+   */
+  async findAll(filterDto: FilterProgrammeParams = {}) {
+    const { keyword, location, skill, interest, start, end } = filterDto;
+
+    // 1. Setup Pagination values (Default to Page 1, 6 items per page)
+    const page = Number(filterDto.page) || 1;
+    const limit = Number(filterDto.limit) || 6;
+    const skip = (page - 1) * limit;
+
+    const query = this.programmeRepo
+      .createQueryBuilder('programme')
+      .leftJoinAndSelect('programme.schedule', 'schedule')
+      .leftJoinAndSelect('programme.organization', 'organization')
+      .leftJoinAndSelect('organization.user', 'user')
+      .leftJoinAndSelect('programme.related_skills', 'skills')
+      .leftJoinAndSelect('programme.related_interests', 'interests');
+
+    // 2. Apply Filters
+    if (keyword) {
+      query.andWhere(
+        '(programme.title LIKE :keyword OR programme.description LIKE :keyword)', // Changed ILIKE to LIKE
+        { keyword: `%${keyword}%` },
+      );
+    }
+
+    if (location) {
+      const locations = location.split(',');
+      query.andWhere('schedule.location IN (:...locations)', { locations });
+    }
+
+    if (skill) {
+      const skillIds = skill.split(',');
+      query.andWhere('skills.id IN (:...skillIds)', { skillIds });
+    }
+
+    if (interest) {
+      const interestIds = interest.split(',');
+      query.andWhere('interests.id IN (:...interestIds)', { interestIds });
+    }
+
+    if (start) {
+      query.andWhere('schedule.start_time >= :start', {
+        start: new Date(start),
+      });
+    }
+    if (end) {
+      query.andWhere('schedule.end_time <= :end', { end: new Date(end) });
+    }
+
+    // 3. Apply Pagination & Sorting
+    query.orderBy('programme.id', 'DESC').skip(skip).take(limit);
+
+    // 4. Return both the data and the total count (needed for frontend pagination controls)
+    const [items, total] = await query.getManyAndCount();
+
+    return {
+      items,
+      total,
+      page,
+      lastPage: Math.ceil(total / limit),
+    };
   }
 
   async findOne(id: string) {
@@ -62,7 +127,7 @@ export class ProgrammesService {
       relations: [
         'schedule',
         'organization',
-        'organization.user', // Added so username/email works on Details Page
+        'organization.user',
         'related_skills',
         'related_interests',
       ],
