@@ -8,6 +8,14 @@ import { useState, forwardRef, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import axios from 'axios';
 
+// --- Constants ---
+const MALAYSIAN_STATES = [
+    "Johor", "Kedah", "Kelantan", "Melaka", "Negeri Sembilan", "Pahang",
+    "Penang", "Perak", "Perlis", "Sabah", "Sarawak", "Selangor", "Terengganu",
+    "Kuala Lumpur", "Labuan", "Putrajaya"
+];
+
+// --- Interfaces ---
 interface Programme {
     id: string;
     title: string;
@@ -15,51 +23,68 @@ interface Programme {
     organization: {
         profile_picture_url: string;
         rating: number;
-        user: {
-            username: string;
-        }
+        user: { username: string; }
     }
 }
 
-interface DateBoxInputProps {
+interface DateBoxProps {
     value?: string;
     onClick?: (event: React.MouseEvent<HTMLDivElement, MouseEvent>) => void;
     placeholder?: string;
 }
 
-const DateBox = forwardRef<HTMLDivElement, DateBoxInputProps>(
-    ({ value, onClick, placeholder }, ref) => (
+// BULLETPROOF DATEBOX LOGIC
+const DateBox = forwardRef<HTMLDivElement, DateBoxProps>(({ value, onClick, placeholder }, ref) => {
+    // If value is null, undefined, or an empty string, show placeholder
+    const textToShow = (value && value.trim().length > 0) ? value : placeholder;
+
+    return (
         <div className="date-box" onClick={onClick} ref={ref}>
-            <span className="date-text">{value || placeholder}</span>
+            <span className="date-text">{textToShow}</span>
             <GoChevronDown className="select-arrow-icon" />
         </div>
-    )
-);
+    );
+});
 
 export function VolunteerHomePage() {
     const [programmes, setProgrammes] = useState<Programme[]>([]);
     const [loading, setLoading] = useState(true);
+    const navigate = useNavigate();
 
-    // Pagination State
-    const [currentPage, setCurrentPage] = useState(1);
-    const itemsPerPage = 6;
+    const [allSkills, setAllSkills] = useState<{ id: string, skill_name: string }[]>([]);
+    const [allInterests, setAllInterests] = useState<{ id: string, interest_name: string }[]>([]);
 
-    // Filter States
+    const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
+    const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
+    const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
+
     const [searchTerm, setSearchTerm] = useState('');
-    const [selectedLocation, setSelectedLocation] = useState('');
-    const [selectedSkill, setSelectedSkill] = useState('');
-    const [selectedInterest, setSelectedInterest] = useState('');
     const [startDate, setStartDate] = useState<Date | null>(null);
     const [endDate, setEndDate] = useState<Date | null>(null);
     const [saveStatus, setSaveStatus] = useState('all');
 
-    const navigate = useNavigate();
+    const [isLocOpen, setIsLocOpen] = useState(false);
+    const [isSkillOpen, setIsSkillOpen] = useState(false);
+    const [isInterestOpen, setIsInterestOpen] = useState(false);
 
-    // Logic to calculate displayed items
-    const indexOfLastItem = currentPage * itemsPerPage;
-    const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-    const currentProgrammes = programmes.slice(indexOfFirstItem, indexOfLastItem);
-    const totalPages = Math.ceil(programmes.length / itemsPerPage);
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 6;
+
+    useEffect(() => {
+        const fetchFilters = async () => {
+            try {
+                const [skillsRes, interestsRes] = await Promise.all([
+                    axios.get('http://localhost:3000/volunteers/skills'),
+                    axios.get('http://localhost:3000/volunteers/interests')
+                ]);
+                setAllSkills(skillsRes.data);
+                setAllInterests(interestsRes.data);
+            } catch (err) {
+                console.error("Failed to fetch filter options", err);
+            }
+        };
+        fetchFilters();
+    }, []);
 
     useEffect(() => {
         const fetchProgrammes = async () => {
@@ -68,39 +93,38 @@ export function VolunteerHomePage() {
                 const response = await axios.get('http://localhost:3000/programmes', {
                     params: {
                         keyword: searchTerm,
-                        location: selectedLocation,
-                        skill: selectedSkill,
-                        interest: selectedInterest,
+                        location: selectedLocations.join(','),
+                        skill: selectedSkills.join(','),
+                        interest: selectedInterests.join(','),
                         start: startDate?.toISOString(),
                         end: endDate?.toISOString(),
                         saved: saveStatus
                     }
                 });
                 setProgrammes(response.data);
-                setCurrentPage(1); // Reset to page 1 on new search/filter
+                setCurrentPage(1);
             } catch (error) {
                 console.error("API Error:", error);
             } finally {
                 setLoading(false);
             }
         };
-
         fetchProgrammes();
-    }, [searchTerm, selectedLocation, selectedSkill, selectedInterest, startDate, endDate, saveStatus]);
+    }, [searchTerm, selectedLocations, selectedSkills, selectedInterests, startDate, endDate, saveStatus]);
 
-    const handleNextPage = () => {
-        if (currentPage < totalPages) setCurrentPage(prev => prev + 1);
+    const toggleFilter = (val: string, list: string[], setter: (val: string[]) => void) => {
+        setter(list.includes(val) ? list.filter(i => i !== val) : [...list, val]);
     };
 
-    const handlePrevPage = () => {
-        if (currentPage > 1) setCurrentPage(prev => prev - 1);
-    };
+    const totalPages = Math.ceil(programmes.length / itemsPerPage);
+    const currentProgrammes = programmes.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
     return (
         <div className="volunteer-home-page-wrapper">
             <Header />
             <div className="page-body">
                 <div className="search-filter-bar">
+                    
                     <div className="search-input-container">
                         <input
                             className="search-input"
@@ -112,36 +136,65 @@ export function VolunteerHomePage() {
                         <AiOutlineSearch className="search-icon" />
                     </div>
 
-                    <select name="location" id="location" onChange={(e) => setSelectedLocation(e.target.value)}>
-                        <option value="">All Locations</option>
-                        <option value="Selangor">Selangor</option>
-                        <option value="Kuala Lumpur">Kuala Lumpur</option>
-                        <option value="Melaka">Melaka</option>
-                        <option value="Johor">Johor</option>
-                        <option value="Penang">Penang</option>
-                    </select>
+                    <div className="custom-multiselect-container">
+                        <div className="custom-select-box" onClick={() => setIsLocOpen(!isLocOpen)}>
+                            <span className="select-text">
+                                {selectedLocations.length === 0 ? "All Locations" : `${selectedLocations.length} selected`}
+                            </span>
+                            <GoChevronDown className="select-arrow-icon" />
+                        </div>
+                        {isLocOpen && (
+                            <div className="multiselect-dropdown">
+                                {MALAYSIAN_STATES.map(state => (
+                                    <label key={state} className="checkbox-label">
+                                        <input type="checkbox" checked={selectedLocations.includes(state)} onChange={() => toggleFilter(state, selectedLocations, setSelectedLocations)} /> {state}
+                                    </label>
+                                ))}
+                            </div>
+                        )}
+                    </div>
 
-                    <select name="skill" id="skill" onChange={(e) => setSelectedSkill(e.target.value)}>
-                        <option value="">All Skills</option>
-                        <option value="SKL001">Coding</option>
-                        <option value="SKL002">Graphic design</option>
-                        <option value="SKL009">Tutoring</option>
-                        <option value="SKL014">Photography</option>
-                    </select>
+                    <div className="custom-multiselect-container">
+                        <div className="custom-select-box" onClick={() => setIsSkillOpen(!isSkillOpen)}>
+                            <span className="select-text">
+                                {selectedSkills.length === 0 ? "All Skills" : `${selectedSkills.length} selected`}
+                            </span>
+                            <GoChevronDown className="select-arrow-icon" />
+                        </div>
+                        {isSkillOpen && (
+                            <div className="multiselect-dropdown">
+                                {allSkills.map(skill => (
+                                    <label key={skill.id} className="checkbox-label">
+                                        <input type="checkbox" checked={selectedSkills.includes(skill.id)} onChange={() => toggleFilter(skill.id, selectedSkills, setSelectedSkills)} /> {skill.skill_name}
+                                    </label>
+                                ))}
+                            </div>
+                        )}
+                    </div>
 
-                    <select name="interest" id="interest" onChange={(e) => setSelectedInterest(e.target.value)}>
-                        <option value="">All Interests</option>
-                        <option value="INT001">Animal Welfare</option>
-                        <option value="INT018">Gender equality</option>
-                        <option value="INT003">Education</option>
-                        <option value="INT013">Marine conservation</option>
-                    </select>
+                    <div className="custom-multiselect-container">
+                        <div className="custom-select-box" onClick={() => setIsInterestOpen(!isInterestOpen)}>
+                            <span className="select-text">
+                                {selectedInterests.length === 0 ? "All Interests" : `${selectedInterests.length} selected`}
+                            </span>
+                            <GoChevronDown className="select-arrow-icon" />
+                        </div>
+                        {isInterestOpen && (
+                            <div className="multiselect-dropdown">
+                                {allInterests.map(interest => (
+                                    <label key={interest.id} className="checkbox-label">
+                                        <input type="checkbox" checked={selectedInterests.includes(interest.id)} onChange={() => toggleFilter(interest.id, selectedInterests, setSelectedInterests)} /> {interest.interest_name}
+                                    </label>
+                                ))}
+                            </div>
+                        )}
+                    </div>
 
                     <DatePicker
                         selected={startDate}
                         onChange={(date: Date | null) => setStartDate(date)}
-                        placeholderText="Start Time"
-                        customInput={<DateBox placeholder="Start Time" />}
+                        placeholderText="Start Time" // Library internal
+                        customInput={<DateBox placeholder="Start Time" />} // Explicitly pass to your DateBox
                         showTimeSelect
                         dateFormat="Pp"
                     />
@@ -149,13 +202,13 @@ export function VolunteerHomePage() {
                     <DatePicker
                         selected={endDate}
                         onChange={(date: Date | null) => setEndDate(date)}
-                        placeholderText="End Time"
-                        customInput={<DateBox placeholder="End Time" />}
+                        placeholderText="End Time" // Library internal
+                        customInput={<DateBox placeholder="End Time" />} // Explicitly pass to your DateBox
                         showTimeSelect
                         dateFormat="Pp"
                     />
 
-                    <select name="saved" id="saved" onChange={(e) => setSaveStatus(e.target.value)}>
+                    <select className="standard-select" value={saveStatus} onChange={(e) => setSaveStatus(e.target.value)}>
                         <option value="all">All</option>
                         <option value="saved">Saved</option>
                         <option value="not-saved">Not saved</option>
@@ -165,58 +218,28 @@ export function VolunteerHomePage() {
                 <div className="programmes-container">
                     {loading ? (
                         <div className="loading-state">Loading opportunities...</div>
-                    ) : currentProgrammes.length > 0 ? (
-                        currentProgrammes.map((prog) => (
-                            <div
-                                key={prog.id}
-                                className="programme"
-                                onClick={() => navigate(`/programme-details/${prog.id}`)}
-                            >
-                                <div
-                                    className="programme-image"
-                                    style={{
-                                        backgroundImage: `url(${prog.imageUrl})`,
-                                        backgroundSize: 'cover',
-                                        backgroundPosition: 'center'
-                                    }}
-                                ></div>
-                                <div className="programme-info">
-                                    <div className="programme-name">{prog.title}</div>
-                                    <div className="organization-info">
-                                        <div
-                                            className="organization-profile-pic"
-                                            style={{
-                                                backgroundImage: `url(${prog.organization?.profile_picture_url || ''})`,
-                                                backgroundSize: 'cover',
-                                                backgroundPosition: 'center'
-                                            }}
-                                        ></div>
-                                        <div className="organization-name">{prog.organization?.user?.username || 'Unknown'}</div>
-                                        <div className="organization-rating">
-                                            <AiFillStar className="star-icon" />
-                                            <p className="organization-rating-text">
-                                                {prog.organization?.rating?.toFixed(1) || '0.0'}
-                                            </p>
-                                        </div>
+                    ) : currentProgrammes.map((prog) => (
+                        <div key={prog.id} className="programme" onClick={() => navigate(`/programme-details/${prog.id}`)}>
+                            <div className="programme-image" style={{ backgroundImage: `url(${prog.imageUrl})`, backgroundSize: 'cover' }}></div>
+                            <div className="programme-info">
+                                <div className="programme-name">{prog.title}</div>
+                                <div className="organization-info">
+                                    <div className="organization-profile-pic" style={{ backgroundImage: `url(${prog.organization?.profile_picture_url || ''})`, backgroundSize: 'cover' }}></div>
+                                    <div className="organization-name">{prog.organization?.user?.username || 'Unknown'}</div>
+                                    <div className="organization-rating">
+                                        <AiFillStar className="star-icon" />
+                                        <p className="organization-rating-text">{prog.organization?.rating?.toFixed(1) || '0.0'}</p>
                                     </div>
                                 </div>
                             </div>
-                        ))
-                    ) : (
-                        <div className="no-results">No programmes found matching your filters.</div>
-                    )}
+                        </div>
+                    ))}
                 </div>
 
                 <div className="pagination-container">
-                    <GoTriangleLeft 
-                        className={`pagination-arrow ${currentPage === 1 ? 'disabled' : ''}`} 
-                        onClick={handlePrevPage}
-                    />
+                    <GoTriangleLeft className={`pagination-arrow ${currentPage === 1 ? 'disabled' : ''}`} onClick={() => currentPage > 1 && setCurrentPage(currentPage - 1)} />
                     <div className="page-number-box">{currentPage}</div>
-                    <GoTriangleRight 
-                        className={`pagination-arrow ${currentPage === totalPages || totalPages === 0 ? 'disabled' : ''}`} 
-                        onClick={handleNextPage}
-                    />
+                    <GoTriangleRight className={`pagination-arrow ${currentPage === totalPages || totalPages === 0 ? 'disabled' : ''}`} onClick={() => currentPage < totalPages && setCurrentPage(currentPage + 1)} />
                 </div>
             </div>
         </div>

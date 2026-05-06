@@ -1,3 +1,5 @@
+/* --- 1. FILTER BAR & INPUTS (MATCHING CLASSIC LOOK) --- */
+
 .volunteer-home-page-wrapper .page-body {
     display: flex;
     flex-direction: column;
@@ -8,6 +10,7 @@
 .search-filter-bar {
     display: flex;
     justify-content: flex-start;
+    align-items: center; /* Vertical alignment fix */
     gap: 12px;
     flex-wrap: wrap;
 }
@@ -16,12 +19,26 @@
     position: relative;
 }
 
-.search-input {
-    width: 300px;
+/* Standardized Classic look for all filter boxes */
+.search-input,
+.search-filter-bar select,
+.custom-select-box,
+.date-box,
+.standard-select {
     height: 45px;
-    padding: 4px 10px;
+    padding: 0 10px;
     font-size: 16px;
     border: 1px solid #767676;
+    border-radius: 0; /* Square corners per screenshot */
+    background-color: white;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    color: black;
+}
+
+.search-input {
+    width: 300px;
 }
 
 .search-icon {
@@ -33,42 +50,67 @@
     cursor: pointer;
 }
 
-.search-filter-bar select {
-    font-size: 16px;
-    padding: 4px 10px;
-    height: 45px;
-    border: 1px solid #767676;
+/* Custom Multiselect / Date Containers */
+.custom-multiselect-container,
+.react-datepicker-wrapper {
+    position: relative;
+    width: 160px; /* Standard width for all dropdowns */
 }
 
-.date-box {
-    width: 150px;
-    height: 45px;
+.custom-select-box, .date-box {
+    width: 100%;
+    justify-content: space-between;
+    cursor: pointer;
+}
+
+/* FIX: Chevron for Native Selects (All Saved / All Locations) */
+.standard-select,
+.search-filter-bar select {
+    width: 160px;
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    /* Using a stroke-based chevron SVG to match GoChevronDown */
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    background-size: 14px;
+    padding-right: 30px;
+}
+
+/* Dropdown Menu styling */
+.multiselect-dropdown {
+    position: absolute;
+    top: 45px;
+    left: 0;
+    width: 220px;
+    max-height: 250px;
+    overflow-y: auto;
+    background-color: white;
     border: 1px solid #767676;
+    border-top: none;
+    z-index: 100;
+    padding: 5px 0;
+}
+
+.checkbox-label {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    padding: 0 10px;
-    background-color: white;
+    padding: 8px 12px;
     cursor: pointer;
-    box-sizing: border-box;
+    font-size: 14px;
 }
 
-.select-arrow-icon {
-    font-size: 18px;
-    color: black;
-    flex-shrink: 0;
+.checkbox-label:hover {
+    background-color: #f0f0f0;
 }
 
-.date-text {
-    font-size: 16px;
-    color: black;
-    white-space: nowrap;
-    overflow: hidden;
+.checkbox-label input {
+    margin-right: 10px;
 }
 
-.react-datepicker-wrapper {
-    width: auto;
-}
+/* --- 2. PROGRAMME CARD STYLING (PROTECTED / NO CHANGES) --- */
 
 .programmes-container {
     display: grid;
@@ -145,6 +187,7 @@
     margin: 0;
 }
 
+/* Pagination & Loading States */
 .pagination-container {
     display: flex;
     align-items: center;
