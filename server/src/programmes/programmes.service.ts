@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, Brackets } from 'typeorm'; // Added Brackets here
 import { Programme } from './entities/programme.entity';
 import { Schedule } from './entities/schedule.entity';
 import { Organization } from '../organizations/entities/organization.entity';
@@ -57,12 +57,11 @@ export class ProgrammesService {
   }
 
   /**
-   * FULL IMPLEMENTATION: Filtering + Server-Side Pagination
+   * FULL IMPLEMENTATION: Filtering + Fuzzy Location + Pagination
    */
   async findAll(filterDto: FilterProgrammeParams = {}) {
     const { keyword, location, skill, interest, start, end } = filterDto;
 
-    // 1. Setup Pagination values (Default to Page 1, 6 items per page)
     const page = Number(filterDto.page) || 1;
     const limit = Number(filterDto.limit) || 6;
     const skip = (page - 1) * limit;
@@ -75,29 +74,50 @@ export class ProgrammesService {
       .leftJoinAndSelect('programme.related_skills', 'skills')
       .leftJoinAndSelect('programme.related_interests', 'interests');
 
-    // 2. Apply Filters
+    // 1. Keyword Search
     if (keyword) {
       query.andWhere(
-        '(programme.title LIKE :keyword OR programme.description LIKE :keyword)', // Changed ILIKE to LIKE
+        '(programme.title LIKE :keyword OR programme.description LIKE :keyword)',
         { keyword: `%${keyword}%` },
       );
     }
 
+    // 2. FUZZY LOCATION SEARCH (Find state inside long address)
     if (location) {
       const locations = location.split(',');
-      query.andWhere('schedule.location IN (:...locations)', { locations });
+
+      // We use Brackets to wrap the "OR" logic so it doesn't break the other "AND" filters
+      query.andWhere(
+        new Brackets((qb) => {
+          locations.forEach((loc, index) => {
+            const paramName = `loc_${index}`;
+            if (index === 0) {
+              qb.where(`schedule.location LIKE :${paramName}`, {
+                [paramName]: `%${loc.trim()}%`,
+              });
+            } else {
+              qb.orWhere(`schedule.location LIKE :${paramName}`, {
+                [paramName]: `%${loc.trim()}%`,
+              });
+            }
+          });
+        }),
+      );
     }
 
+    // 3. Multi-Skills (Exact match by ID)
     if (skill) {
       const skillIds = skill.split(',');
       query.andWhere('skills.id IN (:...skillIds)', { skillIds });
     }
 
+    // 4. Multi-Interests (Exact match by ID)
     if (interest) {
       const interestIds = interest.split(',');
       query.andWhere('interests.id IN (:...interestIds)', { interestIds });
     }
 
+    // 5. Date Filtering
     if (start) {
       query.andWhere('schedule.start_time >= :start', {
         start: new Date(start),
@@ -107,10 +127,9 @@ export class ProgrammesService {
       query.andWhere('schedule.end_time <= :end', { end: new Date(end) });
     }
 
-    // 3. Apply Pagination & Sorting
+    // 6. Pagination & Ordering
     query.orderBy('programme.id', 'DESC').skip(skip).take(limit);
 
-    // 4. Return both the data and the total count (needed for frontend pagination controls)
     const [items, total] = await query.getManyAndCount();
 
     return {

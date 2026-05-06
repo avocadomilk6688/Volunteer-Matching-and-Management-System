@@ -1,7 +1,7 @@
 import { Header } from './Header';
 import './volunteer_home_page.css';
 import { AiOutlineSearch, AiFillStar } from 'react-icons/ai';
-import { GoTriangleLeft, GoTriangleRight, GoChevronDown } from 'react-icons/go';
+import { GoTriangleLeft, GoTriangleRight, GoChevronDown, GoSync } from 'react-icons/go';
 import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
 import { useState, forwardRef, useEffect } from 'react';
@@ -45,11 +45,9 @@ export function VolunteerHomePage() {
     const [loading, setLoading] = useState(true);
     const navigate = useNavigate();
 
-    // Master Data for Dropdowns
     const [allSkills, setAllSkills] = useState<{ id: string, skill_name: string }[]>([]);
     const [allInterests, setAllInterests] = useState<{ id: string, interest_name: string }[]>([]);
 
-    // Filter States
     const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
     const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
     const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
@@ -58,36 +56,40 @@ export function VolunteerHomePage() {
     const [endDate, setEndDate] = useState<Date | null>(null);
     const [saveStatus, setSaveStatus] = useState('all');
 
-    // UI states for dropdowns
     const [isLocOpen, setIsLocOpen] = useState(false);
     const [isSkillOpen, setIsSkillOpen] = useState(false);
     const [isInterestOpen, setIsInterestOpen] = useState(false);
 
-    // --- SERVER-SIDE PAGINATION STATES ---
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
     const itemsPerPage = 6;
 
-    // --- FUNCTION: FETCH DATA ---
-    // Added 'page' parameter so we can call it from different triggers
-    const handleSearch = async (pageNumber: number = 1) => {
+    const handleSearch = async (pageNumber: number = 1, isReset: boolean = false) => {
         try {
             setLoading(true);
-            const response = await axios.get('http://localhost:3000/programmes', {
-                params: {
-                    keyword: searchTerm,
-                    location: selectedLocations.join(','),
-                    skill: selectedSkills.join(','),
-                    interest: selectedInterests.join(','),
-                    start: startDate?.toISOString(),
-                    end: endDate?.toISOString(),
-                    saved: saveStatus,
-                    page: pageNumber, // Send current page to backend
-                    limit: itemsPerPage
-                }
-            });
+            const params = isReset ? {
+                keyword: '',
+                location: '',
+                skill: '',
+                interest: '',
+                start: undefined,
+                end: undefined,
+                saved: 'all',
+                page: 1,
+                limit: itemsPerPage
+            } : {
+                keyword: searchTerm,
+                location: selectedLocations.join(','),
+                skill: selectedSkills.join(','),
+                interest: selectedInterests.join(','),
+                start: startDate?.toISOString(),
+                end: endDate?.toISOString(),
+                saved: saveStatus,
+                page: pageNumber,
+                limit: itemsPerPage
+            };
 
-            // Update states based on new backend object structure
+            const response = await axios.get('http://localhost:3000/programmes', { params });
             setProgrammes(response.data.items);
             setTotalPages(response.data.lastPage);
             setCurrentPage(response.data.page);
@@ -98,7 +100,18 @@ export function VolunteerHomePage() {
         }
     };
 
-    // Initial load: Fetch master data and first page of programmes
+    const handleReset = () => {
+        setSearchTerm('');
+        setSelectedLocations([]);
+        setSelectedSkills([]);
+        setSelectedInterests([]);
+        setStartDate(null);
+        setEndDate(null);
+        setSaveStatus('all');
+        setCurrentPage(1);
+        handleSearch(1, true);
+    };
+
     useEffect(() => {
         const loadPageData = async () => {
             try {
@@ -108,7 +121,6 @@ export function VolunteerHomePage() {
                 ]);
                 setAllSkills(skillsRes.data);
                 setAllInterests(interestsRes.data);
-
                 await handleSearch(1);
             } catch (err) {
                 console.error("Load Error:", err);
@@ -117,17 +129,12 @@ export function VolunteerHomePage() {
         loadPageData();
     }, []);
 
-    // Pagination Click Handlers
     const goToNextPage = () => {
-        if (currentPage < totalPages) {
-            handleSearch(currentPage + 1);
-        }
+        if (currentPage < totalPages) handleSearch(currentPage + 1);
     };
 
     const goToPrevPage = () => {
-        if (currentPage > 1) {
-            handleSearch(currentPage - 1);
-        }
+        if (currentPage > 1) handleSearch(currentPage - 1);
     };
 
     const toggleFilter = (val: string, list: string[], setter: (val: string[]) => void) => {
@@ -138,101 +145,111 @@ export function VolunteerHomePage() {
         <div className="volunteer-home-page-wrapper">
             <Header />
             <div className="page-body">
-                <div className="search-filter-bar">
+                <div className="search-filter-section">
+                    
+                    {/* ROW 1: THE INPUTS */}
+                    <div className="filter-inputs-row">
+                        <div className="search-input-container">
+                            <input
+                                className="search-input"
+                                type="text"
+                                placeholder="Search by keyword"
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                onKeyDown={(e) => e.key === 'Enter' && handleSearch(1)}
+                            />
+                        </div>
 
-                    {/* Keyword Search */}
-                    <div className="search-input-container">
-                        <input
-                            className="search-input"
-                            type="text"
-                            placeholder="Search by keyword"
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && handleSearch(1)}
+                        <div className="custom-multiselect-container">
+                            <div className="custom-select-box" onClick={() => setIsLocOpen(!isLocOpen)}>
+                                <span className="select-text">
+                                    {selectedLocations.length === 0 ? "All Locations" : `${selectedLocations.length} selected`}
+                                </span>
+                                <GoChevronDown className="select-arrow-icon" />
+                            </div>
+                            {isLocOpen && (
+                                <div className="multiselect-dropdown">
+                                    {MALAYSIAN_STATES.map(state => (
+                                        <label key={state} className="checkbox-label">
+                                            <input type="checkbox" checked={selectedLocations.includes(state)} onChange={() => toggleFilter(state, selectedLocations, setSelectedLocations)} /> {state}
+                                        </label>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="custom-multiselect-container">
+                            <div className="custom-select-box" onClick={() => setIsSkillOpen(!isSkillOpen)}>
+                                <span className="select-text">
+                                    {selectedSkills.length === 0 ? "All Skills" : `${selectedSkills.length} selected`}
+                                </span>
+                                <GoChevronDown className="select-arrow-icon" />
+                            </div>
+                            {isSkillOpen && (
+                                <div className="multiselect-dropdown">
+                                    {allSkills.map(skill => (
+                                        <label key={skill.id} className="checkbox-label">
+                                            <input type="checkbox" checked={selectedSkills.includes(skill.id)} onChange={() => toggleFilter(skill.id, selectedSkills, setSelectedSkills)} /> {skill.skill_name}
+                                        </label>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="custom-multiselect-container">
+                            <div className="custom-select-box" onClick={() => setIsInterestOpen(!isInterestOpen)}>
+                                <span className="select-text">
+                                    {selectedInterests.length === 0 ? "All Interests" : `${selectedInterests.length} selected`}
+                                </span>
+                                <GoChevronDown className="select-arrow-icon" />
+                            </div>
+                            {isInterestOpen && (
+                                <div className="multiselect-dropdown">
+                                    {allInterests.map(interest => (
+                                        <label key={interest.id} className="checkbox-label">
+                                            <input type="checkbox" checked={selectedInterests.includes(interest.id)} onChange={() => toggleFilter(interest.id, selectedInterests, setSelectedInterests)} /> {interest.interest_name}
+                                        </label>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        <DatePicker
+                            selected={startDate}
+                            onChange={(date: Date | null) => setStartDate(date)}
+                            placeholderText="Start Time"
+                            customInput={<DateBox placeholder="Start Time" />}
+                            showTimeSelect
+                            dateFormat="Pp"
                         />
-                        <AiOutlineSearch className="search-icon" onClick={() => handleSearch(1)} />
+
+                        <DatePicker
+                            selected={endDate}
+                            onChange={(date: Date | null) => setEndDate(date)}
+                            placeholderText="End Time"
+                            customInput={<DateBox placeholder="End Time" />}
+                            showTimeSelect
+                            dateFormat="Pp"
+                        />
+
+                        <select className="standard-select" value={saveStatus} onChange={(e) => setSaveStatus(e.target.value)}>
+                            <option value="all">All</option>
+                            <option value="saved">Saved</option>
+                            <option value="not-saved">Not saved</option>
+                        </select>
                     </div>
 
-                    {/* Locations */}
-                    <div className="custom-multiselect-container">
-                        <div className="custom-select-box" onClick={() => setIsLocOpen(!isLocOpen)}>
-                            <span className="select-text">
-                                {selectedLocations.length === 0 ? "All Locations" : `${selectedLocations.length} selected`}
-                            </span>
-                            <GoChevronDown className="select-arrow-icon" />
-                        </div>
-                        {isLocOpen && (
-                            <div className="multiselect-dropdown">
-                                {MALAYSIAN_STATES.map(state => (
-                                    <label key={state} className="checkbox-label">
-                                        <input type="checkbox" checked={selectedLocations.includes(state)} onChange={() => toggleFilter(state, selectedLocations, setSelectedLocations)} /> {state}
-                                    </label>
-                                ))}
-                            </div>
-                        )}
+                    {/* ROW 2: THE ACTION BUTTONS */}
+                    <div className="filter-actions-row">
+                        <button className="search-trigger-btn" onClick={() => handleSearch(1)}>
+                            <AiOutlineSearch className="btn-icon" />
+                            Search
+                        </button>
+                        <button className="reset-filter-btn" onClick={handleReset}>
+                            <GoSync className="btn-icon reset-animate" />
+                            Reset Filters
+                        </button>
                     </div>
-
-                    {/* Skills */}
-                    <div className="custom-multiselect-container">
-                        <div className="custom-select-box" onClick={() => setIsSkillOpen(!isSkillOpen)}>
-                            <span className="select-text">
-                                {selectedSkills.length === 0 ? "All Skills" : `${selectedSkills.length} selected`}
-                            </span>
-                            <GoChevronDown className="select-arrow-icon" />
-                        </div>
-                        {isSkillOpen && (
-                            <div className="multiselect-dropdown">
-                                {allSkills.map(skill => (
-                                    <label key={skill.id} className="checkbox-label">
-                                        <input type="checkbox" checked={selectedSkills.includes(skill.id)} onChange={() => toggleFilter(skill.id, selectedSkills, setSelectedSkills)} /> {skill.skill_name}
-                                    </label>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Interests */}
-                    <div className="custom-multiselect-container">
-                        <div className="custom-select-box" onClick={() => setIsInterestOpen(!isInterestOpen)}>
-                            <span className="select-text">
-                                {selectedInterests.length === 0 ? "All Interests" : `${selectedInterests.length} selected`}
-                            </span>
-                            <GoChevronDown className="select-arrow-icon" />
-                        </div>
-                        {isInterestOpen && (
-                            <div className="multiselect-dropdown">
-                                {allInterests.map(interest => (
-                                    <label key={interest.id} className="checkbox-label">
-                                        <input type="checkbox" checked={selectedInterests.includes(interest.id)} onChange={() => toggleFilter(interest.id, selectedInterests, setSelectedInterests)} /> {interest.interest_name}
-                                    </label>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-
-                    <DatePicker
-                        selected={startDate}
-                        onChange={(date: Date | null) => setStartDate(date)}
-                        placeholderText="Start Time"
-                        customInput={<DateBox placeholder="Start Time" />}
-                        showTimeSelect
-                        dateFormat="Pp"
-                    />
-
-                    <DatePicker
-                        selected={endDate}
-                        onChange={(date: Date | null) => setEndDate(date)}
-                        placeholderText="End Time"
-                        customInput={<DateBox placeholder="End Time" />}
-                        showTimeSelect
-                        dateFormat="Pp"
-                    />
-
-                    <select className="standard-select" value={saveStatus} onChange={(e) => setSaveStatus(e.target.value)}>
-                        <option value="all">All</option>
-                        <option value="saved">Saved</option>
-                        <option value="not-saved">Not saved</option>
-                    </select>
                 </div>
 
                 <div className="programmes-container">
@@ -261,15 +278,9 @@ export function VolunteerHomePage() {
                 </div>
 
                 <div className="pagination-container">
-                    <GoTriangleLeft
-                        className={`pagination-arrow ${currentPage === 1 ? 'disabled' : ''}`}
-                        onClick={goToPrevPage}
-                    />
+                    <GoTriangleLeft className={`pagination-arrow ${currentPage === 1 ? 'disabled' : ''}`} onClick={goToPrevPage} />
                     <div className="page-number-box">{currentPage}</div>
-                    <GoTriangleRight
-                        className={`pagination-arrow ${currentPage === totalPages || totalPages === 0 ? 'disabled' : ''}`}
-                        onClick={goToNextPage}
-                    />
+                    <GoTriangleRight className={`pagination-arrow ${currentPage === totalPages || totalPages === 0 ? 'disabled' : ''}`} onClick={goToNextPage} />
                 </div>
             </div>
         </div>
