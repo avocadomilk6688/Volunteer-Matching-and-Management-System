@@ -7,6 +7,7 @@ import "react-datepicker/dist/react-datepicker.css";
 import { useState, forwardRef, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import axios from 'axios';
+import { useAuth } from '../context/auth/useAuth'; // Ensure this path matches your project
 
 // --- Constants ---
 const MALAYSIAN_STATES = [
@@ -41,13 +42,16 @@ const DateBox = forwardRef<HTMLDivElement, DateBoxProps>(({ value, onClick, plac
 ));
 
 export function VolunteerHomePage() {
-    const [programmes, setProgrammes] = useState<Programme[]>([]);
-    const [loading, setLoading] = useState(true);
+    const { user } = useAuth(); // Get logged-in user for the "Saved" filter
     const navigate = useNavigate();
 
+    // Data States
+    const [programmes, setProgrammes] = useState<Programme[]>([]);
+    const [loading, setLoading] = useState(true);
     const [allSkills, setAllSkills] = useState<{ id: string, skill_name: string }[]>([]);
     const [allInterests, setAllInterests] = useState<{ id: string, interest_name: string }[]>([]);
 
+    // Filter States
     const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
     const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
     const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
@@ -56,10 +60,10 @@ export function VolunteerHomePage() {
     const [endDate, setEndDate] = useState<Date | null>(null);
     const [saveStatus, setSaveStatus] = useState('all');
 
+    // UI Logic States
     const [isLocOpen, setIsLocOpen] = useState(false);
     const [isSkillOpen, setIsSkillOpen] = useState(false);
     const [isInterestOpen, setIsInterestOpen] = useState(false);
-
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
     const itemsPerPage = 6;
@@ -75,6 +79,7 @@ export function VolunteerHomePage() {
                 start: undefined,
                 end: undefined,
                 saved: 'all',
+                userId: user?.id, // Keep the user context even on reset
                 page: 1,
                 limit: itemsPerPage
             } : {
@@ -85,14 +90,17 @@ export function VolunteerHomePage() {
                 start: startDate?.toISOString(),
                 end: endDate?.toISOString(),
                 saved: saveStatus,
+                userId: user?.id, // CRITICAL: Tells the backend WHO is filtering saved items
                 page: pageNumber,
                 limit: itemsPerPage
             };
 
             const response = await axios.get('http://localhost:3000/programmes', { params });
-            setProgrammes(response.data.items);
-            setTotalPages(response.data.lastPage);
-            setCurrentPage(response.data.page);
+
+            // Backend now returns { items, total, lastPage... }
+            setProgrammes(response.data.items || []);
+            setTotalPages(response.data.lastPage || 1);
+            setCurrentPage(response.data.page || 1);
         } catch (error) {
             console.error("Search Error:", error);
         } finally {
@@ -146,7 +154,7 @@ export function VolunteerHomePage() {
             <Header />
             <div className="page-body">
                 <div className="search-filter-section">
-                    
+
                     {/* ROW 1: THE INPUTS */}
                     <div className="filter-inputs-row">
                         <div className="search-input-container">
@@ -160,6 +168,7 @@ export function VolunteerHomePage() {
                             />
                         </div>
 
+                        {/* Location Dropdown */}
                         <div className="custom-multiselect-container">
                             <div className="custom-select-box" onClick={() => setIsLocOpen(!isLocOpen)}>
                                 <span className="select-text">
@@ -178,6 +187,7 @@ export function VolunteerHomePage() {
                             )}
                         </div>
 
+                        {/* Skills Dropdown */}
                         <div className="custom-multiselect-container">
                             <div className="custom-select-box" onClick={() => setIsSkillOpen(!isSkillOpen)}>
                                 <span className="select-text">
@@ -196,6 +206,7 @@ export function VolunteerHomePage() {
                             )}
                         </div>
 
+                        {/* Interests Dropdown */}
                         <div className="custom-multiselect-container">
                             <div className="custom-select-box" onClick={() => setIsInterestOpen(!isInterestOpen)}>
                                 <span className="select-text">
@@ -214,6 +225,7 @@ export function VolunteerHomePage() {
                             )}
                         </div>
 
+                        {/* Date Pickers */}
                         <DatePicker
                             selected={startDate}
                             onChange={(date: Date | null) => setStartDate(date)}
@@ -232,10 +244,15 @@ export function VolunteerHomePage() {
                             dateFormat="Pp"
                         />
 
-                        <select className="standard-select" value={saveStatus} onChange={(e) => setSaveStatus(e.target.value)}>
-                            <option value="all">All</option>
-                            <option value="saved">Saved</option>
-                            <option value="not-saved">Not saved</option>
+                        {/* Save Status Select */}
+                        <select
+                            className="standard-select"
+                            value={saveStatus}
+                            onChange={(e) => setSaveStatus(e.target.value)}
+                        >
+                            <option value="all">All Status</option>
+                            <option value="saved">Saved Only</option>
+                            <option value="not-saved">Not Saved</option>
                         </select>
                     </div>
 
@@ -252,13 +269,14 @@ export function VolunteerHomePage() {
                     </div>
                 </div>
 
+                {/* Programmes Grid */}
                 <div className="programmes-container">
                     {loading ? (
                         <div className="loading-state">Loading opportunities...</div>
                     ) : programmes.length > 0 ? (
                         programmes.map((prog) => (
                             <div key={prog.id} className="programme" onClick={() => navigate(`/programme-details/${prog.id}`)}>
-                                <div className="programme-image" style={{ backgroundImage: `url(${prog.imageUrl})`, backgroundSize: 'cover' }}></div>
+                                <div className="programme-image" style={{ backgroundImage: `url(${prog.imageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' }}></div>
                                 <div className="programme-info">
                                     <div className="programme-name">{prog.title}</div>
                                     <div className="organization-info">
@@ -277,10 +295,17 @@ export function VolunteerHomePage() {
                     )}
                 </div>
 
+                {/* Pagination */}
                 <div className="pagination-container">
-                    <GoTriangleLeft className={`pagination-arrow ${currentPage === 1 ? 'disabled' : ''}`} onClick={goToPrevPage} />
+                    <GoTriangleLeft
+                        className={`pagination-arrow ${currentPage === 1 ? 'disabled' : ''}`}
+                        onClick={goToPrevPage}
+                    />
                     <div className="page-number-box">{currentPage}</div>
-                    <GoTriangleRight className={`pagination-arrow ${currentPage === totalPages || totalPages === 0 ? 'disabled' : ''}`} onClick={goToNextPage} />
+                    <GoTriangleRight
+                        className={`pagination-arrow ${currentPage === totalPages || totalPages === 0 ? 'disabled' : ''}`}
+                        onClick={goToNextPage}
+                    />
                 </div>
             </div>
         </div>

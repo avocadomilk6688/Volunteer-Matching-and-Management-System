@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Brackets } from 'typeorm'; // Added Brackets here
+import { Repository, Brackets } from 'typeorm';
 import { Programme } from './entities/programme.entity';
 import { Schedule } from './entities/schedule.entity';
 import { Organization } from '../organizations/entities/organization.entity';
@@ -10,6 +10,17 @@ import { CreateProgrammeDto } from './dto/create-programme.dto';
 import { UpdateProgrammeDto } from './dto/update-programme.dto';
 import { generateCustomId } from '../common/utils/id_generator.util';
 
+/**
+ * Interface for Toggle Save response to avoid "Unsafe return" errors.
+ */
+export interface SaveToggleResponse {
+  isSaved: boolean;
+  message: string;
+}
+
+/**
+ * DTO for filtering. Changed to a class to support NestJS metadata.
+ */
 export class FilterProgrammeParams {
   keyword?: string;
   location?: string;
@@ -18,6 +29,7 @@ export class FilterProgrammeParams {
   start?: string;
   end?: string;
   saved?: string;
+  userId?: string; // Required for the "Saved" filter to know who the user is
   page?: number;
   limit?: number;
 }
@@ -32,6 +44,9 @@ export class ProgrammesService {
     private readonly scheduleRepo: Repository<Schedule>,
   ) {}
 
+  /**
+   * CREATE: Generates custom IDs and saves programme with relations.
+   */
   async create(dto: CreateProgrammeDto) {
     const pId = await generateCustomId(this.programmeRepo, 'P');
     const schId = await generateCustomId(this.scheduleRepo, 'P');
@@ -57,10 +72,11 @@ export class ProgrammesService {
   }
 
   /**
-   * FULL IMPLEMENTATION: Filtering + Fuzzy Location + Pagination
+   * FIND ALL: Handles filtering, Fuzzy Location, "Saved" status, and Pagination.
    */
   async findAll(filterDto: FilterProgrammeParams = {}) {
-    const { keyword, location, skill, interest, start, end } = filterDto;
+    const { keyword, location, skill, interest, start, end, saved, userId } =
+      filterDto;
 
     const page = Number(filterDto.page) || 1;
     const limit = Number(filterDto.limit) || 6;
@@ -72,9 +88,10 @@ export class ProgrammesService {
       .leftJoinAndSelect('programme.organization', 'organization')
       .leftJoinAndSelect('organization.user', 'user')
       .leftJoinAndSelect('programme.related_skills', 'skills')
-      .leftJoinAndSelect('programme.related_interests', 'interests');
+      .leftJoinAndSelect('programme.related_interests', 'interests')
+      .leftJoin('programme.saved_by', 'savedByUsers'); // Join for the "Saved" filter
 
-    // 1. Keyword Search
+    // 1. Keyword Search (MySQL Case-Insensitive LIKE)
     if (keyword) {
       query.andWhere(
         '(programme.title LIKE :keyword OR programme.description LIKE :keyword)',
@@ -82,42 +99,42 @@ export class ProgrammesService {
       );
     }
 
-    // 2. FUZZY LOCATION SEARCH (Find state inside long address)
+    // 2. Fuzzy Location Search (Finds state inside a long address)
     if (location) {
       const locations = location.split(',');
-
-      // We use Brackets to wrap the "OR" logic so it doesn't break the other "AND" filters
       query.andWhere(
         new Brackets((qb) => {
           locations.forEach((loc, index) => {
             const paramName = `loc_${index}`;
+            const condition = `schedule.location LIKE :${paramName}`;
+            const params = { [paramName]: `%${loc.trim()}%` };
+
             if (index === 0) {
-              qb.where(`schedule.location LIKE :${paramName}`, {
-                [paramName]: `%${loc.trim()}%`,
-              });
+              qb.where(condition, params);
             } else {
-              qb.orWhere(`schedule.location LIKE :${paramName}`, {
-                [paramName]: `%${loc.trim()}%`,
-              });
+              qb.orWhere(condition, params);
             }
           });
         }),
       );
     }
 
-    // 3. Multi-Skills (Exact match by ID)
+    // 3. Saved Filter Logic
+    if (saved === 'saved' && userId) {
+      query.andWhere('savedByUsers.id = :userId', { userId });
+    }
+
+    // 4. Multi-Skills & Multi-Interests
     if (skill) {
       const skillIds = skill.split(',');
       query.andWhere('skills.id IN (:...skillIds)', { skillIds });
     }
-
-    // 4. Multi-Interests (Exact match by ID)
     if (interest) {
       const interestIds = interest.split(',');
       query.andWhere('interests.id IN (:...interestIds)', { interestIds });
     }
 
-    // 5. Date Filtering
+    // 5. Date Range Filtering
     if (start) {
       query.andWhere('schedule.start_time >= :start', {
         start: new Date(start),
@@ -127,7 +144,7 @@ export class ProgrammesService {
       query.andWhere('schedule.end_time <= :end', { end: new Date(end) });
     }
 
-    // 6. Pagination & Ordering
+    // 6. Pagination and Sorting
     query.orderBy('programme.id', 'DESC').skip(skip).take(limit);
 
     const [items, total] = await query.getManyAndCount();
@@ -140,6 +157,9 @@ export class ProgrammesService {
     };
   }
 
+  /**
+   * FIND ONE: Fetches specific programme with full relations.
+   */
   async findOne(id: string) {
     const programme = await this.programmeRepo.findOne({
       where: { id },
@@ -149,6 +169,7 @@ export class ProgrammesService {
         'organization.user',
         'related_skills',
         'related_interests',
+        'saved_by',
       ],
     });
 
@@ -158,6 +179,49 @@ export class ProgrammesService {
     return programme;
   }
 
+  /**
+   * TOGGLE SAVE: Adds/Removes a user from the programme's saved list.
+   */
+  async toggleSave(
+    programmeId: string,
+    userId: string,
+  ): Promise<SaveToggleResponse> {
+    const programme = await this.programmeRepo.findOne({
+      where: { id: programmeId },
+      relations: ['saved_by'],
+    });
+
+    if (!programme) {
+      throw new NotFoundException('Programme not found');
+    }
+
+    if (!programme.saved_by) {
+      programme.saved_by = [];
+    }
+
+    const isAlreadySaved = programme.saved_by.some((v) => v.id === userId);
+
+    if (isAlreadySaved) {
+      // Unsave logic
+      programme.saved_by = programme.saved_by.filter((v) => v.id !== userId);
+    } else {
+      // Save logic (Partial object casted to satisfy relation)
+      programme.saved_by.push({ id: userId } as any);
+    }
+
+    await this.programmeRepo.save(programme);
+
+    return {
+      isSaved: !isAlreadySaved,
+      message: !isAlreadySaved
+        ? 'Programme saved successfully'
+        : 'Programme unsaved successfully',
+    };
+  }
+
+  /**
+   * UPDATE: Merges and updates existing programme and schedule.
+   */
   async update(id: string, updateDto: UpdateProgrammeDto) {
     const programme = await this.findOne(id);
     if (!programme) return null;
@@ -192,6 +256,9 @@ export class ProgrammesService {
     return await this.programmeRepo.save(updatedProgramme);
   }
 
+  /**
+   * REMOVE: Deletes a programme by ID.
+   */
   async remove(id: string) {
     const result = await this.programmeRepo.delete(id);
     return { deleted: (result.affected ?? 0) > 0 };

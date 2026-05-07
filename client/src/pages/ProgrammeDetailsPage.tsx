@@ -57,6 +57,11 @@ interface VolunteerProfileResponse {
     resume_url: string | null;
 }
 
+interface SaveToggleResponse {
+    isSaved: boolean;
+    message: string;
+}
+
 const API_BASE_URL = "http://localhost:3000";
 
 export function ProgrammeDetailsPage() {
@@ -67,6 +72,9 @@ export function ProgrammeDetailsPage() {
     const [programme, setProgramme] = useState<ProgrammeDetailsData | null>(null);
     const [loading, setLoading] = useState(true);
     const [enrollmentStatus, setEnrollmentStatus] = useState<string | null>(null);
+
+    // SAVE FEATURE STATE
+    const [isSaved, setIsSaved] = useState(false);
 
     // Modal Application States
     const [mySkills, setMySkills] = useState<TagItem[]>([]);
@@ -98,7 +106,7 @@ export function ProgrammeDetailsPage() {
             try {
                 setLoading(true);
 
-                // 1. Fetch Global Data (Always needed)
+                // 1. Fetch Global Data
                 const [progRes, skillsRes, interestsRes] = await Promise.all([
                     axios.get<ProgrammeDetailsData>(`${API_BASE_URL}/programmes/${programmeId}`),
                     axios.get<Skill[]>(`${API_BASE_URL}/volunteers/skills`),
@@ -111,14 +119,22 @@ export function ProgrammeDetailsPage() {
 
                 // 2. Fetch User-Specific Info
                 if (user?.id) {
-                    // Isolated Enrollment Check (FIXED URL: changed /enrollments to /applications)
+                    // Check Enrollment
                     try {
                         const enrollRes = await axios.get<EnrollmentCheckResponse>(`${API_BASE_URL}/applications/check/${user.id}/${programmeId}`);
                         if (enrollRes.data && enrollRes.data.status) {
                             setEnrollmentStatus(enrollRes.data.status);
                         }
-                    } catch (e) {
-                        console.warn("Enrollment status check failed (usually means not enrolled)." + e);
+                    } catch (e: unknown) {
+                        console.warn("Enrollment status check failed." + e);
+                    }
+
+                    // CHECK IF PROGRAMME IS SAVED
+                    try {
+                        const saveRes = await axios.get<{ isSaved: boolean }>(`${API_BASE_URL}/programmes/${programmeId}/is-saved/${user.id}`);
+                        setIsSaved(saveRes.data.isSaved);
+                    } catch (e: unknown) {
+                        console.warn("Save status check failed." + e);
                     }
 
                     // Fetch Volunteer Profile
@@ -129,12 +145,12 @@ export function ProgrammeDetailsPage() {
                             setMyInterests((volRes.data.interests || []).map((i) => ({ id: i.id, name: i.interest_name })));
                             setResumeUrl(volRes.data.resume_url || '');
                         }
-                    } catch (e) {
-                        console.error("Failed to load volunteer profile.", e);
+                    } catch (e: unknown) {
+                        console.error("Failed to load volunteer profile." + e);
                     }
                 }
 
-            } catch (error) {
+            } catch (error: unknown) {
                 console.error("Initialization error:", error);
             } finally {
                 setLoading(false);
@@ -142,6 +158,32 @@ export function ProgrammeDetailsPage() {
         };
         initLoad();
     }, [programmeId, user?.id]);
+
+    // --- FUNCTION: TOGGLE SAVE ---
+    const handleToggleSave = async () => {
+        if (!user) {
+            alert("Please login to save programmes.");
+            return;
+        }
+
+        try {
+            const response = await axios.post<SaveToggleResponse>(`${API_BASE_URL}/programmes/${programmeId}/save`, {
+                userId: user.id
+            });
+
+            const currentlySaved = response.data.isSaved;
+            setIsSaved(currentlySaved);
+
+            if (currentlySaved) {
+                alert("The programme is saved!");
+            } else {
+                alert("Programme removed from saved list.");
+            }
+        } catch (error: unknown) {
+            console.error("Save error:", error);
+            alert("Failed to update save status.");
+        }
+    };
 
     const toggleTag = (item: TagItem, type: 'skill' | 'interest') => {
         if (type === 'skill') {
@@ -158,27 +200,17 @@ export function ProgrammeDetailsPage() {
             const formData = new FormData();
             formData.append('volunteerId', user?.id || '');
             formData.append('programmeId', programmeId || '');
-
-            formData.append('skills', JSON.stringify(mySkills.map(s => ({
-                id: s.id,
-                skill_name: s.name
-            }))));
-
-            formData.append('interests', JSON.stringify(myInterests.map(i => ({
-                id: i.id,
-                interest_name: i.name
-            }))));
+            formData.append('skills', JSON.stringify(mySkills.map(s => ({ id: s.id, skill_name: s.name }))));
+            formData.append('interests', JSON.stringify(myInterests.map(i => ({ id: i.id, interest_name: i.name }))));
 
             if (selectedResume) {
                 formData.append('resume', selectedResume);
             }
 
-            // --- FIX: Changed URL from /enrollments/apply to /applications ---
-            const response = await axios.post(`${API_BASE_URL}/applications`, formData, {
+            await axios.post(`${API_BASE_URL}/applications`, formData, {
                 headers: { 'Content-Type': 'multipart/form-data' }
             });
 
-            console.log("Application successful:", response.data);
             alert("Application submitted! Your enrollment is currently pending.");
             setEnrollmentStatus('pending');
             setShowModal(false);
@@ -216,14 +248,22 @@ export function ProgrammeDetailsPage() {
                         <div className="tool-bar">
                             <button className="chat-button">Chat</button>
                             <button
-                                className={`join-button ${enrollmentStatus ? 'applied-disabled' : ''}`} // Changed class name for clarity
+                                className={`join-button ${enrollmentStatus ? 'applied-disabled' : ''}`}
                                 onClick={() => !enrollmentStatus && setShowModal(true)}
                                 disabled={!!enrollmentStatus}
                             >
-                                {/* Always show "Applied" if enrollmentStatus exists, otherwise "Join" */}
                                 {enrollmentStatus ? 'Applied' : 'Join'}
                             </button>
-                            <AiOutlineStar className="save-button" />
+
+                            {/* DYNAMIC STAR ICON */}
+                            <div className="save-button-wrapper" onClick={handleToggleSave} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                                {isSaved ? (
+                                    <AiFillStar className="save-button saved" style={{ color: '#FF8C42' }} />
+                                ) : (
+                                    <AiOutlineStar className="save-button" />
+                                )}
+                            </div>
+
                             <AiOutlineFlag className="report-button" />
                         </div>
                     </div>

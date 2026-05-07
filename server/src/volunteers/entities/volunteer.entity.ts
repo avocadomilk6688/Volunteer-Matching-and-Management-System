@@ -12,6 +12,7 @@ import { User } from '../../users/entities/user.entity';
 import { Skill } from './skill.entity';
 import { Interest } from './interest.entity';
 import { Application } from '../../applications/entities/application.entity';
+import { Programme } from '../../programmes/entities/programme.entity';
 
 @Entity()
 export class Volunteer {
@@ -56,4 +57,7 @@ export class Volunteer {
 
   @OneToMany(() => Application, (application) => application.volunteer)
   applications!: Application[];
+
+  @ManyToMany(() => Programme, (programme) => programme.saved_by)
+  saved_programmes!: Programme[];
 }
