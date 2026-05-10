@@ -43,7 +43,7 @@ export function LoginPage() {
             } else if (role === 'admin') {
                 alert('Admin dashboard coming soon!');
             } else {
-                alert('Organization dashboard coming soon!');
+                navigate('/manage-listing');
             }
         } catch (error: unknown) {
             console.error("Login error:", error);

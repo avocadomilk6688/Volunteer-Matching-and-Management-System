@@ -1,0 +1,160 @@
+.manage-listing-wrapper {
+    width: 100%;
+}
+
+.manage-listing-container {
+    display: flex;
+    min-height: calc(100vh - 80px);
+    font-family: Inter;
+}
+
+/* Sidebar Styling */
+.org-sidebar {
+    width: 250px;
+    background-color: #FF8C42;
+    /* The orange from your screenshot */
+    color: white;
+    padding: 30px 0;
+}
+
+.org-sidebar ul {
+    list-style: none;
+    padding: 0;
+}
+
+.org-sidebar li {
+    padding: 15px 25px;
+    font-size: 1.1rem;
+    cursor: pointer;
+}
+
+.org-sidebar li.active {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.org-sidebar nav ul li:first-child::after {
+    content: '';
+    display: block;
+    width: 80%;
+    height: 1px;
+    background: rgba(255, 255, 255, 0.5);
+    margin-top: 15px;
+}
+
+/* Main Content Styling */
+.manage-listing-content {
+    flex: 1;
+    padding: 40px;
+    background-color: white;
+    overflow-x: hidden;
+}
+
+.manage-listing-content h1 {
+    font-size: 3rem;
+    font-weight: 800;
+    margin-bottom: 30px;
+}
+
+.add-listing-btn {
+    background-color: #FF8C42;
+    color: white;
+    border: none;
+    padding: 10px 50px;
+    font-size: 1.2rem;
+    border-radius: 4px;
+    cursor: pointer;
+    margin-bottom: 40px;
+}
+
+/* Table Column Adjustments */
+.col-title {
+    min-width: 150px;
+}
+
+.col-desc {
+    min-width: 350px;
+    line-height: 1.4;
+}
+
+.col-img {
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.col-schedule {
+    min-width: 150px;
+}
+
+/* Badge/Tag Styling */
+.badge-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.orange-badge {
+    background-color: #FF8C42;
+    color: white;
+    padding: 4px 12px;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    text-align: center;
+    white-space: nowrap;
+}
+
+/* Reusing your GenericTable classes for consistency */
+.custom-table-container {
+    overflow-x: auto;
+    /* This creates that gray scrollbar you see in the screenshot */
+    border-radius: 4px;
+}
+
+.custom-table th {
+    background-color: #FF8C42;
+    color: white;
+    text-align: left;
+    padding: 12px;
+}
+
+.col-action {
+    min-width: 200px;
+    vertical-align: middle !important;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    align-items: center;
+    height: 100%;
+}
+
+.modify-btn, .delete-btn {
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    min-width: 90px;
+    transition: opacity 0.2s;
+    color: white;
+}
+
+.modify-btn {
+    background-color: #FF8C42; /* Matches the Approve orange */
+}
+
+.delete-btn {
+    background-color: #C4C4C4; /* Matches the Reject gray */
+}
+
+.modify-btn:hover, .delete-btn:hover {
+    opacity: 0.85;
+}
+
+/* Ensure the table cell doesn't squash buttons */
+.custom-table td.col-action {
+    padding: 10px;
+    text-align: center;
+}

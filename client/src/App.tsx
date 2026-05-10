@@ -8,6 +8,7 @@ import { LeaderboardPage } from './pages/LeaderboardPage';
 import { QAPage } from './pages/QAPage';
 import { VolunteeringHistoryPage } from './pages/VolunteeringHistoryPage';
 import { ManageProfilePage } from './pages/ManageProfilePage';
+import { ManageListingPage } from './pages/ManageListingPage';
 
 function App() {
   return (
@@ -22,6 +23,7 @@ function App() {
         <Route path="qa" element={<QAPage />}></Route>
         <Route path="volunteering-history" element={<VolunteeringHistoryPage />}></Route>
         <Route path="manage-profile" element={<ManageProfilePage />}></Route>
+        <Route path="manage-listing" element={<ManageListingPage />}></Route>
       </Routes>
     </AuthProvider>
   )
