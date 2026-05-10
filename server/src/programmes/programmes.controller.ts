@@ -90,4 +90,13 @@ export class ProgrammesController {
   async remove(@Param('id') id: string) {
     return await this.programmesService.remove(id);
   }
+
+  @Get('recommendations/:userId')
+  async getRecommendations(
+    @Param('userId') userId: string,
+    @Query() filterDto: FilterProgrammeParams,
+  ) {
+    // This calls your new "Veteran-First" logic
+    return await this.programmesService.getRecommended(userId, filterDto);
+  }
 }

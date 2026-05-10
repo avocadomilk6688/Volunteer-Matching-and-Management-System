@@ -51,7 +51,7 @@ export function VolunteerHomePage() {
     const [allSkills, setAllSkills] = useState<{ id: string, skill_name: string }[]>([]);
     const [allInterests, setAllInterests] = useState<{ id: string, interest_name: string }[]>([]);
 
-    // --- FIXED: Generic type-safe session storage helper ---
+    // --- Type-safe session storage helper ---
     const getStored = <T,>(key: string, defaultValue: T): T => {
         const saved = sessionStorage.getItem(key);
         if (!saved) return defaultValue;
@@ -106,6 +106,15 @@ export function VolunteerHomePage() {
             setLoading(true);
             if (!isReset) persistFilters(pageNumber);
 
+            /**
+             * SMART ENDPOINT LOGIC:
+             * We always hit the recommendation endpoint. 
+             * If the user isn't logged in, we pass 'guest' to trigger 
+             * the Global Quality (Rating) ranking.
+             */
+            const userIdParam = user?.id || 'guest';
+            const url = `http://localhost:3000/programmes/recommendations/${userIdParam}`;
+
             const params = isReset ? {
                 keyword: '',
                 location: '',
@@ -130,7 +139,7 @@ export function VolunteerHomePage() {
                 limit: itemsPerPage
             };
 
-            const response = await axios.get('http://localhost:3000/programmes', { params });
+            const response = await axios.get(url, { params });
             setProgrammes(response.data.items || []);
             setTotalPages(response.data.lastPage || 1);
             setCurrentPage(response.data.page || 1);
@@ -171,7 +180,8 @@ export function VolunteerHomePage() {
             }
         };
         loadPageData();
-    }, []);
+        // Dependencies include user?.id so the feed personalizes as soon as login finishes
+    }, [user?.id]);
 
     const goToNextPage = () => {
         if (currentPage < totalPages) handleSearch(currentPage + 1);
@@ -202,6 +212,7 @@ export function VolunteerHomePage() {
                             />
                         </div>
 
+                        {/* Location Select */}
                         <div className="custom-multiselect-container">
                             <div className="custom-select-box" onClick={() => setIsLocOpen(!isLocOpen)}>
                                 <span className="select-text">
@@ -220,6 +231,7 @@ export function VolunteerHomePage() {
                             )}
                         </div>
 
+                        {/* Skills Select */}
                         <div className="custom-multiselect-container">
                             <div className="custom-select-box" onClick={() => setIsSkillOpen(!isSkillOpen)}>
                                 <span className="select-text">
@@ -238,6 +250,7 @@ export function VolunteerHomePage() {
                             )}
                         </div>
 
+                        {/* Interests Select */}
                         <div className="custom-multiselect-container">
                             <div className="custom-select-box" onClick={() => setIsInterestOpen(!isInterestOpen)}>
                                 <span className="select-text">
@@ -295,7 +308,7 @@ export function VolunteerHomePage() {
 
                 <div className="programmes-container">
                     {loading ? (
-                        <div className="loading-state">Loading opportunities...</div>
+                        <div className="loading-state">Personalizing your feed...</div>
                     ) : programmes.length > 0 ? (
                         programmes.map((prog) => (
                             <div key={prog.id} className="programme" onClick={() => navigate(`/programme-details/${prog.id}`)}>
@@ -314,7 +327,7 @@ export function VolunteerHomePage() {
                             </div>
                         ))
                     ) : (
-                        <div className="no-results">No programmes found matching your filters.</div>
+                        <div className="no-results">No programmes found. Try adjusting your filters!</div>
                     )}
                 </div>
 

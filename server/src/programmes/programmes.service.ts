@@ -9,9 +9,10 @@ import { Interest } from '../volunteers/entities/interest.entity';
 import { CreateProgrammeDto } from './dto/create-programme.dto';
 import { UpdateProgrammeDto } from './dto/update-programme.dto';
 import { generateCustomId } from '../common/utils/id_generator.util';
+import { Volunteer } from '../volunteers/entities/volunteer.entity';
 
 /**
- * Interface for Toggle Save response to avoid "Unsafe return" errors.
+ * Interface for the Toggle Save response.
  */
 export interface SaveToggleResponse {
   isSaved: boolean;
@@ -19,7 +20,16 @@ export interface SaveToggleResponse {
 }
 
 /**
- * DTO for filtering. Changed to a class to support NestJS metadata.
+ * Interface for raw SQL statistics in recommendation engine.
+ */
+interface RawSkillStat {
+  skillId: string;
+  participationCount: string;
+  totalHours: string;
+}
+
+/**
+ * Filter parameters for searching and pagination.
  */
 export class FilterProgrammeParams {
   keyword?: string;
@@ -29,7 +39,7 @@ export class FilterProgrammeParams {
   start?: string;
   end?: string;
   saved?: string;
-  userId?: string; // Required for the "Saved" filter to know who the user is
+  userId?: string;
   page?: number;
   limit?: number;
 }
@@ -42,10 +52,13 @@ export class ProgrammesService {
 
     @InjectRepository(Schedule)
     private readonly scheduleRepo: Repository<Schedule>,
+
+    @InjectRepository(Volunteer)
+    private readonly volunteerRepo: Repository<Volunteer>,
   ) {}
 
   /**
-   * CREATE: Generates custom IDs and saves programme with relations.
+   * CREATE: Saves a new programme and automatically creates the associated schedule.
    */
   async create(dto: CreateProgrammeDto) {
     const pId = await generateCustomId(this.programmeRepo, 'P');
@@ -72,7 +85,8 @@ export class ProgrammesService {
   }
 
   /**
-   * FIND ALL: Handles filtering, Fuzzy Location, "Saved" status, and Pagination.
+   * FIND ALL: Standard search with filters.
+   * (Fallback for basic search requests)
    */
   async findAll(filterDto: FilterProgrammeParams = {}) {
     const { keyword, location, skill, interest, start, end, saved, userId } =
@@ -89,9 +103,8 @@ export class ProgrammesService {
       .leftJoinAndSelect('organization.user', 'user')
       .leftJoinAndSelect('programme.related_skills', 'skills')
       .leftJoinAndSelect('programme.related_interests', 'interests')
-      .leftJoin('programme.saved_by', 'savedByUsers'); // Join for the "Saved" filter
+      .leftJoin('programme.saved_by', 'savedByUsers');
 
-    // 1. Keyword Search (MySQL Case-Insensitive LIKE)
     if (keyword) {
       query.andWhere(
         '(programme.title LIKE :keyword OR programme.description LIKE :keyword)',
@@ -99,66 +112,149 @@ export class ProgrammesService {
       );
     }
 
-    // 2. Fuzzy Location Search (Finds state inside a long address)
     if (location) {
       const locations = location.split(',');
       query.andWhere(
         new Brackets((qb) => {
           locations.forEach((loc, index) => {
             const paramName = `loc_${index}`;
-            const condition = `schedule.location LIKE :${paramName}`;
-            const params = { [paramName]: `%${loc.trim()}%` };
-
-            if (index === 0) {
-              qb.where(condition, params);
-            } else {
-              qb.orWhere(condition, params);
-            }
+            qb.orWhere(`schedule.location LIKE :${paramName}`, {
+              [paramName]: `%${loc.trim()}%`,
+            });
           });
         }),
       );
     }
 
-    // 3. Saved Filter Logic
     if (saved === 'saved' && userId) {
       query.andWhere('savedByUsers.id = :userId', { userId });
     }
 
-    // 4. Multi-Skills & Multi-Interests
     if (skill) {
       const skillIds = skill.split(',');
       query.andWhere('skills.id IN (:...skillIds)', { skillIds });
     }
+
     if (interest) {
       const interestIds = interest.split(',');
       query.andWhere('interests.id IN (:...interestIds)', { interestIds });
     }
 
-    // 5. Date Range Filtering
-    if (start) {
+    if (start)
       query.andWhere('schedule.start_time >= :start', {
         start: new Date(start),
       });
-    }
-    if (end) {
+    if (end)
       query.andWhere('schedule.end_time <= :end', { end: new Date(end) });
-    }
 
-    // 6. Pagination and Sorting
     query.orderBy('programme.id', 'DESC').skip(skip).take(limit);
 
     const [items, total] = await query.getManyAndCount();
 
-    return {
-      items,
-      total,
-      page,
-      lastPage: Math.ceil(total / limit),
-    };
+    return { items, total, page, lastPage: Math.ceil(total / limit) };
   }
 
   /**
-   * FIND ONE: Fetches specific programme with full relations.
+   * GET RECOMMENDED: The Smart "YouTube-Style" Feed.
+   * Handles Guests, Newbies, and Veterans naturally.
+   */
+  async getRecommended(
+    userId: string | null,
+    filterDto: FilterProgrammeParams,
+  ) {
+    const page = Number(filterDto.page) || 1;
+    const limit = Number(filterDto.limit) || 6;
+    const skip = (page - 1) * limit;
+
+    // 1. Determine User Context
+    const isGuest = !userId || userId === 'guest';
+    const volunteer = !isGuest
+      ? await this.volunteerRepo.findOne({
+          where: { id: userId },
+          relations: ['skills'],
+        })
+      : null;
+
+    // 2. Fetch Veteran Stats (Participation + Hours)
+    const statsMap = new Map<string, { count: number; hours: number }>();
+    if (volunteer) {
+      const skillStats: RawSkillStat[] = await this.programmeRepo.query(
+        `
+          SELECT 
+              ps.skillId, 
+              COUNT(app.id) AS participationCount, 
+              SUM(TIMESTAMPDIFF(HOUR, s.start_time, s.end_time)) AS totalHours
+          FROM application app
+          JOIN programme p ON app.programmeId = p.id
+          JOIN schedule s ON p.scheduleId = s.id 
+          JOIN programme_skills ps ON p.id = ps.programmeId
+          WHERE app.volunteerId = ? AND app.status = 'completed'
+          GROUP BY ps.skillId
+      `,
+        [userId],
+      );
+
+      skillStats.forEach((s) => {
+        statsMap.set(s.skillId, {
+          count: parseFloat(s.participationCount) || 0,
+          hours: parseFloat(s.totalHours) || 0,
+        });
+      });
+    }
+
+    // 3. The Scored Recommendation Query
+    const query = this.programmeRepo
+      .createQueryBuilder('programme')
+      .leftJoinAndSelect('programme.schedule', 'schedule')
+      .leftJoinAndSelect('programme.organization', 'organization')
+      .leftJoinAndSelect('organization.user', 'user')
+      .leftJoin('programme.related_skills', 'p_skills');
+
+    // SCORING FORMULA:
+    // Global Quality (Rating * 5) + Location Match (+35 pts)
+    let scoreSql = `(COALESCE(organization.rating, 0) * 5) + 
+                    (CASE WHEN schedule.location LIKE :userLoc THEN 35 ELSE 0 END)`;
+
+    // Add "Veteran Expertise" points if volunteer has skills
+    if (volunteer?.skills) {
+      volunteer.skills.forEach((skill, index) => {
+        const sId = `skill_${index}`;
+        const stats = statsMap.get(skill.id) || { count: 0, hours: 0 };
+
+        // Boost = Participation*5 + Hours*0.5 + BaseMatch*10
+        const boost = stats.count * 5 + stats.hours * 0.5 + 10;
+
+        scoreSql += ` + (CASE WHEN EXISTS (
+            SELECT 1 FROM programme_skills psk 
+            WHERE psk.programmeId = programme.id AND psk.skillId = :${sId}
+        ) THEN ${boost} ELSE 0 END)`;
+
+        query.setParameter(sId, skill.id);
+      });
+    }
+
+    query.addSelect(scoreSql, 'relevance_score');
+    query.setParameter('userLoc', `%${volunteer?.location || ''}%`);
+
+    if (filterDto.keyword) {
+      query.andWhere('programme.title LIKE :kw', {
+        kw: `%${filterDto.keyword}%`,
+      });
+    }
+
+    query
+      .orderBy('relevance_score', 'DESC')
+      .addOrderBy('programme.id', 'DESC')
+      .skip(skip)
+      .take(limit);
+
+    const [items, total] = await query.getManyAndCount();
+
+    return { items, total, page, lastPage: Math.ceil(total / limit) };
+  }
+
+  /**
+   * FIND ONE: Fetches a single programme with full relationship data.
    */
   async findOne(id: string) {
     const programme = await this.programmeRepo.findOne({
@@ -172,92 +268,66 @@ export class ProgrammesService {
         'saved_by',
       ],
     });
-
-    if (!programme) {
+    if (!programme)
       throw new NotFoundException(`Programme with ID ${id} not found`);
-    }
     return programme;
   }
 
   /**
-   * TOGGLE SAVE: Adds/Removes a user from the programme's saved list.
+   * TOGGLE SAVE: Adds or removes a programme from the volunteer's saved list.
    */
   async toggleSave(
     programmeId: string,
     userId: string,
   ): Promise<SaveToggleResponse> {
-    const programme = await this.programmeRepo.findOne({
-      where: { id: programmeId },
-      relations: ['saved_by'],
-    });
-
-    if (!programme) {
-      throw new NotFoundException('Programme not found');
-    }
-
-    if (!programme.saved_by) {
-      programme.saved_by = [];
-    }
+    const programme = await this.findOne(programmeId);
+    if (!programme.saved_by) programme.saved_by = [];
 
     const isAlreadySaved = programme.saved_by.some((v) => v.id === userId);
 
     if (isAlreadySaved) {
-      // Unsave logic
       programme.saved_by = programme.saved_by.filter((v) => v.id !== userId);
     } else {
-      // Save logic (Partial object casted to satisfy relation)
-      programme.saved_by.push({ id: userId } as any);
+      programme.saved_by.push({ id: userId } as Volunteer);
     }
 
     await this.programmeRepo.save(programme);
-
     return {
       isSaved: !isAlreadySaved,
-      message: !isAlreadySaved
-        ? 'Programme saved successfully'
-        : 'Programme unsaved successfully',
+      message: !isAlreadySaved ? 'Saved successfully' : 'Unsaved successfully',
     };
   }
 
   /**
-   * UPDATE: Merges and updates existing programme and schedule.
+   * UPDATE: Merges new data into an existing programme and schedule.
    */
   async update(id: string, updateDto: UpdateProgrammeDto) {
     const programme = await this.findOne(id);
-    if (!programme) return null;
-
     const updatedProgramme = this.programmeRepo.merge(programme, {
       title: updateDto.title,
       description: updateDto.description,
       imageUrl: updateDto.imageUrl,
-      schedule:
-        updateDto.start_time ||
-        updateDto.end_time ||
-        updateDto.location ||
-        updateDto.mode
-          ? {
-              ...programme.schedule,
-              start_time: updateDto.start_time
-                ? new Date(updateDto.start_time)
-                : programme.schedule.start_time,
-              end_time: updateDto.end_time
-                ? new Date(updateDto.end_time)
-                : programme.schedule.end_time,
-              location: updateDto.location ?? programme.schedule.location,
-              mode: updateDto.mode ?? programme.schedule.mode,
-            }
-          : programme.schedule,
+      schedule: {
+        ...programme.schedule,
+        start_time: updateDto.start_time
+          ? new Date(updateDto.start_time)
+          : programme.schedule.start_time,
+        end_time: updateDto.end_time
+          ? new Date(updateDto.end_time)
+          : programme.schedule.end_time,
+        location: updateDto.location ?? programme.schedule.location,
+        mode: updateDto.mode ?? programme.schedule.mode,
+      },
       related_skills: updateDto.skillIds?.map((id) => ({ id }) as Skill),
       related_interests: updateDto.interestIds?.map(
         (id) => ({ id }) as Interest,
       ),
     });
-
     return await this.programmeRepo.save(updatedProgramme);
   }
 
   /**
-   * REMOVE: Deletes a programme by ID.
+   * REMOVE: Permanently deletes a programme by ID.
    */
   async remove(id: string) {
     const result = await this.programmeRepo.delete(id);
