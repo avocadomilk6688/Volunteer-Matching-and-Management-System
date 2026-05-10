@@ -25,6 +25,7 @@ import { Admin } from './users/entities/admin.entity';
 import { ApplicationsModule } from './applications/applications.module';
 import { Application } from './applications/entities/application.entity';
 import { AuthModule } from './auth/auth.module';
+import { VolunteerMonthlyPoint } from './volunteers/entities/volunteer-monthly-point.entity';
 
 @Module({
   imports: [
@@ -52,6 +53,7 @@ import { AuthModule } from './auth/auth.module';
         QuestionAnswer,
         Admin,
         Application,
+        VolunteerMonthlyPoint,
       ],
       synchronize: true,
     }),

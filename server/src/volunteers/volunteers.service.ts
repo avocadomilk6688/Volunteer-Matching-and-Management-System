@@ -1,27 +1,17 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Volunteer } from './entities/volunteer.entity';
 import { Skill } from './entities/skill.entity';
 import { Interest } from './entities/interest.entity';
+import { VolunteerMonthlyPoint } from './entities/volunteer-monthly-point.entity';
+import { Application } from '../applications/entities/application.entity';
 import { generateCustomId } from '../common/utils/id_generator.util';
 
 /**
- * 1. Interfaces for Type Safety
+ * 1. Change to CLASS to support NestJS Decorator Metadata
  */
-interface IRegistrationRecord {
-  name: string;
-}
-
-// Local interface to bypass global Express.Multer.File namespace issues
-interface LocalMulterFile {
-  filename: string;
-  path?: string;
-  mimetype?: string;
-  size?: number;
-}
-
-interface UpdateProfileDto {
+export class UpdateProfileDto {
   username?: string;
   gender?: string;
   location?: string;
@@ -30,25 +20,44 @@ interface UpdateProfileDto {
   interests?: string | Interest[];
 }
 
+export interface LocalMulterFile {
+  filename: string;
+}
+
+/**
+ * 2. Define an interface for History to avoid "any"
+ */
+export interface VolunteerHistory {
+  rating: number;
+  history: {
+    id: string;
+    status: string | undefined;
+    title: string | undefined;
+  }[];
+}
+
 @Injectable()
 export class VolunteersService {
   constructor(
     @InjectRepository(Volunteer)
     private readonly volRepo: Repository<Volunteer>,
-
     @InjectRepository(Skill)
     private readonly skillRepo: Repository<Skill>,
-
     @InjectRepository(Interest)
     private readonly interestRepo: Repository<Interest>,
+    @InjectRepository(VolunteerMonthlyPoint)
+    private readonly monthlyRepo: Repository<VolunteerMonthlyPoint>,
+    @InjectRepository(Application)
+    private readonly applicationRepo: Repository<Application>,
   ) {}
 
-  /**
-   * Basic Queries
-   */
-  async getLeaderboard(): Promise<Volunteer[]> {
-    return await this.volRepo.find({
-      relations: ['user'],
+  async getLeaderboard(
+    month: number,
+    year: number,
+  ): Promise<VolunteerMonthlyPoint[]> {
+    return await this.monthlyRepo.find({
+      where: { month: Number(month), year: Number(year) },
+      relations: ['volunteer', 'volunteer.user'],
       order: { points: 'DESC' },
       take: 10,
     });
@@ -67,9 +76,6 @@ export class VolunteersService {
     });
   }
 
-  /**
-   * Skill & Interest Management
-   */
   async findAllSkills(): Promise<Skill[]> {
     return await this.skillRepo.find();
   }
@@ -90,20 +96,6 @@ export class VolunteersService {
     return await this.interestRepo.save(newInterest);
   }
 
-  async updateSkill(id: string, newName: string) {
-    await this.skillRepo.update(id, { skill_name: newName });
-    return { message: `Skill ${id} updated to ${newName}` };
-  }
-
-  async updateInterest(id: string, newName: string) {
-    await this.interestRepo.update(id, { interest_name: newName });
-    return { message: `Interest ${id} updated to ${newName}` };
-  }
-
-  /**
-   * THE UPDATE METHOD:
-   * Handles Multipart/FormData, File Uploads, and Many-to-Many Sync
-   */
   async update(
     id: string,
     updateDto: UpdateProfileDto,
@@ -112,25 +104,16 @@ export class VolunteersService {
       resume?: LocalMulterFile[];
     },
   ): Promise<Volunteer | null> {
-    const volunteer = await this.volRepo.findOne({
-      where: { id },
-      relations: ['user', 'skills', 'interests'],
-    });
-
+    const volunteer = await this.findOne(id);
     if (!volunteer) return null;
 
-    // 1. Text Fields
     if (updateDto.gender) volunteer.gender = updateDto.gender;
     if (updateDto.location) volunteer.location = updateDto.location;
     if (updateDto.contact_number)
       volunteer.contact_number = updateDto.contact_number;
-
-    // Update username in linked User entity
-    if (updateDto.username && volunteer.user) {
+    if (updateDto.username && volunteer.user)
       volunteer.user.username = updateDto.username;
-    }
 
-    // 2. Many-to-Many Logic (Parsing JSON strings from FormData)
     if (updateDto.skills) {
       volunteer.skills =
         typeof updateDto.skills === 'string'
@@ -145,102 +128,80 @@ export class VolunteersService {
           : updateDto.interests;
     }
 
-    // 3. Safe File Handling (Using Type Guarding)
-    if (files?.profile_picture && files.profile_picture.length > 0) {
-      const profileFile = files.profile_picture[0];
-      if (profileFile && 'filename' in profileFile) {
-        volunteer.profile_picture_url = `/uploads/avatars/${profileFile.filename}`;
-      }
+    if (files?.profile_picture?.[0]) {
+      volunteer.profile_picture_url = `/uploads/avatars/${files.profile_picture[0].filename}`;
     }
 
-    if (files?.resume && files.resume.length > 0) {
-      const resumeFile = files.resume[0];
-      if (resumeFile && 'filename' in resumeFile) {
-        volunteer.resume_url = `/uploads/resumes/${resumeFile.filename}`;
-      }
+    if (files?.resume?.[0]) {
+      volunteer.resume_url = `/uploads/resumes/${files.resume[0].filename}`;
     }
 
     return await this.volRepo.save(volunteer);
   }
 
-  async remove(id: string): Promise<{ deleted: boolean }> {
-    const result = await this.volRepo.delete(id);
-    return { deleted: (result.affected ?? 0) > 0 };
+  async completeProgramme(
+    applicationId: string,
+  ): Promise<VolunteerMonthlyPoint> {
+    const app = await this.applicationRepo.findOne({
+      where: { id: applicationId },
+      relations: ['volunteer', 'programme', 'programme.schedule'],
+    });
+
+    if (!app) throw new NotFoundException('Application not found');
+
+    const volunteer = app.volunteer;
+    const schedule = app.programme.schedule;
+    const diffMs = schedule.end_time.getTime() - schedule.start_time.getTime();
+    const hoursWorked = diffMs / (1000 * 60 * 60);
+    const pointsEarned = hoursWorked * (Number(volunteer.rating) || 0);
+
+    const now = new Date();
+    const month = now.getMonth() + 1;
+    const year = now.getFullYear();
+
+    let monthlyRecord = await this.monthlyRepo.findOne({
+      where: { volunteer: { id: volunteer.id }, month, year },
+    });
+
+    if (!monthlyRecord) {
+      monthlyRecord = this.monthlyRepo.create({
+        volunteer,
+        month,
+        year,
+        totalHours: hoursWorked,
+        points: pointsEarned,
+      });
+    } else {
+      monthlyRecord.totalHours += hoursWorked;
+      monthlyRecord.points += pointsEarned;
+    }
+
+    return await this.monthlyRepo.save(monthlyRecord);
   }
 
-  /**
-   * Volunteer History Logic
-   */
-  async getHistory(id: string) {
+  async getHistory(id: string): Promise<VolunteerHistory | null> {
     const volunteer = await this.volRepo.findOne({
       where: { id },
       relations: [
         'applications',
         'applications.programme',
-        'applications.programme.organization',
-        'applications.programme.organization.registrationRecord',
         'applications.programme.schedule',
       ],
     });
-
     if (!volunteer) return null;
-
-    const totalHours: number = (volunteer.applications || [])
-      .filter((app) => app.status?.toLowerCase() === 'completed')
-      .reduce((sum: number, app): number => {
-        const sched = app.programme?.schedule;
-        if (sched?.start_time && sched?.end_time) {
-          const start = new Date(sched.start_time).getTime();
-          const end = new Date(sched.end_time).getTime();
-          const diffHours = (end - start) / (1000 * 60 * 60);
-          return sum + Math.max(0, diffHours);
-        }
-        return sum;
-      }, 0);
-
-    const history = (volunteer.applications || []).map((app) => {
-      const prog = app.programme;
-      const sched = prog?.schedule;
-      const org = prog?.organization;
-      const regRecord = org?.registrationRecord as unknown as
-        | IRegistrationRecord
-        | undefined;
-
-      let durationStr = '-';
-      if (
-        sched?.start_time &&
-        sched?.end_time &&
-        app.status?.toLowerCase() === 'completed'
-      ) {
-        const diff =
-          (new Date(sched.end_time).getTime() -
-            new Date(sched.start_time).getTime()) /
-          (1000 * 60 * 60);
-        durationStr = `${diff.toFixed(1)}h`;
-      }
-
-      return {
-        id: app.id,
-        programme: prog?.title || 'Unknown Programme',
-        org: regRecord?.name || 'Unknown Organization',
-        schedule: sched?.start_time
-          ? new Date(sched.start_time).toLocaleString('en-GB', {
-              day: '2-digit',
-              month: '2-digit',
-              year: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit',
-            })
-          : 'No date set',
-        hours: durationStr,
-        status: app.status || 'Pending',
-      };
-    });
 
     return {
       rating: Number(volunteer.rating) || 0,
-      totalHours: parseFloat(totalHours.toFixed(1)),
-      history,
+      history: (volunteer.applications || []).map((app) => ({
+        id: app.id,
+        status: app.status,
+        title: app.programme?.title,
+      })),
     };
+  }
+
+  async remove(id: string): Promise<{ deleted: boolean }> {
+    const result = await this.volRepo.delete(id);
+    return { deleted: (result.affected ?? 0) > 0 };
   }
 }
