@@ -9,6 +9,7 @@ import { QAPage } from './pages/QAPage';
 import { VolunteeringHistoryPage } from './pages/VolunteeringHistoryPage';
 import { ManageProfilePage } from './pages/ManageProfilePage';
 import { ManageListingPage } from './pages/ManageListingPage';
+import { ManageVolunteerApplicationPage } from './pages/ManageVolunteerApplicationPage';
 
 function App() {
   return (
@@ -24,6 +25,7 @@ function App() {
         <Route path="volunteering-history" element={<VolunteeringHistoryPage />}></Route>
         <Route path="manage-profile" element={<ManageProfilePage />}></Route>
         <Route path="manage-listing" element={<ManageListingPage />}></Route>
+        <Route path="manage-applications" element={<ManageVolunteerApplicationPage />} />
       </Routes>
     </AuthProvider>
   )

@@ -1,10 +1,10 @@
 import { Header } from './Header';
 import './manage_listing_page.css';
 import { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router';
 import { GenericTable } from './Table';
 
 // --- Interfaces ---
-
 interface ProgrammeListing {
     id: string;
     title: string;
@@ -17,10 +17,11 @@ interface ProgrammeListing {
 }
 
 export function ManageListingPage() {
+    const navigate = useNavigate();
+    const location = useLocation(); // To check which path we are on
     const [listings, setListings] = useState<ProgrammeListing[]>([]);
     const [loading, setLoading] = useState(true);
 
-    // UPDATED: Added 'Action' to headers
     const headers = ['Title', 'Description', 'Cover Image', 'Skills', 'Interests', 'Mode', 'Schedule', 'Action'];
 
     useEffect(() => {
@@ -31,7 +32,7 @@ export function ManageListingPage() {
                     {
                         id: 'P001',
                         title: 'River Revival Project',
-                        description: 'Volunteers work together to restore polluted rivers by organizing clean-up drives, installing eco-friendly waste bins, and conducting awareness campaigns in local communities.',
+                        description: 'Volunteers work together to restore polluted rivers by organizing clean-up drives...',
                         coverImage: 'image.png',
                         skills: ['Teamwork', 'Waste management', 'Event Coordination'],
                         interests: ['Sustainability', 'Community Services'],
@@ -41,7 +42,7 @@ export function ManageListingPage() {
                     {
                         id: 'P002',
                         title: 'Urban Green Spaces Initiative',
-                        description: 'Volunteers help transform unused urban areas into community gardens and mini-parks. Activities include planting trees, setting up benches, and creating educational signboards.',
+                        description: 'Volunteers help transform unused urban areas into community gardens and mini-parks...',
                         coverImage: 'image.jpg',
                         skills: ['Gardening', 'Creative', 'Communication'],
                         interests: ['Sustainability'],
@@ -64,7 +65,6 @@ export function ManageListingPage() {
         fetchListings();
     }, []);
 
-    // Placeholder handlers for later
     const handleModify = (id: string) => console.log('Modify:', id);
     const handleDelete = (id: string) => console.log('Delete:', id);
 
@@ -72,11 +72,22 @@ export function ManageListingPage() {
         <div className="manage-listing-wrapper">
             <Header />
             <div className="manage-listing-container">
+                {/* Sidebar with Navigation Logic */}
                 <aside className="org-sidebar">
                     <nav>
                         <ul>
-                            <li className="active">Manage listing</li>
-                            <li>Manage volunteer application</li>
+                            <li
+                                className={location.pathname === '/manage-listing' ? 'active' : ''}
+                                onClick={() => navigate('/manage-listing')}
+                            >
+                                Manage listing
+                            </li>
+                            <li
+                                className={location.pathname === '/manage-applications' ? 'active' : ''}
+                                onClick={() => navigate('/manage-applications')}
+                            >
+                                Manage volunteer application
+                            </li>
                         </ul>
                     </nav>
                 </aside>
@@ -113,21 +124,10 @@ export function ManageListingPage() {
                                     <td>{item.mode}</td>
                                     <td className="col-schedule">{item.schedule}</td>
 
-                                    {/* NEW: Action Column */}
                                     <td className="col-action">
                                         <div className="action-buttons">
-                                            <button
-                                                className="modify-btn"
-                                                onClick={() => handleModify(item.id)}
-                                            >
-                                                Modify
-                                            </button>
-                                            <button
-                                                className="delete-btn"
-                                                onClick={() => handleDelete(item.id)}
-                                            >
-                                                Delete
-                                            </button>
+                                            <button className="modify-btn" onClick={() => handleModify(item.id)}>Modify</button>
+                                            <button className="delete-btn" onClick={() => handleDelete(item.id)}>Delete</button>
                                         </div>
                                     </td>
                                 </tr>
