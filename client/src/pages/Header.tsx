@@ -15,23 +15,42 @@ export function Header() {
         navigate('/');
     };
 
-    // --- Dynamic Name Logic ---
-    // This checks for username first (from the DB update), then name, then fallback
-    const displayName = user?.username || user?.username || 'Volunteer';
+    // --- Role Constants ---
+    const role = user?.role;
+    const isVolunteer = role === 'volunteer';
+    const isOrganization = role === 'organization';
+    const isAdmin = role === 'admin';
 
-    console.log("Current User in Header:", user);
+    // --- Dynamic Name Logic ---
+    const displayName = user?.username || (isAdmin ? 'Admin' : isOrganization ? 'Organization' : 'Volunteer');
+
+    // --- Logo Link Logic ---
+    const getLogoLink = () => {
+        if (!isAuthenticated) return '/';
+        if (isAdmin) return '/admin-dashboard';
+        if (isOrganization) return '/manage-listing';
+        return '/volunteer-home';
+    };
 
     return (
         <div className="header-container">
-            <Link to={isAuthenticated ? '/volunteer-home' : '/'} className="header-logo">
+            <Link to={getLogoLink()} className="header-logo">
                 <h1>Volunteer Matching and Management System</h1>
             </Link>
 
             {isAuthenticated && (
                 <div className="header-actions">
                     <div className="logged-in-nav">
-                        <Link to="/leaderboard" className="nav-link">Leaderboard</Link>
-                        <Link to="/qa" className="nav-link">Q&A</Link>
+
+                        {/* ONLY Volunteers see the Leaderboard */}
+                        {isVolunteer && (
+                            <Link to="/leaderboard" className="nav-link">Leaderboard</Link>
+                        )}
+
+                        {/* Everyone EXCEPT Admins sees Q&A */}
+                        {!isAdmin && (
+                            <Link to="/qa" className="nav-link">Q&A</Link>
+                        )}
 
                         <div className="user-controls">
                             <span className="greeting">
@@ -51,15 +70,19 @@ export function Header() {
 
             {showProfileOptions && (
                 <div className="profile-options">
-                    <Link
-                        to="/volunteering-history"
-                        className="view-volunteering-history"
-                        onClick={() => isShowProfileOptions(false)}
-                    >
-                        View volunteering <br /> history
-                    </Link>
-
-                    <hr />
+                    {/* Only Volunteers have history */}
+                    {isVolunteer && (
+                        <>
+                            <Link
+                                to="/volunteering-history"
+                                className="view-volunteering-history"
+                                onClick={() => isShowProfileOptions(false)}
+                            >
+                                View volunteering <br /> history
+                            </Link>
+                            <hr />
+                        </>
+                    )}
 
                     <Link
                         to="/manage-profile"
