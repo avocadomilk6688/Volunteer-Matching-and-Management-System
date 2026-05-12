@@ -55,6 +55,24 @@
 .profile-icon {
     background: none;
     border: none;
+    padding: 0;
+    /* Reset padding to ensure the circle fits perfectly */
+}
+
+/* --- THE FIX FOR THE 0x0 ISSUE --- */
+.profile-image-circle {
+    width: 40px;
+    /* Sets the horizontal size */
+    height: 40px;
+    /* Sets the vertical size */
+    border-radius: 50%;
+    /* Makes it a circle */
+    background-size: cover;
+    /* Ensures image fills the circle */
+    background-position: center;
+    background-repeat: no-repeat;
+    border: 2px solid white;
+    /* Optional: matches your previous design */
 }
 
 .notif-icon {
@@ -98,4 +116,12 @@
     text-align: center;
     width: 100%;
     box-sizing: border-box;
+}
+
+/* Log out style from previous context if needed */
+.log-out {
+    padding: 10px;
+    text-align: center;
+    cursor: pointer;
+    width: 100%;
 }

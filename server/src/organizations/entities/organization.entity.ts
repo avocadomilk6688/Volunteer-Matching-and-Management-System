@@ -23,7 +23,7 @@ export class Organization {
   @JoinColumn()
   registrationRecord!: OrganizationRegistration;
 
-  @OneToOne(() => User)
-  @JoinColumn()
+  @OneToOne(() => User, (user) => user.organization)
+  @JoinColumn({ name: 'userId' })
   user!: User;
 }

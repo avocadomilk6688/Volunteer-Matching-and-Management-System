@@ -1,6 +1,7 @@
 import { Entity, Column, PrimaryColumn, OneToOne } from 'typeorm';
 import { Volunteer } from '../../volunteers/entities/volunteer.entity';
 import { Admin } from './admin.entity';
+import { Organization } from '../../organizations/entities/organization.entity'; // Import this!
 
 @Entity()
 export class User {
@@ -23,9 +24,14 @@ export class User {
   })
   role!: string;
 
-  @OneToOne(() => Volunteer, (volunteer) => volunteer.user)
+  @OneToOne(() => Volunteer, (volunteer) => volunteer.user, { eager: true })
   volunteer?: Volunteer;
 
-  @OneToOne(() => Admin, (admin) => admin.user)
+  @OneToOne(() => Admin, (admin) => admin.user, { eager: true })
   admin?: Admin;
+
+  @OneToOne(() => Organization, (organization) => organization.user, {
+    eager: true,
+  })
+  organization?: Organization;
 }

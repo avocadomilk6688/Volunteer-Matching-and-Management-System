@@ -1,18 +1,27 @@
 import { createContext } from "react";
 
-// Defines the shape of the User object to store credentials and role information
 export interface User {
   id: string;
   email: string;
-  role: string;
-  username?: string | null; // This allows us to store the new username
+  role: "admin" | "volunteer" | "organization";
+  username?: string | null;
+
+  // These allow the nested data from TypeORM relations to exist in React
+  volunteer?: {
+    profile_picture_url?: string;
+    rating?: number;
+    points?: number;
+  };
+  organization?: {
+    profile_picture_url?: string;
+    description?: string;
+    rating?: number;
+  };
 }
 
-// Defines the structural contract for the authentication state and its associated methods
-interface AuthContextType {
+export interface AuthContextType {
   isAuthenticated: boolean;
   user: User | null;
-  // Add setUser here so components can update the global user state
   setUser: (user: User | null) => void;
   login: (token: string, userData: User) => void;
   logout: () => void;

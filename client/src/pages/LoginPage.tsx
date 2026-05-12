@@ -25,19 +25,20 @@ export function LoginPage() {
 
             const data = await response.json();
 
+            // This log will now show the organization/volunteer objects if the backend is fixed
             console.log("DEBUG: Full response from server:", data);
 
             if (!response.ok) {
                 throw new Error(data.message || 'Login failed');
             }
 
-            login(data.access_token, {
-                id: data.id,
-                email: data.email,
-                role: data.role,
-                username: data.username
-            });
+            // --- THE FIX ---
+            // Pass the entire 'data' object. 
+            // Because we fixed the backend 'AuthService', this 'data' now contains 
+            // the 'organization' or 'volunteer' keys needed for the profile picture.
+            login(data.access_token, data);
 
+            // --- Navigation Logic ---
             if (role === 'volunteer') {
                 navigate('/volunteer-home');
             } else if (role === 'admin') {
