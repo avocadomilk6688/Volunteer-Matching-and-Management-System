@@ -151,6 +151,35 @@ export function ManageListingPage() {
         }
     };
 
+    // --- NEW: DELETE FUNCTIONALITY ---
+    const handleDelete = async (id: string) => {
+        const token = localStorage.getItem('token');
+        if (!window.confirm("Are you sure you want to delete this programme? This action cannot be undone.")) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/programmes/${id}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            if (response.ok) {
+                // Refresh the list locally or fetch again
+                alert("Programme deleted successfully.");
+                await fetchInitialData();
+            } else {
+                const err = await response.json();
+                alert(`Delete failed: ${err.message}`);
+            }
+        } catch (error) {
+            console.error("Delete error:", error);
+            alert("An error occurred while trying to delete.");
+        }
+    };
+
     const resetForm = () => {
         setIsAdding(false);
         setMySkills([]);
@@ -257,7 +286,6 @@ export function ManageListingPage() {
                                     <td className="col-title">{item.title}</td>
                                     <td className="col-desc">{item.description}</td>
                                     <td className="col-img">
-                                        {/* SUPPOSED TO SHOW FILENAME: Clickable link opens the real image */}
                                         <a
                                             href={`${API_BASE_URL}${item.imageUrl}`}
                                             target="_blank"
@@ -280,7 +308,8 @@ export function ManageListingPage() {
                                     <td className="col-action">
                                         <div className="action-buttons">
                                             <button className="modify-btn" onClick={() => navigate(`/edit-listing/${item.id}`)}>Modify</button>
-                                            <button className="delete-btn">Delete</button>
+                                            {/* UPDATED DELETE BUTTON */}
+                                            <button className="delete-btn" onClick={() => handleDelete(item.id)}>Delete</button>
                                         </div>
                                     </td>
                                 </tr>
