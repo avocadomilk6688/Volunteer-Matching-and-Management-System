@@ -10,9 +10,9 @@ import { Volunteer } from '../volunteers/entities/volunteer.entity';
 import { Programme } from '../programmes/entities/programme.entity';
 import { Skill } from '../volunteers/entities/skill.entity';
 import { Interest } from '../volunteers/entities/interest.entity';
-import { UpdateApplicationDto } from './dto/update-application.dto';
 import { generateCustomId } from '../common/utils/id_generator.util';
 
+// --- Interfaces for Type Safety ---
 export interface IncomingApplicationDto {
   volunteerId: string;
   programmeId: string;
@@ -22,7 +22,6 @@ export interface IncomingApplicationDto {
 
 interface TagJsonItem {
   id: string;
-  name?: string;
 }
 
 @Injectable()
@@ -35,6 +34,28 @@ export class ApplicationsService {
     private readonly volunteerRepo: Repository<Volunteer>,
   ) {}
 
+  /**
+   * Fetch all applications for a specific organization.
+   * Used by the Manage Applications page.
+   */
+  async findAllByOrg(orgId: string): Promise<Application[]> {
+    return await this.appRepo.find({
+      where: {
+        programme: { organization: { id: orgId } },
+      },
+      relations: [
+        'volunteer',
+        'volunteer.user',
+        'volunteer.skills',
+        'volunteer.interests',
+        'programme',
+      ],
+    });
+  }
+
+  /**
+   * Check if a volunteer is already enrolled in a programme.
+   */
   async checkStatus(volunteerId: string, programmeId: string) {
     const application = await this.appRepo.findOne({
       where: {
@@ -49,12 +70,12 @@ export class ApplicationsService {
     };
   }
 
+  /**
+   * Create a new application and update volunteer profile skills/interests/resume.
+   */
   async create(dto: IncomingApplicationDto, file?: Express.Multer.File) {
-    // 1. SAFETY CHECK: Ensure dto was parsed correctly by the controller
     if (!dto || !dto.volunteerId || !dto.programmeId) {
-      throw new BadRequestException(
-        'Missing volunteerId or programmeId in request body.',
-      );
+      throw new BadRequestException('Missing volunteerId or programmeId');
     }
 
     const { volunteerId, programmeId } = dto;
@@ -66,7 +87,7 @@ export class ApplicationsService {
 
     if (!volunteer) throw new NotFoundException('Volunteer not found');
 
-    // 2. Parse Tags safely
+    // 1. Safe parsing of Skills
     if (dto.skills && dto.skills !== 'undefined' && dto.skills !== '') {
       try {
         const skillsData = JSON.parse(dto.skills) as TagJsonItem[];
@@ -78,6 +99,7 @@ export class ApplicationsService {
       }
     }
 
+    // 2. Safe parsing of Interests
     if (
       dto.interests &&
       dto.interests !== 'undefined' &&
@@ -93,14 +115,15 @@ export class ApplicationsService {
       }
     }
 
-    // 3. Handle Resume
+    // 3. Update Resume path if a new file is uploaded
     if (file) {
       volunteer.resume_url = `/uploads/resumes/${file.filename}`;
     }
 
+    // Save volunteer profile updates
     await this.volunteerRepo.save(volunteer);
 
-    // 4. Create Application record
+    // 4. Create the Application record
     const id = await generateCustomId(this.appRepo, 'APP');
     const newApplication = this.appRepo.create({
       id,
@@ -113,10 +136,27 @@ export class ApplicationsService {
     return await this.appRepo.save(newApplication);
   }
 
-  async findAll() {
-    return await this.appRepo.find({ relations: ['volunteer', 'programme'] });
+  /**
+   * Approve or Reject an application.
+   */
+  async updateStatus(id: string, status: 'approved' | 'rejected') {
+    const application = await this.findOne(id);
+    application.status = status;
+    return await this.appRepo.save(application);
   }
 
+  /**
+   * Basic fetch all applications.
+   */
+  async findAll() {
+    return await this.appRepo.find({
+      relations: ['volunteer', 'volunteer.user', 'programme'],
+    });
+  }
+
+  /**
+   * Fetch a single application by ID.
+   */
   async findOne(id: string) {
     const application = await this.appRepo.findOne({
       where: { id },
@@ -126,11 +166,9 @@ export class ApplicationsService {
     return application;
   }
 
-  async update(id: string, updateApplicationDto: UpdateApplicationDto) {
-    await this.appRepo.update(id, updateApplicationDto);
-    return await this.findOne(id);
-  }
-
+  /**
+   * Delete an application.
+   */
   async remove(id: string) {
     const result = await this.appRepo.delete(id);
     return { deleted: (result.affected ?? 0) > 0 };
