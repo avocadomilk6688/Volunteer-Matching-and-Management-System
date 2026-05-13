@@ -1,7 +1,9 @@
-import { Entity, Column, PrimaryColumn, OneToOne } from 'typeorm';
+import { Entity, Column, PrimaryColumn, OneToOne, OneToMany } from 'typeorm';
 import { Volunteer } from '../../volunteers/entities/volunteer.entity';
 import { Admin } from './admin.entity';
-import { Organization } from '../../organizations/entities/organization.entity'; // Import this!
+import { Organization } from '../../organizations/entities/organization.entity';
+import { Notification } from '../../interactions/entities/notification.entity';
+import type { Relation } from 'typeorm';
 
 @Entity()
 export class User {
@@ -22,16 +24,22 @@ export class User {
     enum: ['admin', 'volunteer', 'organization'],
     default: 'volunteer',
   })
-  role!: string;
+  // Use a union type here for better autocomplete/safety
+  role!: 'admin' | 'volunteer' | 'organization';
 
+  // Relation<> helps fix that "Error typed value" linter bug
   @OneToOne(() => Volunteer, (volunteer) => volunteer.user, { eager: true })
-  volunteer?: Volunteer;
+  volunteer?: Relation<Volunteer>;
 
   @OneToOne(() => Admin, (admin) => admin.user, { eager: true })
-  admin?: Admin;
+  admin?: Relation<Admin>;
 
   @OneToOne(() => Organization, (organization) => organization.user, {
     eager: true,
   })
-  organization?: Organization;
+  organization?: Relation<Organization>;
+
+  // Inverse side of the notification relationship
+  @OneToMany(() => Notification, (notification) => notification.receiver)
+  notifications?: Relation<Notification[]>;
 }

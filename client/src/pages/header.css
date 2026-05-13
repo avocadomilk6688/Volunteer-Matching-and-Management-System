@@ -125,3 +125,86 @@
     cursor: pointer;
     width: 100%;
 }
+
+/* Container for the whole header should be relative for absolute children */
+.header-container {
+    position: relative;
+    /* ... your existing styles ... */
+}
+
+.notif-icon {
+    position: relative;
+    background: none;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+}
+
+/* Red dot badge */
+.notif-badge {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    width: 8px;
+    height: 8px;
+    background-color: #ff4d4d;
+    border-radius: 50%;
+    border: 1px solid #1a1a1a;
+    /* Matches header bg */
+}
+
+/* Notification Dropdown Box */
+.notification-dropdown {
+    position: absolute;
+    top: 70px;
+    /* Adjust based on your header height */
+    right: 20px;
+    width: 320px;
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+    z-index: 1000;
+    overflow: hidden;
+    border: 1px solid #e0e0e0;
+}
+
+/* Individual Item */
+.notif-item {
+    padding: 15px;
+    border-bottom: 1px solid #f0f0f0;
+    transition: background-color 0.2s;
+}
+
+.notif-item:last-child {
+    border-bottom: none;
+}
+
+.notif-item:hover {
+    background-color: #f9f9f9;
+}
+
+/* Message Text */
+.notif-message {
+    margin: 0;
+    font-size: 14px;
+    color: #333;
+    line-height: 1.4;
+    font-family: 'Inter', sans-serif;
+    /* Use your project's font */
+}
+
+/* Timestamp Text */
+.notif-time {
+    display: block;
+    margin-top: 8px;
+    font-size: 12px;
+    color: #888;
+}
+
+.notif-empty {
+    padding: 20px;
+    text-align: center;
+    color: #999;
+    font-size: 14px;
+}

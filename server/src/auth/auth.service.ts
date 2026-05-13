@@ -34,11 +34,12 @@ export class AuthService {
     const salt = await bcrypt.genSalt();
     const hashedPassword = await bcrypt.hash(password, salt);
 
+    // FIXED: Explicitly cast the role to satisfy the 'User' entity union type
     const user = this.userRepository.create({
       id: newId,
       email,
       password: hashedPassword,
-      role,
+      role: role as 'admin' | 'volunteer' | 'organization',
     });
 
     try {
@@ -63,7 +64,6 @@ export class AuthService {
   async login(loginDto: LoginDto) {
     const { email, password, role } = loginDto;
 
-    // --- FIX 1: Explicitly fetch the relations here ---
     const user = await this.userRepository.findOne({
       where: { email },
       relations: ['volunteer', 'organization', 'admin'],
@@ -79,14 +79,12 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials.');
     }
 
-    // --- FIX 2: Include the nested objects in the return data ---
     return {
       access_token: 'session_active_token',
       id: user.id,
       email: user.email,
       role: user.role,
       username: user.username,
-      // Pass the relation data to the frontend
       volunteer: user.volunteer,
       organization: user.organization,
     };

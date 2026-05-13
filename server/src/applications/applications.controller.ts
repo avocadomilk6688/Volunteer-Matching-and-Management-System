@@ -25,7 +25,6 @@ export class ApplicationsController {
     return await this.applicationsService.create(createApplicationDto, file);
   }
 
-  // FIXED: Frontend was getting 404 because this was missing
   @Get('organization/:orgId')
   async findByOrganization(@Param('orgId') orgId: string) {
     return await this.applicationsService.findAllByOrg(orgId);
@@ -39,13 +38,17 @@ export class ApplicationsController {
     return await this.applicationsService.checkStatus(volunteerId, programmeId);
   }
 
-  // ADDED: Endpoint for approving/rejecting applications
   @Patch(':id/status')
   async updateStatus(
     @Param('id') id: string,
-    @Body('status') status: 'approved' | 'rejected',
+    @Body('status') status: 'upcoming' | 'rejected' | 'approved',
   ) {
-    return await this.applicationsService.updateStatus(id, status);
+    // By explicitly typing the variable here, TS knows it's safe
+    // for the service call without needing 'as'
+    const finalStatus: 'upcoming' | 'rejected' =
+      status === 'approved' ? 'upcoming' : status;
+
+    return await this.applicationsService.updateStatus(id, finalStatus);
   }
 
   @Get()

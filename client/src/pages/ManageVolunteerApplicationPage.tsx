@@ -7,14 +7,14 @@ import { AiFillStar } from 'react-icons/ai';
 import { BiFilterAlt } from 'react-icons/bi';
 import { useAuth } from '../context/auth/useAuth';
 
-// --- Updated Interfaces for Strict Type Safety ---
+// --- Interfaces ---
 interface Skill { id: string; skill_name: string; }
 interface Interest { id: string; interest_name: string; }
 
 interface ProgrammeEntity {
     id: string;
     title: string;
-    organization?: { id: string }; // Added this to fix the "any" error
+    organization?: { id: string };
 }
 
 interface VolunteerApplication {
@@ -35,7 +35,6 @@ interface VolunteerApplication {
     };
 }
 
-// Interface for the fetched data wrapper
 interface BackendProgResponse {
     items: ProgrammeEntity[];
     total: number;
@@ -50,8 +49,6 @@ export function ManageVolunteerApplicationPage() {
     const [applications, setApplications] = useState<VolunteerApplication[]>([]);
     const [allProgrammes, setAllProgrammes] = useState<ProgrammeEntity[]>([]);
     const [loading, setLoading] = useState(true);
-
-    // --- Filter States ---
     const [selectedProgrammeId, setSelectedProgrammeId] = useState<string>('All');
     const [isFilterOpen, setIsFilterOpen] = useState(false);
 
@@ -63,7 +60,6 @@ export function ManageVolunteerApplicationPage() {
 
         try {
             setLoading(true);
-
             const [appRes, progRes] = await Promise.all([
                 fetch(`${API_BASE_URL}/applications/organization/${user.id}`, {
                     headers: { 'Authorization': `Bearer ${token}` }
@@ -77,18 +73,17 @@ export function ManageVolunteerApplicationPage() {
             const progData = await progRes.json() as BackendProgResponse;
 
             if (Array.isArray(appData)) {
+                // Show only pending applications
                 const pendingApps = appData.filter((app: VolunteerApplication) => app.status === 'pending');
                 setApplications(pendingApps);
             }
 
-            // FIXED: Using ProgrammeEntity instead of any
             if (progData && Array.isArray(progData.items)) {
                 const orgProgrammes = progData.items.filter(
                     (p: ProgrammeEntity) => p.organization?.id === user.id
                 );
                 setAllProgrammes(orgProgrammes);
             }
-
         } catch (error) {
             console.error("Error fetching data:", error);
         } finally {
@@ -109,7 +104,6 @@ export function ManageVolunteerApplicationPage() {
                 display: `${prog.title} (${count})`
             };
         });
-
         const totalPending = applications.length;
         return [{ id: 'All', title: 'All', display: `All (${totalPending})` }, ...options];
     }, [allProgrammes, applications]);
@@ -124,9 +118,14 @@ export function ManageVolunteerApplicationPage() {
         return selected ? selected.title : 'Programme';
     }, [selectedProgrammeId, filterOptions]);
 
-    const handleUpdateStatus = async (id: string, newStatus: 'approved' | 'rejected') => {
+    /**
+     * Updated: Approve becomes 'upcoming', Reject becomes 'rejected'
+     */
+    const handleUpdateStatus = async (id: string, action: 'approve' | 'reject') => {
         const token = localStorage.getItem('token');
-        if (!window.confirm(`Are you sure you want to ${newStatus} this application?`)) return;
+        const newStatus = action === 'approve' ? 'upcoming' : 'rejected';
+
+        if (!window.confirm(`Are you sure you want to ${action} this application?`)) return;
 
         try {
             const response = await fetch(`${API_BASE_URL}/applications/${id}/status`, {
@@ -139,8 +138,10 @@ export function ManageVolunteerApplicationPage() {
             });
 
             if (response.ok) {
-                alert(`Application ${newStatus}!`);
-                fetchData();
+                alert(`Application ${action === 'approve' ? 'Approved' : 'Rejected'}! Notification sent.`);
+                fetchData(); // Refresh list
+            } else {
+                alert("Failed to update application status.");
             }
         } catch (error) {
             console.error("Update error:", error);
@@ -169,10 +170,7 @@ export function ManageVolunteerApplicationPage() {
                     <h1>Manage Volunteer Application</h1>
 
                     <div className="filter-container">
-                        <button
-                            className="filter-dropdown-btn"
-                            onClick={() => setIsFilterOpen(!isFilterOpen)}
-                        >
+                        <button className="filter-dropdown-btn" onClick={() => setIsFilterOpen(!isFilterOpen)}>
                             {currentFilterLabel} <BiFilterAlt className="filter-icon" />
                         </button>
 
@@ -197,7 +195,7 @@ export function ManageVolunteerApplicationPage() {
                     {loading ? (
                         <div className="loading-state">Loading applications...</div>
                     ) : filteredApplications.length === 0 ? (
-                        <div className="no-results">No pending applications found for this filter.</div>
+                        <div className="no-results">No pending applications found.</div>
                     ) : (
                         <GenericTable headers={headers}>
                             {filteredApplications.map((app) => (
@@ -227,12 +225,7 @@ export function ManageVolunteerApplicationPage() {
                                     </td>
                                     <td className="col-resume">
                                         {app.volunteer.resume_url ? (
-                                            <a
-                                                href={`${API_BASE_URL}${app.volunteer.resume_url}`}
-                                                target="_blank"
-                                                rel="noreferrer"
-                                                className="file-link"
-                                            >
+                                            <a href={`${API_BASE_URL}${app.volunteer.resume_url}`} target="_blank" rel="noreferrer" className="file-link">
                                                 {getFileName(app.volunteer.resume_url)}
                                             </a>
                                         ) : (
@@ -244,8 +237,8 @@ export function ManageVolunteerApplicationPage() {
                                     </td>
                                     <td className="col-action">
                                         <div className="action-buttons">
-                                            <button className="approve-btn" onClick={() => handleUpdateStatus(app.id, 'approved')}>Approve</button>
-                                            <button className="reject-btn" onClick={() => handleUpdateStatus(app.id, 'rejected')}>Reject</button>
+                                            <button className="approve-btn" onClick={() => handleUpdateStatus(app.id, 'approve')}>Approve</button>
+                                            <button className="reject-btn" onClick={() => handleUpdateStatus(app.id, 'reject')}>Reject</button>
                                         </div>
                                     </td>
                                 </tr>

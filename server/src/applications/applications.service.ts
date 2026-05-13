@@ -10,6 +10,7 @@ import { Volunteer } from '../volunteers/entities/volunteer.entity';
 import { Programme } from '../programmes/entities/programme.entity';
 import { Skill } from '../volunteers/entities/skill.entity';
 import { Interest } from '../volunteers/entities/interest.entity';
+import { Notification } from '../interactions/entities/notification.entity';
 import { generateCustomId } from '../common/utils/id_generator.util';
 
 // --- Interfaces for Type Safety ---
@@ -32,11 +33,13 @@ export class ApplicationsService {
 
     @InjectRepository(Volunteer)
     private readonly volunteerRepo: Repository<Volunteer>,
+
+    @InjectRepository(Notification)
+    private readonly notifRepo: Repository<Notification>,
   ) {}
 
   /**
    * Fetch all applications for a specific organization.
-   * Used by the Manage Applications page.
    */
   async findAllByOrg(orgId: string): Promise<Application[]> {
     return await this.appRepo.find({
@@ -71,7 +74,7 @@ export class ApplicationsService {
   }
 
   /**
-   * Create a new application and update volunteer profile skills/interests/resume.
+   * Create a new application and update volunteer profile.
    */
   async create(dto: IncomingApplicationDto, file?: Express.Multer.File) {
     if (!dto || !dto.volunteerId || !dto.programmeId) {
@@ -115,12 +118,11 @@ export class ApplicationsService {
       }
     }
 
-    // 3. Update Resume path if a new file is uploaded
+    // 3. Update Resume path
     if (file) {
       volunteer.resume_url = `/uploads/resumes/${file.filename}`;
     }
 
-    // Save volunteer profile updates
     await this.volunteerRepo.save(volunteer);
 
     // 4. Create the Application record
@@ -137,26 +139,43 @@ export class ApplicationsService {
   }
 
   /**
-   * Approve or Reject an application.
+   * Approve or Reject an application and notify the volunteer.
    */
-  async updateStatus(id: string, status: 'approved' | 'rejected') {
-    const application = await this.findOne(id);
+  async updateStatus(id: string, status: 'upcoming' | 'rejected') {
+    const application = await this.appRepo.findOne({
+      where: { id },
+      relations: ['volunteer', 'volunteer.user', 'programme'],
+    });
+
+    if (!application) throw new NotFoundException('Application not found');
+
     application.status = status;
-    return await this.appRepo.save(application);
+    const savedApp = await this.appRepo.save(application);
+
+    if (application.volunteer?.user) {
+      const notifId = await generateCustomId(this.notifRepo, 'NOT');
+      const message =
+        status === 'upcoming'
+          ? `Your application for "${application.programme.title}" has been approved! It is now listed under your upcoming events.`
+          : `We regret to inform you that your application for "${application.programme.title}" was not accepted at this time.`;
+
+      const newNotif = this.notifRepo.create();
+      newNotif.id = notifId;
+      newNotif.content = message;
+      newNotif.receiver = application.volunteer.user;
+
+      await this.notifRepo.save(newNotif);
+    }
+
+    return savedApp;
   }
 
-  /**
-   * Basic fetch all applications.
-   */
   async findAll() {
     return await this.appRepo.find({
       relations: ['volunteer', 'volunteer.user', 'programme'],
     });
   }
 
-  /**
-   * Fetch a single application by ID.
-   */
   async findOne(id: string) {
     const application = await this.appRepo.findOne({
       where: { id },
@@ -166,9 +185,6 @@ export class ApplicationsService {
     return application;
   }
 
-  /**
-   * Delete an application.
-   */
   async remove(id: string) {
     const result = await this.appRepo.delete(id);
     return { deleted: (result.affected ?? 0) > 0 };
