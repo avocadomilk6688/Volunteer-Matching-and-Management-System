@@ -86,4 +86,15 @@ export class InteractionsService {
   async findAll(): Promise<Message[]> {
     return await this.messageRepo.find();
   }
+
+  /**
+   * Added: Fetch all notifications for a specific user ID
+   * Used by the Header to display real notifications
+   */
+  async findAllByUserId(userId: string): Promise<Notification[]> {
+    return await this.notificationRepo.find({
+      where: { receiver: { id: userId } },
+      order: { createdAt: 'DESC' }, // Show newest first
+    });
+  }
 }

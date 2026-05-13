@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param } from '@nestjs/common';
 import { InteractionsService } from './interactions.service';
 import { QuestionAnswer } from './entities/question_answer.entity';
 import {
@@ -47,5 +47,10 @@ export class InteractionsController {
   @Get()
   findAll() {
     return this.interactionsService.findAll();
+  }
+
+  @Get('user/:userId')
+  async findByUser(@Param('userId') userId: string) {
+    return await this.interactionsService.findAllByUserId(userId);
   }
 }

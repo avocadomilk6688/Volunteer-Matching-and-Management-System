@@ -2,11 +2,19 @@ import './header.css';
 import { useAuth } from '../context/auth/useAuth';
 import { Link, useNavigate } from 'react-router';
 import { MdNotifications } from 'react-icons/md';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import axios from 'axios';
 
 const API_BASE_URL = "http://localhost:3000";
 
+// --- Interfaces ---
 interface ProfileRelation { profile_picture_url?: string; }
+
+interface Notification {
+    id: string;
+    content: string;
+    createdAt: string;
+}
 
 interface AuthenticatedUser {
     id: string;
@@ -16,33 +24,36 @@ interface AuthenticatedUser {
     organization?: ProfileRelation;
 }
 
-// Hardcoded Data based on your image
-const NOTIFICATIONS = [
-    {
-        id: 1,
-        message: "Congratulations, you’ve been matched with the upcoming Community Clean-Up event on March 5th!",
-        time: "15s ago"
-    },
-    {
-        id: 2,
-        message: "Your updated skills in ‘First Aid’ have been saved. New volunteer opportunities related are now available for you.",
-        time: "30mins ago"
-    },
-    {
-        id: 3,
-        message: "Reminder: You’re scheduled for the Food Bank Distribution tomorrow at 9:00 AM. Please arrive 15 minutes early to check in.",
-        time: "2h ago"
-    }
-];
-
 export function Header() {
     const { user: rawUser, isAuthenticated, logout } = useAuth();
     const user = rawUser as AuthenticatedUser | null;
     const navigate = useNavigate();
 
-    // States for dropdowns
+    // States
     const [showProfileOptions, isShowProfileOptions] = useState(false);
     const [showNotifications, setShowNotifications] = useState(false);
+    const [notifications, setNotifications] = useState<Notification[]>([]);
+
+    // 1. Fetch real notifications from backend
+    useEffect(() => {
+        if (isAuthenticated && user?.id) {
+            const fetchNotifications = async () => {
+                try {
+                    // This assumes your backend has a GET /notifications/user/:id endpoint
+                    const res = await axios.get(`${API_BASE_URL}/interactions/user/${user.id}`);
+                    setNotifications(res.data);
+                } catch (err) {
+                    console.error("Error fetching notifications:", err);
+                }
+            };
+
+            fetchNotifications();
+
+            // Optional: Refresh notifications every 60 seconds
+            const interval = setInterval(fetchNotifications, 60000);
+            return () => clearInterval(interval);
+        }
+    }, [isAuthenticated, user?.id]);
 
     const handleLogout = () => {
         logout();
@@ -53,19 +64,35 @@ export function Header() {
 
     const toggleNotifications = () => {
         setShowNotifications(!showNotifications);
-        if (showProfileOptions) isShowProfileOptions(false); // Close profile if notification opens
+        if (showProfileOptions) isShowProfileOptions(false);
     };
 
     const toggleProfile = () => {
         isShowProfileOptions(!showProfileOptions);
-        if (showNotifications) setShowNotifications(false); // Close notifications if profile opens
+        if (showNotifications) setShowNotifications(false);
+    };
+
+    // --- Helper: Format DB Date to "Time Ago" ---
+    const formatTimeAgo = (dateString: string) => {
+        const now = new Date();
+        const past = new Date(dateString);
+        const diffInMs = now.getTime() - past.getTime();
+
+        const seconds = Math.floor(diffInMs / 1000);
+        const minutes = Math.floor(seconds / 60);
+        const hours = Math.floor(minutes / 60);
+        const days = Math.floor(hours / 24);
+
+        if (seconds < 60) return `${seconds}s ago`;
+        if (minutes < 60) return `${minutes}mins ago`;
+        if (hours < 24) return `${hours}h ago`;
+        return `${days}d ago`;
     };
 
     const role = user?.role;
     const isVolunteer = role === 'volunteer';
     const isOrganization = role === 'organization';
     const isAdmin = role === 'admin';
-
     const displayName = user?.username || (isAdmin ? 'Admin' : isOrganization ? 'Organization' : 'Volunteer');
 
     const getProfilePic = () => {
@@ -112,24 +139,27 @@ export function Header() {
 
                             <button className="notif-icon" onClick={toggleNotifications}>
                                 <MdNotifications size={24} color="white" />
-                                {/* Optional: Red dot badge if there are notifications */}
-                                <span className="notif-badge"></span>
+                                {notifications.length > 0 && <span className="notif-badge"></span>}
                             </button>
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* Notification Dropdown */}
+            {/* Dynamic Notification Dropdown */}
             {showNotifications && (
                 <div className="notification-dropdown">
-                    {NOTIFICATIONS.map((notif) => (
-                        <div key={notif.id} className="notif-item">
-                            <p className="notif-message">{notif.message}</p>
-                            <span className="notif-time">{notif.time}</span>
-                        </div>
-                    ))}
-                    {NOTIFICATIONS.length === 0 && (
+                    {notifications.length > 0 ? (
+                        // Sort by latest first before mapping
+                        [...notifications]
+                            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                            .map((notif) => (
+                                <div key={notif.id} className="notif-item">
+                                    <p className="notif-message">{notif.content}</p>
+                                    <span className="notif-time">{formatTimeAgo(notif.createdAt)}</span>
+                                </div>
+                            ))
+                    ) : (
                         <div className="notif-empty">No new notifications</div>
                     )}
                 </div>
