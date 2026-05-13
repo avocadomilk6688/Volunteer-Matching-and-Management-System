@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Organization } from './entities/organization.entity';
@@ -10,6 +10,18 @@ import {
 import { generateCustomId } from '../common/utils/id_generator.util';
 import { User } from '../users/entities/user.entity';
 
+// --- Define an Interface for the Update Payload ---
+// This tells TypeScript exactly what fields might come from the frontend
+interface UpdateOrgPayload {
+  username?: string;
+  email?: string;
+  password?: string;
+  address?: string;
+  description?: string;
+  contact_number?: string;
+  profile_picture_url?: string;
+}
+
 @Injectable()
 export class OrganizationsService {
   constructor(
@@ -19,6 +31,8 @@ export class OrganizationsService {
     @InjectRepository(OrganizationRegistration)
     private readonly regRepo: Repository<OrganizationRegistration>,
   ) {}
+
+  // --- Registration Record Methods ---
 
   async createRegistration(dto: CreateOrganizationRegistrationDto) {
     const id = await generateCustomId(this.regRepo, 'REG');
@@ -36,10 +50,15 @@ export class OrganizationsService {
   }
 
   async findOneRegistration(id: string) {
-    return await this.regRepo.findOne({ where: { id } });
+    const reg = await this.regRepo.findOne({ where: { id } });
+    if (!reg) throw new NotFoundException(`Registration ${id} not found`);
+    return reg;
   }
 
-  async updateRegistration(id: string, updateDto: any) {
+  async updateRegistration(
+    id: string,
+    updateDto: Partial<CreateOrganizationRegistrationDto>,
+  ) {
     await this.regRepo.update(id, updateDto);
     return await this.findOneRegistration(id);
   }
@@ -48,6 +67,8 @@ export class OrganizationsService {
     const result = await this.regRepo.delete(id);
     return { deleted: (result.affected ?? 0) > 0 };
   }
+
+  // --- Organization Profile Methods ---
 
   async create(dto: CreateOrganizationDto) {
     const id = await generateCustomId(this.orgRepo, 'ORG');
@@ -69,14 +90,56 @@ export class OrganizationsService {
   }
 
   async findOne(id: string) {
-    return await this.orgRepo.findOne({
+    const org = await this.orgRepo.findOne({
       where: { id },
       relations: ['registrationRecord', 'user'],
     });
+    if (!org) throw new NotFoundException(`Organization ${id} not found`);
+    return org;
   }
 
-  async update(id: string, updateDto: any) {
-    await this.orgRepo.update(id, updateDto);
+  /**
+   * Updates Organization, Linked User, and Linked Registration Record
+   */
+  async update(id: string, updateDto: UpdateOrgPayload) {
+    const org = await this.orgRepo.findOne({
+      where: { id },
+      relations: ['registrationRecord', 'user'],
+    });
+
+    if (!org) throw new NotFoundException('Organization not found');
+
+    // 1. Handle User Table Updates
+    // We use Partial<User> to ensure type safety
+    const userData: Partial<User> = {};
+    if (updateDto.username) userData.username = updateDto.username;
+    if (updateDto.email) userData.email = updateDto.email;
+    if (updateDto.password) userData.password = updateDto.password;
+
+    if (Object.keys(userData).length > 0 && org.user) {
+      await this.orgRepo.manager.update(User, org.user.id, userData);
+    }
+
+    // 2. Handle Registration Table Updates
+    if (updateDto.address && org.registrationRecord) {
+      await this.regRepo.update(org.registrationRecord.id, {
+        address: updateDto.address,
+      });
+    }
+
+    // 3. Handle Organization Table Updates
+    const orgUpdateData: Partial<Organization> = {};
+    if (updateDto.description)
+      orgUpdateData.description = updateDto.description;
+    if (updateDto.contact_number)
+      orgUpdateData.contact_number = updateDto.contact_number;
+    if (updateDto.profile_picture_url)
+      orgUpdateData.profile_picture_url = updateDto.profile_picture_url;
+
+    if (Object.keys(orgUpdateData).length > 0) {
+      await this.orgRepo.update(id, orgUpdateData);
+    }
+
     return this.findOne(id);
   }
 

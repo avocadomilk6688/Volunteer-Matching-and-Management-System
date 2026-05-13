@@ -4,25 +4,22 @@ import { Link, useNavigate } from 'react-router';
 import { MdNotifications } from 'react-icons/md';
 import { useState } from 'react';
 
-// --- Interfaces to satisfy the Linter ---
-interface VolunteerRelation {
-    profile_picture_url?: string;
-}
+const API_BASE_URL = "http://localhost:3000";
 
-interface OrganizationRelation {
+interface ProfileRelation {
     profile_picture_url?: string;
 }
 
 interface AuthenticatedUser {
+    id: string;
     username: string;
     role: 'admin' | 'volunteer' | 'organization';
-    volunteer?: VolunteerRelation;
-    organization?: OrganizationRelation;
+    volunteer?: ProfileRelation;
+    organization?: ProfileRelation;
 }
 
 export function Header() {
     const { user: rawUser, isAuthenticated, logout } = useAuth();
-    // Cast user to our extended interface
     const user = rawUser as AuthenticatedUser | null;
 
     const navigate = useNavigate();
@@ -34,57 +31,32 @@ export function Header() {
         navigate('/');
     };
 
-    // --- Role Constants ---
     const role = user?.role;
     const isVolunteer = role === 'volunteer';
     const isOrganization = role === 'organization';
     const isAdmin = role === 'admin';
 
-    // --- Dynamic Name Logic ---
     const displayName = user?.username || (isAdmin ? 'Admin' : isOrganization ? 'Organization' : 'Volunteer');
 
-    // --- Profile Picture Helper (WITH DEBUG LOGS) ---
     const getProfilePic = () => {
         const defaultPic = '/images/default_profile_pic.png';
 
-        // 1. Check if user exists
-        if (!user) {
-            console.log("DEBUG: No user found in AuthContext.");
-            return defaultPic;
-        }
-
-        if (isAdmin) {
-            console.log("DEBUG: User is Admin, using default pic.");
-            return defaultPic;
-        }
-
-        // 2. Peek at the raw relation data
-        console.log("DEBUG: Full User Object:", user);
+        if (!user || isAdmin) return defaultPic;
 
         const picUrl = isVolunteer
             ? user.volunteer?.profile_picture_url
             : user.organization?.profile_picture_url;
 
-        console.log("DEBUG: picUrl extracted from DB:", picUrl);
+        if (!picUrl) return defaultPic;
 
-        if (!picUrl) {
-            console.log("DEBUG: No picUrl found in relations. Using default.");
-            return defaultPic;
+        if (picUrl.startsWith('http') || picUrl.startsWith('blob:')) {
+            return picUrl;
         }
 
-        // 3. Construct Final URL
-        let finalUrl = "";
-        if (picUrl.startsWith('http')) {
-            finalUrl = picUrl;
-        } else {
-            finalUrl = `http://localhost:3000${picUrl.startsWith('/') ? '' : '/'}${picUrl}`;
-        }
-
-        console.log("DEBUG: Final Computed URL:", finalUrl);
-        return finalUrl;
+        const cleanPath = picUrl.startsWith('/') ? picUrl : `/${picUrl}`;
+        return `${API_BASE_URL}${cleanPath}`;
     };
 
-    // --- Logo Link Logic ---
     const getLogoLink = () => {
         if (!isAuthenticated) return '/';
         if (isAdmin) return '/admin-dashboard';
@@ -101,8 +73,6 @@ export function Header() {
             {isAuthenticated && (
                 <div className="header-actions">
                     <div className="logged-in-nav">
-
-                        {/* Role-based Link Visibility */}
                         {isVolunteer && (
                             <Link to="/leaderboard" className="nav-link">Leaderboard</Link>
                         )}
@@ -114,11 +84,15 @@ export function Header() {
                         <div className="user-controls">
                             <span className="greeting">Hi, {displayName}!</span>
 
-                            {/* Profile Picture Button */}
                             <button className="profile-icon" onClick={() => isShowProfileOptions(!showProfileOptions)}>
                                 <div
                                     className="profile-image-circle"
-                                    style={{ backgroundImage: `url("${getProfilePic()}")` }}
+                                    style={{
+                                        backgroundImage: `url("${getProfilePic()}")`,
+                                        backgroundSize: 'cover',
+                                        backgroundPosition: 'center',
+                                        backgroundRepeat: 'no-repeat'
+                                    }}
                                 ></div>
                             </button>
 
