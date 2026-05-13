@@ -1,15 +1,21 @@
 import { Header } from './Header';
 import './manage_volunteer_application.css';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router';
 import { GenericTable } from './Table';
 import { AiFillStar } from 'react-icons/ai';
 import { BiFilterAlt } from 'react-icons/bi';
 import { useAuth } from '../context/auth/useAuth';
 
-// --- Interfaces matching your DB structure ---
+// --- Updated Interfaces for Strict Type Safety ---
 interface Skill { id: string; skill_name: string; }
 interface Interest { id: string; interest_name: string; }
+
+interface ProgrammeEntity {
+    id: string;
+    title: string;
+    organization?: { id: string }; // Added this to fix the "any" error
+}
 
 interface VolunteerApplication {
     id: string;
@@ -18,7 +24,7 @@ interface VolunteerApplication {
     volunteer: {
         id: string;
         rating: number;
-        resume_url: string | null; // Resume is stored here
+        resume_url: string | null;
         user: { username: string };
         skills: Skill[];
         interests: Interest[];
@@ -29,6 +35,12 @@ interface VolunteerApplication {
     };
 }
 
+// Interface for the fetched data wrapper
+interface BackendProgResponse {
+    items: ProgrammeEntity[];
+    total: number;
+}
+
 export function ManageVolunteerApplicationPage() {
     const navigate = useNavigate();
     const location = useLocation();
@@ -36,40 +48,81 @@ export function ManageVolunteerApplicationPage() {
     const API_BASE_URL = "http://localhost:3000";
 
     const [applications, setApplications] = useState<VolunteerApplication[]>([]);
+    const [allProgrammes, setAllProgrammes] = useState<ProgrammeEntity[]>([]);
     const [loading, setLoading] = useState(true);
+
+    // --- Filter States ---
+    const [selectedProgrammeId, setSelectedProgrammeId] = useState<string>('All');
+    const [isFilterOpen, setIsFilterOpen] = useState(false);
 
     const headers = ['Volunteer', 'Current skills', 'Current interests', 'Resume', 'Programme applied', 'Action'];
 
-    const fetchApplications = async () => {
+    const fetchData = async () => {
         if (!user?.id) return;
         const token = localStorage.getItem('token');
 
         try {
             setLoading(true);
-            const response = await fetch(`${API_BASE_URL}/applications/organization/${user.id}`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
 
-            if (!response.ok) throw new Error("Failed to fetch");
+            const [appRes, progRes] = await Promise.all([
+                fetch(`${API_BASE_URL}/applications/organization/${user.id}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                }),
+                fetch(`${API_BASE_URL}/programmes?limit=100`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                })
+            ]);
 
-            const data = await response.json();
+            const appData = await appRes.json();
+            const progData = await progRes.json() as BackendProgResponse;
 
-            if (Array.isArray(data)) {
-                // Show only pending applications for the "Manage" screen
-                const pendingApps = data.filter((app: VolunteerApplication) => app.status === 'pending');
+            if (Array.isArray(appData)) {
+                const pendingApps = appData.filter((app: VolunteerApplication) => app.status === 'pending');
                 setApplications(pendingApps);
             }
+
+            // FIXED: Using ProgrammeEntity instead of any
+            if (progData && Array.isArray(progData.items)) {
+                const orgProgrammes = progData.items.filter(
+                    (p: ProgrammeEntity) => p.organization?.id === user.id
+                );
+                setAllProgrammes(orgProgrammes);
+            }
+
         } catch (error) {
-            console.error("Error fetching applications:", error);
-            setApplications([]);
+            console.error("Error fetching data:", error);
         } finally {
             setLoading(false);
         }
     };
 
     useEffect(() => {
-        fetchApplications();
+        fetchData();
     }, [user?.id]);
+
+    const filterOptions = useMemo(() => {
+        const options = allProgrammes.map(prog => {
+            const count = applications.filter(app => app.programme.id === prog.id).length;
+            return {
+                id: prog.id,
+                title: prog.title,
+                display: `${prog.title} (${count})`
+            };
+        });
+
+        const totalPending = applications.length;
+        return [{ id: 'All', title: 'All', display: `All (${totalPending})` }, ...options];
+    }, [allProgrammes, applications]);
+
+    const filteredApplications = useMemo(() => {
+        if (selectedProgrammeId === 'All') return applications;
+        return applications.filter(app => app.programme.id === selectedProgrammeId);
+    }, [applications, selectedProgrammeId]);
+
+    const currentFilterLabel = useMemo(() => {
+        const selected = filterOptions.find(opt => opt.id === selectedProgrammeId);
+        return selected ? selected.title : 'Programme';
+    }, [selectedProgrammeId, filterOptions]);
 
     const handleUpdateStatus = async (id: string, newStatus: 'approved' | 'rejected') => {
         const token = localStorage.getItem('token');
@@ -87,14 +140,13 @@ export function ManageVolunteerApplicationPage() {
 
             if (response.ok) {
                 alert(`Application ${newStatus}!`);
-                fetchApplications();
+                fetchData();
             }
         } catch (error) {
             console.error("Update error:", error);
         }
     };
 
-    // Helper to extract filename from the path
     const getFileName = (url: string | null | undefined) => {
         if (!url) return 'No Resume';
         return url.split('/').pop();
@@ -116,17 +168,39 @@ export function ManageVolunteerApplicationPage() {
                 <main className="manage-app-content">
                     <h1>Manage Volunteer Application</h1>
 
-                    <button className="filter-dropdown-btn">
-                        Programme <BiFilterAlt className="filter-icon" />
-                    </button>
+                    <div className="filter-container">
+                        <button
+                            className="filter-dropdown-btn"
+                            onClick={() => setIsFilterOpen(!isFilterOpen)}
+                        >
+                            {currentFilterLabel} <BiFilterAlt className="filter-icon" />
+                        </button>
+
+                        {isFilterOpen && (
+                            <div className="filter-menu">
+                                {filterOptions.map(opt => (
+                                    <div
+                                        key={opt.id}
+                                        className={`filter-item ${selectedProgrammeId === opt.id ? 'active' : ''}`}
+                                        onClick={() => {
+                                            setSelectedProgrammeId(opt.id);
+                                            setIsFilterOpen(false);
+                                        }}
+                                    >
+                                        {opt.display}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
 
                     {loading ? (
                         <div className="loading-state">Loading applications...</div>
-                    ) : applications.length === 0 ? (
-                        <div className="no-results">No pending applications found.</div>
+                    ) : filteredApplications.length === 0 ? (
+                        <div className="no-results">No pending applications found for this filter.</div>
                     ) : (
                         <GenericTable headers={headers}>
-                            {applications.map((app) => (
+                            {filteredApplications.map((app) => (
                                 <tr key={app.id}>
                                     <td className="col-volunteer">
                                         <div className="volunteer-info">
@@ -152,7 +226,6 @@ export function ManageVolunteerApplicationPage() {
                                         </div>
                                     </td>
                                     <td className="col-resume">
-                                        {/* FIX: Looking at app.volunteer.resume_url */}
                                         {app.volunteer.resume_url ? (
                                             <a
                                                 href={`${API_BASE_URL}${app.volunteer.resume_url}`}
