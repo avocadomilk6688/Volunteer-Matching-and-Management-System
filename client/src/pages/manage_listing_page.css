@@ -1,3 +1,4 @@
+/* Container Layout */
 .manage-listing-wrapper {
     width: 100%;
 }
@@ -5,16 +6,16 @@
 .manage-listing-container {
     display: flex;
     min-height: calc(100vh - 80px);
-    font-family: Inter;
+    font-family: 'Inter', sans-serif;
 }
 
 /* Sidebar Styling */
 .org-sidebar {
     width: 250px;
     background-color: #FF8C42;
-    /* The orange from your screenshot */
     color: white;
     padding: 30px 0;
+    flex-shrink: 0;
 }
 
 .org-sidebar ul {
@@ -26,12 +27,19 @@
     padding: 15px 25px;
     font-size: 1.1rem;
     cursor: pointer;
+    transition: background-color 0.2s;
 }
 
-.org-sidebar li.active {
+.org-sidebar li:hover {
     background-color: rgba(255, 255, 255, 0.1);
 }
 
+.org-sidebar li.active {
+    background-color: rgba(255, 255, 255, 0.2);
+    font-weight: bold;
+}
+
+/* Divider for the first nav item */
 .org-sidebar nav ul li:first-child::after {
     content: '';
     display: block;
@@ -46,13 +54,14 @@
     flex: 1;
     padding: 40px;
     background-color: white;
-    overflow-x: hidden;
+    overflow-x: auto;
 }
 
 .manage-listing-content h1 {
     font-size: 3rem;
     font-weight: 800;
     margin-bottom: 30px;
+    color: #333;
 }
 
 .add-listing-btn {
@@ -64,32 +73,80 @@
     border-radius: 4px;
     cursor: pointer;
     margin-bottom: 40px;
+    transition: transform 0.1s, opacity 0.2s;
+}
+
+.add-listing-btn:active {
+    transform: scale(0.98);
+}
+
+/* --- Inline Adding Row Styles --- */
+.adding-row {
+    background-color: #fffaf7;
+    /* Slight orange tint to highlight the active row */
+}
+
+.adding-row td {
+    padding: 10px !important;
+    vertical-align: top;
+}
+
+.adding-row input,
+.adding-row textarea,
+.adding-row select {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #FF8C42;
+    border-radius: 4px;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.9rem;
+    box-sizing: border-box;
+    outline: none;
+}
+
+.adding-row input:focus,
+.adding-row textarea:focus {
+    box-shadow: 0 0 0 2px rgba(255, 140, 66, 0.3);
+}
+
+.adding-row textarea {
+    height: 80px;
+    resize: vertical;
+}
+
+.adding-row small {
+    color: #888;
+    font-style: italic;
+    font-size: 0.75rem;
 }
 
 /* Table Column Adjustments */
 .col-title {
-    min-width: 150px;
+    min-width: 180px;
 }
 
 .col-desc {
-    min-width: 350px;
+    min-width: 300px;
+    max-width: 400px;
     line-height: 1.4;
+    font-size: 0.95rem;
 }
 
-.col-img {
+.col-img a {
     text-decoration: underline;
+    color: #FF8C42;
     cursor: pointer;
 }
 
 .col-schedule {
-    min-width: 150px;
+    min-width: 160px;
 }
 
 /* Badge/Tag Styling */
 .badge-stack {
     display: flex;
     flex-direction: column;
-    gap: 5px;
+    gap: 6px;
 }
 
 .orange-badge {
@@ -102,59 +159,72 @@
     white-space: nowrap;
 }
 
-/* Reusing your GenericTable classes for consistency */
-.custom-table-container {
-    overflow-x: auto;
-    /* This creates that gray scrollbar you see in the screenshot */
-    border-radius: 4px;
-}
-
-.custom-table th {
-    background-color: #FF8C42;
-    color: white;
-    text-align: left;
-    padding: 12px;
-}
-
-.col-action {
-    min-width: 200px;
-    vertical-align: middle !important;
-}
-
+/* Action Buttons */
 .action-buttons {
     display: flex;
-    gap: 10px;
+    flex-direction: column;
+    /* Stacked buttons look cleaner in tight tables */
+    gap: 8px;
     justify-content: center;
     align-items: center;
-    height: 100%;
 }
 
-.modify-btn, .delete-btn {
+.modify-btn,
+.delete-btn,
+.save-btn,
+.cancel-btn {
     border: none;
     padding: 8px 16px;
     border-radius: 4px;
-    font-size: 1rem;
-    font-weight: 500;
+    font-size: 0.9rem;
+    font-weight: 600;
     cursor: pointer;
-    min-width: 90px;
-    transition: opacity 0.2s;
+    min-width: 100px;
+    transition: opacity 0.2s, background-color 0.2s;
     color: white;
 }
 
 .modify-btn {
-    background-color: #FF8C42; /* Matches the Approve orange */
+    background-color: #FF8C42;
 }
 
 .delete-btn {
-    background-color: #C4C4C4; /* Matches the Reject gray */
+    background-color: #C4C4C4;
 }
 
-.modify-btn:hover, .delete-btn:hover {
+/* Inline Save/Cancel */
+.save-btn {
+    background-color: #FF8C42;
+}
+
+.cancel-btn {
+    background-color: #C4C4C4;
+}
+
+.modify-btn:hover,
+.delete-btn:hover,
+.save-btn:hover,
+.cancel-btn:hover {
     opacity: 0.85;
 }
 
-/* Ensure the table cell doesn't squash buttons */
-.custom-table td.col-action {
-    padding: 10px;
+/* Loading/Empty States */
+.loading-state {
     text-align: center;
+    padding: 50px;
+    font-size: 1.2rem;
+    color: #888;
+}
+
+/* Utility Class for Table */
+.custom-table td {
+    vertical-align: middle;
+}
+
+.mini-upload-btn {
+    background-color: #FF8C42;
+    color: white;
+    border: none;
+    width: 60px;
+    height: 28px;
 }

@@ -5,27 +5,33 @@ import * as fs from 'fs';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
-  // 1. Create the app with the Express engine type
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
-  // 2. Automatically create upload directories if they don't exist
-  // This prevents the "ENOENT: no such file or directory" error
-  const uploadDirs = ['./uploads/avatars', './uploads/resumes'];
+  // 1. Create the necessary directories
+  // Added './uploads/programmes' to match your data
+  const uploadDirs = [
+    './uploads/avatars',
+    './uploads/resumes',
+    './uploads/programmes',
+  ];
+
   uploadDirs.forEach((dir) => {
     if (!fs.existsSync(dir)) {
-      // recursive: true ensures the parent 'uploads' folder is created first
       fs.mkdirSync(dir, { recursive: true });
       console.log(`[Storage] Created directory: ${dir}`);
     }
   });
 
-  // 3. Serve the 'uploads' folder as static assets
-  // This allows the frontend to access images via http://localhost:3000/uploads/...
+  // 2. Serve the 'uploads' folder for Avatars and Resumes (prefix: /uploads/)
   app.useStaticAssets(join(__dirname, '..', 'uploads'), {
     prefix: '/uploads/',
   });
 
-  // 4. Standard configurations
+  // This maps http://localhost:3000/images/programmes/pic.jpg -> ./uploads/programmes/pic.jpg
+  app.useStaticAssets(join(__dirname, '..', 'uploads/programmes'), {
+    prefix: '/images/programmes/',
+  });
+
   app.enableCors();
 
   const port = process.env.PORT ?? 3000;
@@ -33,7 +39,8 @@ async function bootstrap() {
 
   console.log(`
 🚀 Server is running on: http://localhost:${port}
-📂 Static assets served at: http://localhost:${port}/uploads/
+📂 Programme images served at: http://localhost:${port}/images/programmes/
+📂 User assets served at: http://localhost:${port}/uploads/
   `);
 }
 

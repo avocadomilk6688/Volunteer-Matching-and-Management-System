@@ -126,7 +126,7 @@ export function ProgrammeDetailsPage() {
                             setEnrollmentStatus(enrollRes.data.status);
                         }
                     } catch (e: unknown) {
-                        console.warn("Enrollment status check failed." + e);
+                        console.warn("Enrollment status check failed.", e);
                     }
 
                     // CHECK IF PROGRAMME IS SAVED
@@ -134,7 +134,7 @@ export function ProgrammeDetailsPage() {
                         const saveRes = await axios.get<{ isSaved: boolean }>(`${API_BASE_URL}/programmes/${programmeId}/is-saved/${user.id}`);
                         setIsSaved(saveRes.data.isSaved);
                     } catch (e: unknown) {
-                        console.warn("Save status check failed." + e);
+                        console.warn("Save status check failed.", e);
                     }
 
                     // Fetch Volunteer Profile
@@ -146,7 +146,7 @@ export function ProgrammeDetailsPage() {
                             setResumeUrl(volRes.data.resume_url || '');
                         }
                     } catch (e: unknown) {
-                        console.error("Failed to load volunteer profile." + e);
+                        console.error("Failed to load volunteer profile.", e);
                     }
                 }
 
@@ -159,7 +159,6 @@ export function ProgrammeDetailsPage() {
         initLoad();
     }, [programmeId, user?.id]);
 
-    // --- FUNCTION: TOGGLE SAVE ---
     const handleToggleSave = async () => {
         if (!user) {
             alert("Please login to save programmes.");
@@ -241,7 +240,12 @@ export function ProgrammeDetailsPage() {
             <Header />
             <div className="page-body">
                 <div className="programme-details">
-                    <div className="programme-image" style={{ backgroundImage: `url(${programme.imageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' }}></div>
+                    {/* FIXED PROGRAMME IMAGE URL */}
+                    <div className="programme-image" style={{
+                        backgroundImage: `url(${API_BASE_URL}${programme.imageUrl})`,
+                        backgroundSize: 'cover',
+                        backgroundPosition: 'center'
+                    }}></div>
 
                     <div className="header-row">
                         <div className="programme-name">{programme.title}</div>
@@ -255,7 +259,6 @@ export function ProgrammeDetailsPage() {
                                 {enrollmentStatus ? 'Applied' : 'Join'}
                             </button>
 
-                            {/* DYNAMIC STAR ICON */}
                             <div className="save-button-wrapper" onClick={handleToggleSave} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
                                 {isSaved ? (
                                     <AiFillStar className="save-button saved" style={{ color: '#FF8C42' }} />
@@ -269,7 +272,17 @@ export function ProgrammeDetailsPage() {
                     </div>
 
                     <div className="organization-details">
-                        <div className="organization-profile-pic" style={{ backgroundImage: `url(${programme.organization.profile_picture_url})`, backgroundSize: 'cover' }}></div>
+                        {/* FIXED ORGANIZATION PROFILE PIC URL */}
+                        <div
+                            className="organization-profile-pic"
+                            style={{
+                                backgroundImage: `url(${programme.organization.profile_picture_url?.startsWith('http')
+                                    ? programme.organization.profile_picture_url
+                                    : `${API_BASE_URL}${programme.organization.profile_picture_url}`
+                                    })`,
+                                backgroundSize: 'cover'
+                            }}
+                        ></div>
                         <div className="organization-name">{programme.organization.user.username}</div>
                         <div className="organization-rating">
                             <AiFillStar className="star-icon" />

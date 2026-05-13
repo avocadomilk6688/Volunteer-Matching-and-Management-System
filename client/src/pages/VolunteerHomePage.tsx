@@ -10,6 +10,8 @@ import axios from 'axios';
 import { useAuth } from '../context/auth/useAuth';
 
 // --- Constants ---
+const API_BASE_URL = "http://localhost:3000"; // Added this to fix the image paths
+
 const MALAYSIAN_STATES = [
     "Johor", "Kedah", "Kelantan", "Melaka", "Negeri Sembilan", "Pahang",
     "Penang", "Perak", "Perlis", "Sabah", "Sarawak", "Selangor", "Terengganu",
@@ -106,14 +108,8 @@ export function VolunteerHomePage() {
             setLoading(true);
             if (!isReset) persistFilters(pageNumber);
 
-            /**
-             * SMART ENDPOINT LOGIC:
-             * We always hit the recommendation endpoint. 
-             * If the user isn't logged in, we pass 'guest' to trigger 
-             * the Global Quality (Rating) ranking.
-             */
             const userIdParam = user?.id || 'guest';
-            const url = `http://localhost:3000/programmes/recommendations/${userIdParam}`;
+            const url = `${API_BASE_URL}/programmes/recommendations/${userIdParam}`;
 
             const params = isReset ? {
                 keyword: '',
@@ -167,8 +163,8 @@ export function VolunteerHomePage() {
         const loadPageData = async () => {
             try {
                 const [skillsRes, interestsRes] = await Promise.all([
-                    axios.get('http://localhost:3000/volunteers/skills'),
-                    axios.get('http://localhost:3000/volunteers/interests')
+                    axios.get(`${API_BASE_URL}/volunteers/skills`),
+                    axios.get(`${API_BASE_URL}/volunteers/interests`)
                 ]);
                 setAllSkills(skillsRes.data);
                 setAllInterests(interestsRes.data);
@@ -180,7 +176,6 @@ export function VolunteerHomePage() {
             }
         };
         loadPageData();
-        // Dependencies include user?.id so the feed personalizes as soon as login finishes
     }, [user?.id]);
 
     const goToNextPage = () => {
@@ -312,11 +307,26 @@ export function VolunteerHomePage() {
                     ) : programmes.length > 0 ? (
                         programmes.map((prog) => (
                             <div key={prog.id} className="programme" onClick={() => navigate(`/programme-details/${prog.id}`)}>
-                                <div className="programme-image" style={{ backgroundImage: `url(${prog.imageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' }}></div>
+                                {/* FIXED IMAGE PATH BELOW */}
+                                <div className="programme-image" style={{
+                                    backgroundImage: `url(${API_BASE_URL}${prog.imageUrl})`,
+                                    backgroundSize: 'cover',
+                                    backgroundPosition: 'center'
+                                }}></div>
                                 <div className="programme-info">
                                     <div className="programme-name">{prog.title}</div>
                                     <div className="organization-info">
-                                        <div className="organization-profile-pic" style={{ backgroundImage: `url(${prog.organization?.profile_picture_url || ''})`, backgroundSize: 'cover' }}></div>
+                                        {/* FIXED PROFILE PIC PATH BELOW */}
+                                        <div
+                                            className="organization-profile-pic"
+                                            style={{
+                                                backgroundImage: `url(${prog.organization?.profile_picture_url?.startsWith('http')
+                                                    ? prog.organization.profile_picture_url
+                                                    : `${API_BASE_URL}${prog.organization?.profile_picture_url || ''}`
+                                                    })`,
+                                                backgroundSize: 'cover'
+                                            }}
+                                        ></div>
                                         <div className="organization-name">{prog.organization?.user?.username || 'Unknown'}</div>
                                         <div className="organization-rating">
                                             <AiFillStar className="star-icon" />

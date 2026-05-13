@@ -7,6 +7,8 @@ import {
   Param,
   Delete,
   Query,
+  UseInterceptors,
+  UploadedFile,
 } from '@nestjs/common';
 import {
   ProgrammesService,
@@ -15,33 +17,74 @@ import {
 } from './programmes.service';
 import { CreateProgrammeDto } from './dto/create-programme.dto';
 import { UpdateProgrammeDto } from './dto/update-programme.dto';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import { extname } from 'path';
 
 @Controller('programmes')
 export class ProgrammesController {
   constructor(private readonly programmesService: ProgrammesService) {}
 
-  /**
-   * CREATE a new programme
-   */
   @Post()
-  async create(@Body() createProgrammeDto: CreateProgrammeDto) {
-    return await this.programmesService.create(createProgrammeDto);
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: diskStorage({
+        destination: './uploads/programmes',
+        filename: (req, file, cb) => {
+          const uniqueSuffix =
+            Date.now() + '-' + Math.round(Math.random() * 1e9);
+          cb(null, `${uniqueSuffix}${extname(file.originalname)}`);
+        },
+      }),
+    }),
+  )
+  async create(
+    @Body() createProgrammeDto: CreateProgrammeDto,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    // Relative path for database consistency and browser security
+    const imageUrl = file
+      ? `/images/programmes/${file.filename}`
+      : '/images/programmes/default.jpg';
+
+    return await this.programmesService.create(createProgrammeDto, imageUrl);
   }
 
-  /**
-   * GET all programmes with filtering and pagination
-   * Includes support for keyword, location, skills, interests, and "saved" status.
-   */
+  @Patch(':id')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: diskStorage({
+        destination: './uploads/programmes',
+        filename: (req, file, cb) => {
+          const uniqueSuffix =
+            Date.now() + '-' + Math.round(Math.random() * 1e9);
+          cb(null, `${uniqueSuffix}${extname(file.originalname)}`);
+        },
+      }),
+    }),
+  )
+  async update(
+    @Param('id') id: string,
+    @Body() updateDto: UpdateProgrammeDto,
+    @UploadedFile() file?: Express.Multer.File,
+  ) {
+    let finalImageUrl = updateDto.imageUrl;
+
+    if (file) {
+      finalImageUrl = `/images/programmes/${file.filename}`;
+    }
+
+    return await this.programmesService.update(id, {
+      ...updateDto,
+      imageUrl: finalImageUrl,
+    });
+  }
+
   @Get()
   async findAll(@Query() filterDto: FilterProgrammeParams) {
     return await this.programmesService.findAll(filterDto);
   }
 
-  /**
-   * TOGGLE SAVE STATUS
-   * Triggered when the user clicks the star icon on the details page.
-   * Expects { userId: string } in the body.
-   */
   @Post(':id/save')
   async toggleSave(
     @Param('id') programmeId: string,
@@ -50,42 +93,21 @@ export class ProgrammesController {
     return await this.programmesService.toggleSave(programmeId, userId);
   }
 
-  /**
-   * CHECK SAVED STATUS
-   * Used to determine if the star icon should be filled or outlined when the page loads.
-   */
   @Get(':id/is-saved/:userId')
   async checkSavedStatus(
     @Param('id') programmeId: string,
     @Param('userId') userId: string,
   ): Promise<{ isSaved: boolean }> {
     const programme = await this.programmesService.findOne(programmeId);
-
-    // Check if the volunteer with this userId is in the programme's saved_by list
     const isSaved = programme.saved_by?.some((v) => v.id === userId) || false;
-
     return { isSaved };
   }
 
-  /**
-   * GET a single programme by ID
-   */
   @Get(':id')
   async findOne(@Param('id') id: string) {
     return await this.programmesService.findOne(id);
   }
 
-  /**
-   * UPDATE an existing programme
-   */
-  @Patch(':id')
-  async update(@Param('id') id: string, @Body() updateDto: UpdateProgrammeDto) {
-    return await this.programmesService.update(id, updateDto);
-  }
-
-  /**
-   * DELETE a programme
-   */
   @Delete(':id')
   async remove(@Param('id') id: string) {
     return await this.programmesService.remove(id);
@@ -96,7 +118,6 @@ export class ProgrammesController {
     @Param('userId') userId: string,
     @Query() filterDto: FilterProgrammeParams,
   ) {
-    // This calls your new "Veteran-First" logic
     return await this.programmesService.getRecommended(userId, filterDto);
   }
 }
