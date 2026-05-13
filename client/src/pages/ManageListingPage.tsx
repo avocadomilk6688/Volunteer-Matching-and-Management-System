@@ -31,6 +31,16 @@ interface BackendResponse {
     total: number;
 }
 
+// --- NEW: Interface for the TagSelection props to remove 'any' ---
+interface TagSelectionProps {
+    toggleTag: (item: TagItem, type: 'skill' | 'interest') => void;
+    myTags: TagItem[];
+    allTags: TagItem[];
+    isOpen: boolean;
+    setIsOpen: (open: boolean) => void;
+    type: 'skill' | 'interest';
+}
+
 export function ManageListingPage() {
     const navigate = useNavigate();
     const location = useLocation();
@@ -38,22 +48,22 @@ export function ManageListingPage() {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const API_BASE_URL = "http://localhost:3000";
 
-    // Listings State
     const [listings, setListings] = useState<Programme[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
 
-    // Tag Selection States
     const [allSkills, setAllSkills] = useState<TagItem[]>([]);
     const [allInterests, setAllInterests] = useState<TagItem[]>([]);
+
     const [mySkills, setMySkills] = useState<TagItem[]>([]);
     const [myInterests, setMyInterests] = useState<TagItem[]>([]);
     const [showSkillBox, setShowSkillBox] = useState<boolean>(false);
     const [showInterestBox, setShowInterestBox] = useState<boolean>(false);
 
-    // Inline Add State
+    const [editingId, setEditingId] = useState<string | null>(null);
     const [isAdding, setIsAdding] = useState<boolean>(false);
     const [selectedImage, setSelectedImage] = useState<File | null>(null);
-    const [newRow, setNewRow] = useState({
+
+    const [rowData, setRowData] = useState({
         title: '',
         description: '',
         mode: 'Physical',
@@ -106,35 +116,42 @@ export function ManageListingPage() {
 
     const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
-        if (file) {
-            setSelectedImage(file);
-        }
+        if (file) setSelectedImage(file);
     };
 
-    const handleSaveNew = async () => {
+    const resetForm = () => {
+        setIsAdding(false);
+        setEditingId(null);
+        setMySkills([]);
+        setMyInterests([]);
+        setSelectedImage(null);
+        setRowData({ title: '', description: '', mode: 'Physical', location: '', start_time: '', end_time: '' });
+    };
+
+    const handleSave = async () => {
         const token = localStorage.getItem('token');
-        if (!newRow.title || !newRow.start_time || !newRow.end_time) {
-            return alert("Title, Start Time, and End Time are required.");
+        if (!rowData.title || !rowData.start_time || !rowData.end_time) {
+            return alert("Required fields missing.");
         }
 
+        const formData = new FormData();
+        formData.append('title', rowData.title);
+        formData.append('description', rowData.description);
+        formData.append('mode', rowData.mode);
+        formData.append('location', rowData.location);
+        formData.append('start_time', rowData.start_time);
+        formData.append('end_time', rowData.end_time);
+        formData.append('organizationId', user?.id || '');
+        formData.append('skillIds', JSON.stringify(mySkills.map(s => s.id)));
+        formData.append('interestIds', JSON.stringify(myInterests.map(i => i.id)));
+        if (selectedImage) formData.append('file', selectedImage);
+
         try {
-            const formData = new FormData();
-            formData.append('title', newRow.title);
-            formData.append('description', newRow.description);
-            formData.append('mode', newRow.mode);
-            formData.append('location', newRow.location);
-            formData.append('start_time', newRow.start_time);
-            formData.append('end_time', newRow.end_time);
-            formData.append('organizationId', user?.id || '');
-            formData.append('skillIds', JSON.stringify(mySkills.map(s => s.id)));
-            formData.append('interestIds', JSON.stringify(myInterests.map(i => i.id)));
+            const url = editingId ? `${API_BASE_URL}/programmes/${editingId}` : `${API_BASE_URL}/programmes`;
+            const method = editingId ? 'PATCH' : 'POST';
 
-            if (selectedImage) {
-                formData.append('file', selectedImage);
-            }
-
-            const response = await fetch(`${API_BASE_URL}/programmes`, {
-                method: 'POST',
+            const response = await fetch(url, {
+                method: method,
                 headers: { 'Authorization': `Bearer ${token}` },
                 body: formData
             });
@@ -147,45 +164,39 @@ export function ManageListingPage() {
                 alert(`Error: ${err.message}`);
             }
         } catch (error) {
-            console.error("Save failed:", error);
+            console.error("Save error:", error);
         }
     };
 
-    // --- NEW: DELETE FUNCTIONALITY ---
+    const startEditing = (item: Programme) => {
+        setIsAdding(false);
+        setEditingId(item.id);
+        setRowData({
+            title: item.title,
+            description: item.description,
+            mode: item.schedule.mode,
+            location: item.schedule.location,
+            start_time: new Date(item.schedule.start_time).toISOString().slice(0, 16),
+            end_time: new Date(item.schedule.end_time).toISOString().slice(0, 16),
+        });
+        setMySkills(item.related_skills.map(s => ({ id: s.id, name: s.skill_name })));
+        setMyInterests(item.related_interests.map(i => ({ id: i.id, name: i.interest_name })));
+    };
+
     const handleDelete = async (id: string) => {
         const token = localStorage.getItem('token');
-        if (!window.confirm("Are you sure you want to delete this programme? This action cannot be undone.")) {
-            return;
-        }
-
+        if (!window.confirm("Are you sure?")) return;
         try {
             const response = await fetch(`${API_BASE_URL}/programmes/${id}`, {
                 method: 'DELETE',
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
+                headers: { 'Authorization': `Bearer ${token}` }
             });
-
             if (response.ok) {
-                // Refresh the list locally or fetch again
-                alert("Programme deleted successfully.");
                 await fetchInitialData();
-            } else {
-                const err = await response.json();
-                alert(`Delete failed: ${err.message}`);
             }
         } catch (error) {
             console.error("Delete error:", error);
-            alert("An error occurred while trying to delete.");
         }
-    };
-
-    const resetForm = () => {
-        setIsAdding(false);
-        setMySkills([]);
-        setMyInterests([]);
-        setSelectedImage(null);
-        setNewRow({ title: '', description: '', mode: 'Physical', location: '', start_time: '', end_time: '' });
     };
 
     const formatDate = (dateStr: string) => {
@@ -208,116 +219,133 @@ export function ManageListingPage() {
 
                 <main className="manage-listing-content">
                     <h1>Manage Listing</h1>
-                    <button className="add-listing-btn" onClick={() => setIsAdding(true)}>Add</button>
+                    <button className="add-listing-btn" onClick={() => { resetForm(); setIsAdding(true); }}>Add</button>
 
                     {loading ? (
-                        <div className="loading-state">Loading your listings...</div>
+                        <div className="loading-state">Loading...</div>
                     ) : (
                         <GenericTable headers={headers}>
+                            {/* --- ADD NEW ROW --- */}
                             {isAdding && (
                                 <tr className="adding-row">
-                                    <td><input type="text" placeholder="Title" value={newRow.title} onChange={e => setNewRow({ ...newRow, title: e.target.value })} /></td>
-                                    <td><textarea placeholder="Desc" value={newRow.description} onChange={e => setNewRow({ ...newRow, description: e.target.value })} /></td>
+                                    <td><input type="text" value={rowData.title} onChange={e => setRowData({ ...rowData, title: e.target.value })} /></td>
+                                    <td><textarea value={rowData.description} onChange={e => setRowData({ ...rowData, description: e.target.value })} /></td>
                                     <td>
                                         <div className="upload-cell">
                                             <input type="file" ref={fileInputRef} hidden onChange={handleFileUpload} accept="image/*" />
-                                            <button className="mini-upload-btn" onClick={() => fileInputRef.current?.click()}>
-                                                {selectedImage ? 'Change' : 'Upload'}
-                                            </button>
-                                            {selectedImage && <div className="file-name-hint">{selectedImage.name}</div>}
+                                            <button className="mini-upload-btn" onClick={() => fileInputRef.current?.click()}>{selectedImage ? 'Change' : 'Upload'}</button>
                                         </div>
                                     </td>
-                                    <td className="tags-td">
-                                        <div className="tags-container">
-                                            {mySkills.map(skill => (
-                                                <span key={skill.id} className="tag-pill">{skill.name} <span className="remove-tag" onClick={() => toggleTag(skill, 'skill')}>x</span></span>
-                                            ))}
-                                            <button className="add-tag-btn" onClick={() => setShowSkillBox(!showSkillBox)}>+</button>
-                                            {showSkillBox && (
-                                                <div className="selection-box">
-                                                    <div className="selection-grid">
-                                                        {allSkills.map(s => <div key={s.id} className={`selection-item ${mySkills.find(ms => ms.id === s.id) ? 'selected' : ''}`} onClick={() => toggleTag(s, 'skill')}>{s.name}</div>)}
-                                                    </div>
-                                                    <button className="done-btn" onClick={() => setShowSkillBox(false)}>Done</button>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </td>
-                                    <td className="tags-td">
-                                        <div className="tags-container">
-                                            {myInterests.map(i => (
-                                                <span key={i.id} className="tag-pill">{i.name} <span className="remove-tag" onClick={() => toggleTag(i, 'interest')}>x</span></span>
-                                            ))}
-                                            <button className="add-tag-btn" onClick={() => setShowInterestBox(!showInterestBox)}>+</button>
-                                            {showInterestBox && (
-                                                <div className="selection-box">
-                                                    <div className="selection-grid">
-                                                        {allInterests.map(i => <div key={i.id} className={`selection-item ${myInterests.find(mi => mi.id === i.id) ? 'selected' : ''}`} onClick={() => toggleTag(i, 'interest')}>{i.name}</div>)}
-                                                    </div>
-                                                    <button className="done-btn" onClick={() => setShowInterestBox(false)}>Done</button>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <select value={newRow.mode} onChange={e => setNewRow({ ...newRow, mode: e.target.value })}>
-                                            <option value="Physical">Physical</option>
-                                            <option value="Online">Online</option>
-                                        </select>
-                                    </td>
-                                    <td><input type="text" placeholder="Location" value={newRow.location} onChange={e => setNewRow({ ...newRow, location: e.target.value })} /></td>
+                                    <td className="tags-td"><TagSelection toggleTag={toggleTag} myTags={mySkills} allTags={allSkills} type="skill" isOpen={showSkillBox} setIsOpen={setShowSkillBox} /></td>
+                                    <td className="tags-td"><TagSelection toggleTag={toggleTag} myTags={myInterests} allTags={allInterests} type="interest" isOpen={showInterestBox} setIsOpen={setShowInterestBox} /></td>
+                                    <td><select value={rowData.mode} onChange={e => setRowData({ ...rowData, mode: e.target.value })}><option value="Physical">Physical</option><option value="Online">Online</option></select></td>
+                                    <td><input type="text" value={rowData.location} onChange={e => setRowData({ ...rowData, location: e.target.value })} /></td>
                                     <td>
                                         <div className="schedule-input-group">
-                                            <input type="datetime-local" value={newRow.start_time} onChange={e => setNewRow({ ...newRow, start_time: e.target.value })} />
-                                            <input type="datetime-local" value={newRow.end_time} onChange={e => setNewRow({ ...newRow, end_time: e.target.value })} />
+                                            <input type="datetime-local" value={rowData.start_time} onChange={e => setRowData({ ...rowData, start_time: e.target.value })} />
+                                            <input type="datetime-local" value={rowData.end_time} onChange={e => setRowData({ ...rowData, end_time: e.target.value })} />
                                         </div>
                                     </td>
                                     <td>
                                         <div className="action-buttons">
-                                            <button className="save-btn" onClick={handleSaveNew}>Save</button>
+                                            <button className="save-btn" onClick={handleSave}>Save</button>
                                             <button className="cancel-btn" onClick={resetForm}>Cancel</button>
                                         </div>
                                     </td>
                                 </tr>
                             )}
 
+                            {/* --- LISTINGS ROWS --- */}
                             {listings.map((item) => (
-                                <tr key={item.id}>
-                                    <td className="col-title">{item.title}</td>
-                                    <td className="col-desc">{item.description}</td>
-                                    <td className="col-img">
-                                        <a
-                                            href={`${API_BASE_URL}${item.imageUrl}`}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="img-filename-link"
-                                        >
-                                            {item.imageUrl?.split('/').pop() || 'image.png'}
-                                        </a>
-                                    </td>
-                                    <td><div className="badge-stack">{item.related_skills?.map(s => <span key={s.id} className="orange-badge">{s.skill_name}</span>)}</div></td>
-                                    <td><div className="badge-stack">{item.related_interests?.map(i => <span key={i.id} className="orange-badge">{i.interest_name}</span>)}</div></td>
-                                    <td>{item.schedule?.mode}</td>
-                                    <td>{item.schedule?.location || 'N/A'}</td>
-                                    <td className="col-schedule">
-                                        <div className="time-display">
-                                            <span>S: {formatDate(item.schedule?.start_time)}</span>
-                                            <span>E: {formatDate(item.schedule?.end_time)}</span>
-                                        </div>
-                                    </td>
-                                    <td className="col-action">
-                                        <div className="action-buttons">
-                                            <button className="modify-btn" onClick={() => navigate(`/edit-listing/${item.id}`)}>Modify</button>
-                                            {/* UPDATED DELETE BUTTON */}
-                                            <button className="delete-btn" onClick={() => handleDelete(item.id)}>Delete</button>
-                                        </div>
-                                    </td>
-                                </tr>
+                                editingId === item.id ? (
+                                    <tr key={item.id} className="editing-row">
+                                        <td><input type="text" value={rowData.title} onChange={e => setRowData({ ...rowData, title: e.target.value })} /></td>
+                                        <td><textarea value={rowData.description} onChange={e => setRowData({ ...rowData, description: e.target.value })} /></td>
+                                        <td>
+                                            <div className="upload-cell">
+                                                <input type="file" ref={fileInputRef} hidden onChange={handleFileUpload} accept="image/*" />
+                                                <button className="mini-upload-btn" onClick={() => fileInputRef.current?.click()}>Change</button>
+                                            </div>
+                                        </td>
+                                        <td className="tags-td"><TagSelection toggleTag={toggleTag} myTags={mySkills} allTags={allSkills} type="skill" isOpen={showSkillBox} setIsOpen={setShowSkillBox} /></td>
+                                        <td className="tags-td"><TagSelection toggleTag={toggleTag} myTags={myInterests} allTags={allInterests} type="interest" isOpen={showInterestBox} setIsOpen={setShowInterestBox} /></td>
+                                        <td><select value={rowData.mode} onChange={e => setRowData({ ...rowData, mode: e.target.value })}><option value="Physical">Physical</option><option value="Online">Online</option></select></td>
+                                        <td><input type="text" value={rowData.location} onChange={e => setRowData({ ...rowData, location: e.target.value })} /></td>
+                                        <td>
+                                            <div className="schedule-input-group">
+                                                <input type="datetime-local" value={rowData.start_time} onChange={e => setRowData({ ...rowData, start_time: e.target.value })} />
+                                                <input type="datetime-local" value={rowData.end_time} onChange={e => setRowData({ ...rowData, end_time: e.target.value })} />
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div className="action-buttons">
+                                                <button className="save-btn" onClick={handleSave}>Update</button>
+                                                <button className="cancel-btn" onClick={resetForm}>Cancel</button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    <tr key={item.id}>
+                                        <td className="col-title">{item.title}</td>
+                                        <td className="col-desc">{item.description}</td>
+                                        <td className="col-img">
+                                            <a href={`${API_BASE_URL}${item.imageUrl}`} target="_blank" rel="noopener noreferrer" className="img-filename-link">
+                                                {item.imageUrl?.split('/').pop() || 'image.png'}
+                                            </a>
+                                        </td>
+                                        <td><div className="badge-stack">{item.related_skills?.map(s => <span key={s.id} className="orange-badge">{s.skill_name}</span>)}</div></td>
+                                        <td><div className="badge-stack">{item.related_interests?.map(i => <span key={i.id} className="orange-badge">{i.interest_name}</span>)}</div></td>
+                                        <td>{item.schedule?.mode}</td>
+                                        <td>{item.schedule?.location || 'N/A'}</td>
+                                        <td className="col-schedule">
+                                            <div className="time-display">
+                                                <span>Start: {formatDate(item.schedule?.start_time)}</span><br />
+                                                <span>End: {formatDate(item.schedule?.end_time)}</span>
+                                            </div>
+                                        </td>
+                                        <td className="col-action">
+                                            <div className="action-buttons">
+                                                <button className="modify-btn" onClick={() => startEditing(item)}>Modify</button>
+                                                <button className="delete-btn" onClick={() => handleDelete(item.id)}>Delete</button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                )
                             ))}
                         </GenericTable>
                     )}
                 </main>
             </div>
+        </div>
+    );
+}
+
+// --- SUB-COMPONENT: No longer uses 'any' ---
+function TagSelection({ toggleTag, myTags, allTags, isOpen, setIsOpen, type }: TagSelectionProps) {
+    return (
+        <div className="tags-container">
+            {myTags.map((tag: TagItem) => (
+                <span key={tag.id} className="tag-pill">
+                    {tag.name} <span className="remove-tag" onClick={() => toggleTag(tag, type)}>x</span>
+                </span>
+            ))}
+            <button className="add-tag-btn" onClick={() => setIsOpen(!isOpen)}>+</button>
+            {isOpen && (
+                <div className="selection-box">
+                    <div className="selection-grid">
+                        {allTags.map((t: TagItem) => (
+                            <div
+                                key={t.id}
+                                className={`selection-item ${myTags.find((mt) => mt.id === t.id) ? 'selected' : ''}`}
+                                onClick={() => toggleTag(t, type)}
+                            >
+                                {t.name}
+                            </div>
+                        ))}
+                    </div>
+                    <button className="done-btn" onClick={() => setIsOpen(false)}>Done</button>
+                </div>
+            )}
         </div>
     );
 }

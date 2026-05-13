@@ -80,20 +80,26 @@
     transform: scale(0.98);
 }
 
-/* --- Inline Adding Row Styles --- */
-.adding-row {
+/* --- Inline Adding & Modifying Row Styles --- */
+/* Grouped .adding-row and .editing-row to ensure they look identical */
+.adding-row,
+.editing-row {
     background-color: #fffaf7;
     /* Slight orange tint to highlight the active row */
 }
 
-.adding-row td {
+.adding-row td,
+.editing-row td {
     padding: 10px !important;
     vertical-align: top;
 }
 
 .adding-row input,
 .adding-row textarea,
-.adding-row select {
+.adding-row select,
+.editing-row input,
+.editing-row textarea,
+.editing-row select {
     width: 100%;
     padding: 8px;
     border: 1px solid #FF8C42;
@@ -102,19 +108,27 @@
     font-size: 0.9rem;
     box-sizing: border-box;
     outline: none;
+    background-color: white;
+    /* Ensures consistency against the tinted background */
 }
 
 .adding-row input:focus,
-.adding-row textarea:focus {
+.adding-row textarea:focus,
+.adding-row select:focus,
+.editing-row input:focus,
+.editing-row textarea:focus,
+.editing-row select:focus {
     box-shadow: 0 0 0 2px rgba(255, 140, 66, 0.3);
 }
 
-.adding-row textarea {
+.adding-row textarea,
+.editing-row textarea {
     height: 80px;
     resize: vertical;
 }
 
-.adding-row small {
+.adding-row small,
+.editing-row small {
     color: #888;
     font-style: italic;
     font-size: 0.75rem;
@@ -192,7 +206,7 @@
     background-color: #C4C4C4;
 }
 
-/* Inline Save/Cancel */
+/* Inline Save/Cancel (Identical for Add and Modify) */
 .save-btn {
     background-color: #FF8C42;
 }
@@ -227,4 +241,14 @@
     border: none;
     width: 60px;
     height: 28px;
+    cursor: pointer;
+    border-radius: 4px;
+    font-size: 0.75rem;
+}
+
+/* Formatting for date inputs in Add/Modify mode */
+.schedule-input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
 }
