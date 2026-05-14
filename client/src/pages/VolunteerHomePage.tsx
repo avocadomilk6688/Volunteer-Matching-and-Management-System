@@ -4,10 +4,11 @@ import { AiOutlineSearch, AiFillStar, AiOutlineMessage } from 'react-icons/ai';
 import { GoTriangleLeft, GoTriangleRight, GoChevronDown, GoSync } from 'react-icons/go';
 import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
-import { useState, forwardRef, useEffect, useCallback, useRef } from 'react'; // Added useRef
+import { useState, forwardRef, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router';
 import axios from 'axios';
 import { useAuth } from '../context/auth/useAuth';
+import { ChatWindow } from './ChatWindow';
 
 // --- Constants ---
 const API_BASE_URL = "http://localhost:3000";
@@ -44,18 +45,18 @@ const DateBox = forwardRef<HTMLDivElement, DateBoxProps>(({ value, onClick, plac
 ));
 
 // --- Draggable Chat Button Sub-Component ---
-const DraggableChatButton = () => {
-    // Default position: Bottom Right
-    const [position, setPosition] = useState({ 
-        x: window.innerWidth - 120, 
-        y: window.innerHeight - 120 
+const DraggableChatButton = ({ onClick }: { onClick: () => void }) => {
+    const [position, setPosition] = useState({
+        x: window.innerWidth - 120,
+        y: window.innerHeight - 120
     });
     const [dragging, setDragging] = useState(false);
     const dragOffset = useRef({ x: 0, y: 0 });
+    const startPos = useRef({ x: 0, y: 0 }); // To detect click vs drag
 
     const handleMouseDown = (e: React.MouseEvent) => {
         setDragging(true);
-        // Calculate offset so the button doesn't "snap" to the mouse center
+        startPos.current = { x: e.clientX, y: e.clientY };
         dragOffset.current = {
             x: e.clientX - position.x,
             y: e.clientY - position.y
@@ -68,7 +69,6 @@ const DraggableChatButton = () => {
         let newX = e.clientX - dragOffset.current.x;
         let newY = e.clientY - dragOffset.current.y;
 
-        // Boundary checks to stay within the homepage view
         const btnSize = 70;
         newX = Math.max(0, Math.min(newX, window.innerWidth - btnSize));
         newY = Math.max(0, Math.min(newY, window.innerHeight - btnSize));
@@ -76,7 +76,16 @@ const DraggableChatButton = () => {
         setPosition({ x: newX, y: newY });
     }, [dragging]);
 
-    const handleMouseUp = () => setDragging(false);
+    // Fixed: Properly typed for window event listener to avoid "any" error
+    const handleMouseUp = useCallback((e: MouseEvent) => {
+        setDragging(false);
+        // If movement is less than 5px, it's a click
+        const moveX = Math.abs(e.clientX - startPos.current.x);
+        const moveY = Math.abs(e.clientY - startPos.current.y);
+        if (moveX < 5 && moveY < 5) {
+            onClick();
+        }
+    }, [onClick]);
 
     useEffect(() => {
         if (dragging) {
@@ -90,15 +99,15 @@ const DraggableChatButton = () => {
             window.removeEventListener('mousemove', handleMouseMove);
             window.removeEventListener('mouseup', handleMouseUp);
         };
-    }, [dragging, handleMouseMove]);
+    }, [dragging, handleMouseMove, handleMouseUp]);
 
     return (
-        <div 
+        <div
             className={`floating-chat-button ${dragging ? 'dragging' : ''}`}
             onMouseDown={handleMouseDown}
-            style={{ 
-                left: `${position.x}px`, 
-                top: `${position.y}px` 
+            style={{
+                left: `${position.x}px`,
+                top: `${position.y}px`
             }}
         >
             <AiOutlineMessage />
@@ -115,6 +124,7 @@ export function VolunteerHomePage() {
     const [loading, setLoading] = useState(true);
     const [allSkills, setAllSkills] = useState<{ id: string, skill_name: string }[]>([]);
     const [allInterests, setAllInterests] = useState<{ id: string, interest_name: string }[]>([]);
+    const [isChatOpen, setIsChatOpen] = useState(false); // State to toggle chat
 
     // --- Type-safe session storage helper ---
     const getStored = <T,>(key: string, defaultValue: T): T => {
@@ -270,7 +280,6 @@ export function VolunteerHomePage() {
                             />
                         </div>
 
-                        {/* Location Select */}
                         <div className="custom-multiselect-container">
                             <div className="custom-select-box" onClick={() => setIsLocOpen(!isLocOpen)}>
                                 <span className="select-text">
@@ -289,7 +298,6 @@ export function VolunteerHomePage() {
                             )}
                         </div>
 
-                        {/* Skills Select */}
                         <div className="custom-multiselect-container">
                             <div className="custom-select-box" onClick={() => setIsSkillOpen(!isSkillOpen)}>
                                 <span className="select-text">
@@ -308,7 +316,6 @@ export function VolunteerHomePage() {
                             )}
                         </div>
 
-                        {/* Interests Select */}
                         <div className="custom-multiselect-container">
                             <div className="custom-select-box" onClick={() => setIsInterestOpen(!isInterestOpen)}>
                                 <span className="select-text">
@@ -408,9 +415,12 @@ export function VolunteerHomePage() {
                     <GoTriangleRight className={`pagination-arrow ${currentPage === totalPages || totalPages === 0 ? 'disabled' : ''}`} onClick={goToNextPage} />
                 </div>
             </div>
-            
-            {/* Draggable Chat Component */}
-            <DraggableChatButton />
+
+            {/* Draggable Chat Button */}
+            <DraggableChatButton onClick={() => setIsChatOpen(!isChatOpen)} />
+
+            {/* Conditionally Render Chat Window at Fixed Position */}
+            {isChatOpen && <ChatWindow onClose={() => setIsChatOpen(false)} />}
         </div>
     );
 }
