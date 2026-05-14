@@ -5,6 +5,7 @@ import { useParams } from 'react-router';
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/auth/useAuth';
 import axios from 'axios';
+import { ChatWindow } from './ChatWindow';
 
 // --- Interfaces ---
 interface TagItem { id: string; name: string; }
@@ -91,6 +92,7 @@ export function ProgrammeDetailsPage() {
     const [showModal, setShowModal] = useState(false);
     const [showSkillBox, setShowSkillBox] = useState(false);
     const [showInterestBox, setShowInterestBox] = useState(false);
+    const [showChatWindow, setShowChatWindow] = useState(false); // Added for Chat Window
     const resumeInputRef = useRef<HTMLInputElement>(null);
 
     const formatFileName = (url: string) => {
@@ -240,7 +242,6 @@ export function ProgrammeDetailsPage() {
             <Header />
             <div className="page-body">
                 <div className="programme-details">
-                    {/* FIXED PROGRAMME IMAGE URL */}
                     <div className="programme-image" style={{
                         backgroundImage: `url(${API_BASE_URL}${programme.imageUrl})`,
                         backgroundSize: 'cover',
@@ -250,7 +251,7 @@ export function ProgrammeDetailsPage() {
                     <div className="header-row">
                         <div className="programme-name">{programme.title}</div>
                         <div className="tool-bar">
-                            <button className="chat-button">Chat</button>
+                            <button className="chat-button" onClick={() => setShowChatWindow(true)}>Chat</button>
                             <button
                                 className={`join-button ${enrollmentStatus ? 'applied-disabled' : ''}`}
                                 onClick={() => !enrollmentStatus && setShowModal(true)}
@@ -272,7 +273,6 @@ export function ProgrammeDetailsPage() {
                     </div>
 
                     <div className="organization-details">
-                        {/* FIXED ORGANIZATION PROFILE PIC URL */}
                         <div
                             className="organization-profile-pic"
                             style={{
@@ -385,6 +385,8 @@ export function ProgrammeDetailsPage() {
                     </div>
                 </div>
             )}
+
+            {showChatWindow && <ChatWindow onClose={() => setShowChatWindow(false)} />}
         </div>
     );
 }
