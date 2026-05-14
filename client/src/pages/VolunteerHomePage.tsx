@@ -1,16 +1,16 @@
 import { Header } from './Header';
 import './volunteer_home_page.css';
-import { AiOutlineSearch, AiFillStar } from 'react-icons/ai';
+import { AiOutlineSearch, AiFillStar, AiOutlineMessage } from 'react-icons/ai';
 import { GoTriangleLeft, GoTriangleRight, GoChevronDown, GoSync } from 'react-icons/go';
 import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
-import { useState, forwardRef, useEffect, useCallback } from 'react';
+import { useState, forwardRef, useEffect, useCallback, useRef } from 'react'; // Added useRef
 import { useNavigate } from 'react-router';
 import axios from 'axios';
 import { useAuth } from '../context/auth/useAuth';
 
 // --- Constants ---
-const API_BASE_URL = "http://localhost:3000"; // Added this to fix the image paths
+const API_BASE_URL = "http://localhost:3000";
 
 const MALAYSIAN_STATES = [
     "Johor", "Kedah", "Kelantan", "Melaka", "Negeri Sembilan", "Pahang",
@@ -42,6 +42,69 @@ const DateBox = forwardRef<HTMLDivElement, DateBoxProps>(({ value, onClick, plac
         <GoChevronDown className="select-arrow-icon" />
     </div>
 ));
+
+// --- Draggable Chat Button Sub-Component ---
+const DraggableChatButton = () => {
+    // Default position: Bottom Right
+    const [position, setPosition] = useState({ 
+        x: window.innerWidth - 120, 
+        y: window.innerHeight - 120 
+    });
+    const [dragging, setDragging] = useState(false);
+    const dragOffset = useRef({ x: 0, y: 0 });
+
+    const handleMouseDown = (e: React.MouseEvent) => {
+        setDragging(true);
+        // Calculate offset so the button doesn't "snap" to the mouse center
+        dragOffset.current = {
+            x: e.clientX - position.x,
+            y: e.clientY - position.y
+        };
+    };
+
+    const handleMouseMove = useCallback((e: MouseEvent) => {
+        if (!dragging) return;
+
+        let newX = e.clientX - dragOffset.current.x;
+        let newY = e.clientY - dragOffset.current.y;
+
+        // Boundary checks to stay within the homepage view
+        const btnSize = 70;
+        newX = Math.max(0, Math.min(newX, window.innerWidth - btnSize));
+        newY = Math.max(0, Math.min(newY, window.innerHeight - btnSize));
+
+        setPosition({ x: newX, y: newY });
+    }, [dragging]);
+
+    const handleMouseUp = () => setDragging(false);
+
+    useEffect(() => {
+        if (dragging) {
+            window.addEventListener('mousemove', handleMouseMove);
+            window.addEventListener('mouseup', handleMouseUp);
+        } else {
+            window.removeEventListener('mousemove', handleMouseMove);
+            window.removeEventListener('mouseup', handleMouseUp);
+        }
+        return () => {
+            window.removeEventListener('mousemove', handleMouseMove);
+            window.removeEventListener('mouseup', handleMouseUp);
+        };
+    }, [dragging, handleMouseMove]);
+
+    return (
+        <div 
+            className={`floating-chat-button ${dragging ? 'dragging' : ''}`}
+            onMouseDown={handleMouseDown}
+            style={{ 
+                left: `${position.x}px`, 
+                top: `${position.y}px` 
+            }}
+        >
+            <AiOutlineMessage />
+        </div>
+    );
+};
 
 export function VolunteerHomePage() {
     const { user } = useAuth();
@@ -307,7 +370,6 @@ export function VolunteerHomePage() {
                     ) : programmes.length > 0 ? (
                         programmes.map((prog) => (
                             <div key={prog.id} className="programme" onClick={() => navigate(`/programme-details/${prog.id}`)}>
-                                {/* FIXED IMAGE PATH BELOW */}
                                 <div className="programme-image" style={{
                                     backgroundImage: `url(${API_BASE_URL}${prog.imageUrl})`,
                                     backgroundSize: 'cover',
@@ -316,7 +378,6 @@ export function VolunteerHomePage() {
                                 <div className="programme-info">
                                     <div className="programme-name">{prog.title}</div>
                                     <div className="organization-info">
-                                        {/* FIXED PROFILE PIC PATH BELOW */}
                                         <div
                                             className="organization-profile-pic"
                                             style={{
@@ -347,6 +408,9 @@ export function VolunteerHomePage() {
                     <GoTriangleRight className={`pagination-arrow ${currentPage === totalPages || totalPages === 0 ? 'disabled' : ''}`} onClick={goToNextPage} />
                 </div>
             </div>
+            
+            {/* Draggable Chat Component */}
+            <DraggableChatButton />
         </div>
     );
 }

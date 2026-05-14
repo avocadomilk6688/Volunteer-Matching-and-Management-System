@@ -262,3 +262,35 @@
     padding: 50px;
     color: #777;
 }
+
+.floating-chat-button {
+    position: fixed;
+    /* Changed from relative to fixed */
+    background-color: white;
+    width: 70px;
+    height: 70px;
+    border: 1px solid black;
+    border-radius: 50%;
+    /* Cleaner than 100px for a circle */
+    cursor: grab;
+    z-index: 1000;
+
+    /* Easy centering for the SVG */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    /* Prevent text/icon selection while dragging */
+    user-select: none;
+    touch-action: none;
+}
+
+.floating-chat-button:active {
+    cursor: grabbing;
+}
+
+.floating-chat-button svg {
+    color: #FF8C42;
+    width: 40px;
+    height: 40px;
+}
