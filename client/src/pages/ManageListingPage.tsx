@@ -1,9 +1,11 @@
 import { Header } from './Header';
 import './manage_listing_page.css';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router';
 import { GenericTable } from './Table';
 import { useAuth } from '../context/auth/useAuth';
+import { AiOutlineMessage } from 'react-icons/ai';
+import { ChatWindow } from './ChatWindow';
 
 // --- Explicit TypeScript Interfaces ---
 interface TagItem { id: string; name: string; }
@@ -41,6 +43,77 @@ interface TagSelectionProps {
     type: 'skill' | 'interest';
 }
 
+// --- Draggable Chat Button Sub-Component ---
+const DraggableChatButton = ({ onClick }: { onClick: () => void }) => {
+    const [position, setPosition] = useState({
+        x: window.innerWidth - 120,
+        y: window.innerHeight - 120
+    });
+    const [dragging, setDragging] = useState(false);
+    const dragOffset = useRef({ x: 0, y: 0 });
+    const startPos = useRef({ x: 0, y: 0 }); // To detect click vs drag
+
+    const handleMouseDown = (e: React.MouseEvent) => {
+        setDragging(true);
+        startPos.current = { x: e.clientX, y: e.clientY };
+        dragOffset.current = {
+            x: e.clientX - position.x,
+            y: e.clientY - position.y
+        };
+    };
+
+    const handleMouseMove = useCallback((e: MouseEvent) => {
+        if (!dragging) return;
+
+        let newX = e.clientX - dragOffset.current.x;
+        let newY = e.clientY - dragOffset.current.y;
+
+        const btnSize = 70;
+        newX = Math.max(0, Math.min(newX, window.innerWidth - btnSize));
+        newY = Math.max(0, Math.min(newY, window.innerHeight - btnSize));
+
+        setPosition({ x: newX, y: newY });
+    }, [dragging]);
+
+    // Fixed: Properly typed for window event listener to avoid "any" error
+    const handleMouseUp = useCallback((e: MouseEvent) => {
+        setDragging(false);
+        // If movement is less than 5px, it's a click
+        const moveX = Math.abs(e.clientX - startPos.current.x);
+        const moveY = Math.abs(e.clientY - startPos.current.y);
+        if (moveX < 5 && moveY < 5) {
+            onClick();
+        }
+    }, [onClick]);
+
+    useEffect(() => {
+        if (dragging) {
+            window.addEventListener('mousemove', handleMouseMove);
+            window.addEventListener('mouseup', handleMouseUp);
+        } else {
+            window.removeEventListener('mousemove', handleMouseMove);
+            window.removeEventListener('mouseup', handleMouseUp);
+        }
+        return () => {
+            window.removeEventListener('mousemove', handleMouseMove);
+            window.removeEventListener('mouseup', handleMouseUp);
+        };
+    }, [dragging, handleMouseMove, handleMouseUp]);
+
+    return (
+        <div
+            className={`floating-chat-button ${dragging ? 'dragging' : ''}`}
+            onMouseDown={handleMouseDown}
+            style={{
+                left: `${position.x}px`,
+                top: `${position.y}px`
+            }}
+        >
+            <AiOutlineMessage />
+        </div>
+    );
+};
+
 export function ManageListingPage() {
     const navigate = useNavigate();
     const location = useLocation();
@@ -62,6 +135,7 @@ export function ManageListingPage() {
     const [editingId, setEditingId] = useState<string | null>(null);
     const [isAdding, setIsAdding] = useState<boolean>(false);
     const [selectedImage, setSelectedImage] = useState<File | null>(null);
+    const [isChatOpen, setIsChatOpen] = useState(false); // State to toggle chat
 
     const [rowData, setRowData] = useState({
         title: '',
@@ -316,11 +390,16 @@ export function ManageListingPage() {
                     )}
                 </main>
             </div>
+            {/* Draggable Chat Button */}
+            <DraggableChatButton onClick={() => setIsChatOpen(!isChatOpen)} />
+
+            {/* Conditionally Render Chat Window at Fixed Position */}
+            {isChatOpen && <ChatWindow onClose={() => setIsChatOpen(false)} />}
         </div>
     );
 }
 
-// --- SUB-COMPONENT: No longer uses 'any' ---
+// --- SUB-COMPONENT
 function TagSelection({ toggleTag, myTags, allTags, isOpen, setIsOpen, type }: TagSelectionProps) {
     return (
         <div className="tags-container">
