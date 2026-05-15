@@ -1,5 +1,5 @@
 import { Controller, Get, Post, Body, Param } from '@nestjs/common';
-import { InteractionsService } from './interactions.service';
+import { InteractionsService, RecentContact } from './interactions.service';
 import { QuestionAnswer } from './entities/question_answer.entity';
 import {
   CreateMessageDto,
@@ -13,7 +13,6 @@ import {
 export class InteractionsController {
   constructor(private readonly interactionsService: InteractionsService) {}
 
-  // Fetch all QAs - Path: GET /interactions/qa
   @Get('qa')
   async findAllQA(): Promise<QuestionAnswer[]> {
     return await this.interactionsService.findAllQA();
@@ -27,6 +26,28 @@ export class InteractionsController {
   @Post('message')
   createMessage(@Body() createMessageDto: CreateMessageDto) {
     return this.interactionsService.createMessage(createMessageDto);
+  }
+
+  @Get('history/:user1/:user2')
+  async getHistory(@Param('user1') u1: string, @Param('user2') u2: string) {
+    return await this.interactionsService.getConversationHistory(u1, u2);
+  }
+
+  // Updated to include the explicit return type
+  @Get('contacts/:userId')
+  async getContacts(@Param('userId') userId: string): Promise<RecentContact[]> {
+    return await this.interactionsService.getRecentContacts(userId);
+  }
+
+  @Post('broadcast')
+  async broadcast(
+    @Body() data: { programmeId: string; senderId: string; content: string },
+  ) {
+    return await this.interactionsService.broadcastToProgramme(
+      data.programmeId,
+      data.senderId,
+      data.content,
+    );
   }
 
   @Post('rating')

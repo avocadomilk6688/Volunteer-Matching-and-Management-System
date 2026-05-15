@@ -8,6 +8,8 @@ import { Notification } from './entities/notification.entity';
 import { QuestionAnswer } from './entities/question_answer.entity';
 import { Rating } from './entities/rating.entity';
 import { SupportTicket } from './entities/support_ticket.entity';
+import { Application } from '../applications/entities/application.entity';
+import { User } from '../users/entities/user.entity';
 
 // DTOs
 import {
@@ -20,6 +22,16 @@ import {
 
 // Utils
 import { generateCustomId } from '../common/utils/id_generator.util';
+
+// --- Interface for Frontend Recent Contacts List ---
+export interface RecentContact {
+  partnerId: string;
+  username: string;
+  profilePic: string | null;
+  lastMessage: string;
+  timestamp: Date;
+  role: string;
+}
 
 @Injectable()
 export class InteractionsService {
@@ -38,14 +50,16 @@ export class InteractionsService {
 
     @InjectRepository(SupportTicket)
     private readonly ticketRepo: Repository<SupportTicket>,
+
+    @InjectRepository(Application)
+    private readonly applicationRepo: Repository<Application>,
   ) {}
 
-  // Fetch all QAs for the frontend
+  // --- Q&A Logic ---
   async findAllQA(): Promise<QuestionAnswer[]> {
-    const result: QuestionAnswer[] = await this.qaRepo.find({
+    return await this.qaRepo.find({
       order: { id: 'ASC' },
     });
-    return result;
   }
 
   async createQA(dto: CreateQuestionAnswerDto): Promise<string> {
@@ -55,13 +69,119 @@ export class InteractionsService {
     return `QA ${id} added`;
   }
 
-  async createMessage(dto: CreateMessageDto): Promise<string> {
+  // --- Messaging Logic ---
+  async createMessage(dto: CreateMessageDto): Promise<Message> {
     const id = await generateCustomId(this.messageRepo, 'M');
-    const newMessage = this.messageRepo.create({ id, ...dto });
-    await this.messageRepo.save(newMessage);
-    return `Message ${id} sent successfully`;
+    const newMessage = this.messageRepo.create({
+      id,
+      content: dto.content,
+      sender: { id: dto.senderId } as User,
+      receiver: { id: dto.receiverId } as User,
+    });
+    return await this.messageRepo.save(newMessage);
   }
 
+  /**
+   * Fetches full history with deep relations to get profile pictures for chat bubbles.
+   */
+  async getConversationHistory(
+    user1: string,
+    user2: string,
+  ): Promise<Message[]> {
+    return await this.messageRepo.find({
+      where: [
+        { sender: { id: user1 }, receiver: { id: user2 } },
+        { sender: { id: user2 }, receiver: { id: user1 } },
+      ],
+      order: { timestamp: 'ASC' },
+      relations: [
+        'sender',
+        'sender.volunteer',
+        'sender.organization',
+        'receiver',
+        'receiver.volunteer',
+        'receiver.organization',
+      ],
+    });
+  }
+
+  /**
+   * Strictly typed recent contacts fetcher for the Sidebar.
+   * Resolves the profile picture by checking user roles and associated tables.
+   */
+  async getRecentContacts(userId: string): Promise<RecentContact[]> {
+    const messages = await this.messageRepo.find({
+      where: [{ sender: { id: userId } }, { receiver: { id: userId } }],
+      order: { timestamp: 'DESC' },
+      relations: [
+        'sender',
+        'sender.volunteer',
+        'sender.organization',
+        'receiver',
+        'receiver.volunteer',
+        'receiver.organization',
+      ],
+    });
+
+    const contactsMap = new Map<string, RecentContact>();
+
+    for (const msg of messages) {
+      const partner = msg.sender.id === userId ? msg.receiver : msg.sender;
+
+      if (!contactsMap.has(partner.id)) {
+        let profilePic: string | null = null;
+
+        // Drill down into sub-tables based on role
+        if (partner.role === 'volunteer') {
+          profilePic = partner.volunteer?.profile_picture_url ?? null;
+        } else if (partner.role === 'organization') {
+          profilePic = partner.organization?.profile_picture_url ?? null;
+        }
+
+        contactsMap.set(partner.id, {
+          partnerId: partner.id,
+          username: partner.username,
+          profilePic: profilePic,
+          lastMessage: msg.content,
+          timestamp: msg.timestamp,
+          role: partner.role,
+        });
+      }
+    }
+
+    return Array.from(contactsMap.values());
+  }
+
+  // --- Broadcast Logic ---
+  async broadcastToProgramme(
+    programmeId: string,
+    senderId: string,
+    content: string,
+  ) {
+    const applications = await this.applicationRepo.find({
+      where: { programme: { id: programmeId }, status: 'approved' },
+      relations: ['volunteer', 'volunteer.user'],
+    });
+
+    const participantUserIds = applications.map((app) => app.volunteer.user.id);
+
+    const messages = await Promise.all(
+      participantUserIds.map(async (receiverId) => {
+        const id = await generateCustomId(this.messageRepo, 'M');
+        return this.messageRepo.create({
+          id,
+          content,
+          sender: { id: senderId } as User,
+          receiver: { id: receiverId } as User,
+        });
+      }),
+    );
+
+    await this.messageRepo.save(messages);
+    return { participantUserIds, messages };
+  }
+
+  // --- General Interactions ---
   async createRating(dto: CreateRatingDto): Promise<string> {
     const id = await generateCustomId(this.ratingRepo, 'R');
     const newRating = this.ratingRepo.create({ id, ...dto });
@@ -84,17 +204,16 @@ export class InteractionsService {
   }
 
   async findAll(): Promise<Message[]> {
-    return await this.messageRepo.find();
+    return await this.messageRepo.find({
+      relations: ['sender', 'receiver'],
+      order: { timestamp: 'ASC' },
+    });
   }
 
-  /**
-   * Added: Fetch all notifications for a specific user ID
-   * Used by the Header to display real notifications
-   */
   async findAllByUserId(userId: string): Promise<Notification[]> {
     return await this.notificationRepo.find({
       where: { receiver: { id: userId } },
-      order: { createdAt: 'DESC' }, // Show newest first
+      order: { createdAt: 'DESC' },
     });
   }
 }

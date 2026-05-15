@@ -74,7 +74,7 @@ export class UsersService {
     await this.volunteerRepo.delete(id);
     await this.adminRepo.delete(id);
 
-    // Based on your DB structure, Organization uses 'userId' as the link
+    // Based on DB structure, Organization uses 'userId' as the link
     await this.organizationRepo.delete({ userId: id } as any);
 
     // 2. Finally, delete the main User record
