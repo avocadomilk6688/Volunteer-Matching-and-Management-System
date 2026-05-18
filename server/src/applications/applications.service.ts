@@ -13,10 +13,10 @@ import { Interest } from '../volunteers/entities/interest.entity';
 import { Notification } from '../interactions/entities/notification.entity';
 import { generateCustomId } from '../common/utils/id_generator.util';
 
-// --- Interfaces for Type Safety ---
-export interface IncomingApplicationDto {
-  volunteerId: string;
-  programmeId: string;
+// --- FIX: Converted from interface to class to satisfy emitDecoratorMetadata ---
+export class IncomingApplicationDto {
+  volunteerId!: string;
+  programmeId!: string;
   skills?: string;
   interests?: string;
 }
@@ -52,6 +52,7 @@ export class ApplicationsService {
         'volunteer.skills',
         'volunteer.interests',
         'programme',
+        'programme.schedule',
       ],
     });
   }
@@ -118,7 +119,7 @@ export class ApplicationsService {
       }
     }
 
-    // 3. Update Resume path
+    // 3. Update Resume path Securely
     if (file) {
       volunteer.resume_url = `/uploads/resumes/${file.filename}`;
     }
@@ -172,14 +173,27 @@ export class ApplicationsService {
 
   async findAll() {
     return await this.appRepo.find({
-      relations: ['volunteer', 'volunteer.user', 'programme'],
+      relations: [
+        'volunteer',
+        'volunteer.user',
+        'programme',
+        'programme.schedule',
+        'programme.organization',
+        'programme.organization.user',
+      ],
     });
   }
 
   async findOne(id: string) {
     const application = await this.appRepo.findOne({
       where: { id },
-      relations: ['volunteer', 'programme'],
+      relations: [
+        'volunteer',
+        'programme',
+        'programme.schedule',
+        'programme.organization',
+        'programme.organization.user',
+      ],
     });
     if (!application) throw new NotFoundException('Application not found');
     return application;

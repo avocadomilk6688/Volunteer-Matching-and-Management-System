@@ -5,13 +5,42 @@ import { useAuth } from '../context/auth/useAuth';
 import axios from 'axios';
 import './volunteering_history_page.css';
 
+// --- Explicit, Linter-Compliant Type Contracts ---
+interface UserEntity {
+    username: string;
+    email: string;
+}
+
+interface OrganizationEntity {
+    id: string;
+    description: string;
+    rating: number;
+    user?: UserEntity;
+}
+
+interface ScheduleEntity {
+    id: string;
+    mode: string;
+    location: string;
+    start_time: string;
+    end_time: string;
+}
+
+interface ProgrammeEntity {
+    id: string;
+    title: string;
+    description: string;
+    imageUrl: string;
+    organization?: OrganizationEntity;
+    schedule?: ScheduleEntity;
+}
+
 interface HistoryItem {
     id: string;
-    programme: string;
-    org: string;
-    schedule: string;
-    hours: string;
     status: string;
+    applied_at: string;
+    programme?: ProgrammeEntity;
+    hours?: number | string;
 }
 
 interface VolunteerStats {
@@ -19,6 +48,8 @@ interface VolunteerStats {
     totalHours: number;
     history: HistoryItem[];
 }
+
+const API_BASE_URL = "http://localhost:3000";
 
 export function VolunteeringHistoryPage() {
     const { user } = useAuth();
@@ -36,9 +67,15 @@ export function VolunteeringHistoryPage() {
         const fetchHistory = async () => {
             try {
                 setLoading(true);
+                const token = localStorage.getItem('token');
+
                 const response = await axios.get<VolunteerStats>(
-                    `http://localhost:3000/volunteers/${user.id}/history`
+                    `${API_BASE_URL}/volunteers/${user.id}/history`,
+                    {
+                        headers: { Authorization: `Bearer ${token}` }
+                    }
                 );
+
                 setData(response.data);
                 setError(null);
             } catch (err) {
@@ -54,11 +91,67 @@ export function VolunteeringHistoryPage() {
 
     const headers = ["Programme", "Organization", "Schedule", "Completed Hours", "Status"];
 
-    // --- FILTER LOGIC ---
-    // We create a filtered list that excludes anything with the 'pending' status
-    const filteredHistory = data?.history?.filter(
-        (item) => item.status.toLowerCase() !== 'pending'
-    ) || [];
+    // Case-insensitive filtering matching only 'upcoming' and 'completed' statuses
+    const filteredHistory = (data?.history || []).filter((item) => {
+        if (!item.status) return false;
+        const statusLower = item.status.toLowerCase();
+        return statusLower === 'upcoming' || statusLower === 'completed';
+    });
+
+    const formatStatus = (statusStr: string): string => {
+        return statusStr ? statusStr.toUpperCase() : 'UNKNOWN';
+    };
+
+    // --- RECONFIGURED RANGE-BASED SCHEDULE PARSER ---
+    const getScheduleInfo = (item: HistoryItem): string => {
+        const schedule = item.programme?.schedule;
+        if (!schedule || !schedule.start_time) return 'N/A';
+
+        try {
+            const startDate = new Date(schedule.start_time);
+            if (isNaN(startDate.getTime())) return schedule.start_time;
+
+            const timeOptions: Intl.DateTimeFormatOptions = {
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: true,
+            };
+
+            const dateLabelOptions: Intl.DateTimeFormatOptions = {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric'
+            };
+
+            const fullDateTimeOptions: Intl.DateTimeFormatOptions = {
+                ...dateLabelOptions,
+                ...timeOptions
+            };
+
+            if (schedule.end_time) {
+                const endDate = new Date(schedule.end_time);
+                if (!isNaN(endDate.getTime())) {
+                    // If the project starts and ends on the same calendar day, compress the string
+                    if (startDate.toDateString() === endDate.toDateString()) {
+                        const dateStr = startDate.toLocaleDateString('en-GB', dateLabelOptions);
+                        const startTimeStr = startDate.toLocaleTimeString('en-GB', timeOptions);
+                        const endTimeStr = endDate.toLocaleTimeString('en-GB', timeOptions);
+                        return `${dateStr}, ${startTimeStr} - ${endTimeStr}`;
+                    } else {
+                        // Display separate timestamps side-by-side if the project spans over multiple days
+                        const startStr = startDate.toLocaleString('en-GB', fullDateTimeOptions);
+                        const endStr = endDate.toLocaleString('en-GB', fullDateTimeOptions);
+                        return `${startStr} - ${endStr}`;
+                    }
+                }
+            }
+
+            // Fallback for single date items missing an explicit end timestamp
+            return startDate.toLocaleString('en-GB', fullDateTimeOptions);
+        } catch {
+            return schedule.start_time;
+        }
+    };
 
     if (loading) return <div className="loading-state">Loading your journey...</div>;
 
@@ -80,24 +173,25 @@ export function VolunteeringHistoryPage() {
                 <div className="history-stats">
                     <p>Total hours contributed: {data?.totalHours || 0}h</p>
                     <p>
-                        Rating: <span className="star">★</span> {data?.rating.toFixed(1) || "0.0"}
+                        Rating: <span className="star">★</span> {data?.rating ? data.rating.toFixed(1) : "0.0"}
                     </p>
                 </div>
 
                 <GenericTable headers={headers}>
-                    {/* Use filteredHistory instead of data.history */}
                     {filteredHistory.length > 0 ? (
                         filteredHistory.map((row) => (
                             <tr key={row.id}>
-                                <td>{row.programme}</td>
-                                <td>{row.org}</td>
+                                <td>{row.programme?.title || 'General Activity'}</td>
+                                <td>{row.programme?.organization?.user?.username || 'Independent'}</td>
                                 <td>
-                                    <span className="pill schedule-pill">{row.schedule}</span>
+                                    <span className="pill schedule-pill">
+                                        {getScheduleInfo(row)}
+                                    </span>
                                 </td>
-                                <td>{row.hours}</td>
+                                <td>{row.hours ?? 0}h</td>
                                 <td>
-                                    <span className={`pill status-pill ${row.status.toLowerCase()}`}>
-                                        {row.status}
+                                    <span className={`pill status-pill ${row.status ? row.status.toLowerCase() : 'unknown'}`}>
+                                        {formatStatus(row.status)}
                                     </span>
                                 </td>
                             </tr>

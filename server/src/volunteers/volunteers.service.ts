@@ -8,9 +8,6 @@ import { VolunteerMonthlyPoint } from './entities/volunteer-monthly-point.entity
 import { Application } from '../applications/entities/application.entity';
 import { generateCustomId } from '../common/utils/id_generator.util';
 
-/**
- * 1. Change to CLASS to support NestJS Decorator Metadata
- */
 export class UpdateProfileDto {
   username?: string;
   gender?: string;
@@ -24,16 +21,11 @@ export interface LocalMulterFile {
   filename: string;
 }
 
-/**
- * 2. Define an interface for History to avoid "any"
- */
+// --- FIXED: Updated structural layout contract to align perfectly with frontend expectations ---
 export interface VolunteerHistory {
   rating: number;
-  history: {
-    id: string;
-    status: string | undefined;
-    title: string | undefined;
-  }[];
+  totalHours: number;
+  history: Application[];
 }
 
 @Injectable()
@@ -179,24 +171,38 @@ export class VolunteersService {
     return await this.monthlyRepo.save(monthlyRecord);
   }
 
+  /**
+   * FIX: Rewritten to dynamically fetch matching nested relations and generate totalHours contributors sum metric
+   */
   async getHistory(id: string): Promise<VolunteerHistory | null> {
+    // 1. Fetch deep relational database tables using exact string paths matching entity maps
     const volunteer = await this.volRepo.findOne({
       where: { id },
       relations: [
         'applications',
         'applications.programme',
         'applications.programme.schedule',
+        'applications.programme.organization',
+        'applications.programme.organization.user', // Brings along organization usernames cleanly
       ],
     });
     if (!volunteer) return null;
 
+    // 2. Fetch log history records to calculate overall cumulative hours dynamically
+    const logRecords = await this.monthlyRepo.find({
+      where: { volunteer: { id } },
+    });
+
+    const cumulativeHours = logRecords.reduce(
+      (accum, current) => accum + (Number(current.totalHours) || 0),
+      0,
+    );
+
+    // 3. Return objects context retaining database models hierarchy
     return {
       rating: Number(volunteer.rating) || 0,
-      history: (volunteer.applications || []).map((app) => ({
-        id: app.id,
-        status: app.status,
-        title: app.programme?.title,
-      })),
+      totalHours: cumulativeHours,
+      history: volunteer.applications || [],
     };
   }
 

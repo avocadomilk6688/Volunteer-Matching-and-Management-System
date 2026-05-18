@@ -10,16 +10,33 @@ import {
   UploadedFile,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { ApplicationsService } from './applications.service';
+import {
+  ApplicationsService,
+  IncomingApplicationDto,
+} from './applications.service';
+import { diskStorage } from 'multer';
+import { extname } from 'path';
 
 @Controller('applications')
 export class ApplicationsController {
   constructor(private readonly applicationsService: ApplicationsService) {}
 
   @Post()
-  @UseInterceptors(FileInterceptor('resume'))
+  // FIX: Configured diskStorage destination and filename generation to prevent file execution in memory
+  @UseInterceptors(
+    FileInterceptor('resume', {
+      storage: diskStorage({
+        destination: './uploads/resumes',
+        filename: (req, file, cb) => {
+          const uniqueSuffix =
+            Date.now() + '-' + Math.round(Math.random() * 1e9);
+          cb(null, `resume-${uniqueSuffix}${extname(file.originalname)}`);
+        },
+      }),
+    }),
+  )
   async create(
-    @Body() createApplicationDto: any,
+    @Body() createApplicationDto: IncomingApplicationDto, // FIX: Swapped out 'any' for strict interface type safety
     @UploadedFile() file?: Express.Multer.File,
   ) {
     return await this.applicationsService.create(createApplicationDto, file);
