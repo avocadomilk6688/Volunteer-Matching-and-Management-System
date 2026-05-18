@@ -14,6 +14,7 @@ import { ManageUserAccountPage } from './pages/ManageUserAccountPage';
 import { VerifyOrganizationRegistrationPage } from './pages/VerifyOrganizationRegistrationPage';
 import { AdminManageListingPage } from './pages/AdminManageListingPage';
 import { AdminManageQAPage } from './pages/AdminManageQAPage';
+import { AdminManageTicketsPage } from './pages/AdminManageTicketsPage';
 
 function App() {
   return (
@@ -34,6 +35,7 @@ function App() {
         <Route path="verify-organization-registration" element={<VerifyOrganizationRegistrationPage />} />
         <Route path="admin-manage-listing" element={<AdminManageListingPage />} />
         <Route path="admin-manage-qa" element={<AdminManageQAPage />} />
+        <Route path="admin-manage-tickets" element={<AdminManageTicketsPage />} />
       </Routes>
     </AuthProvider>
   )
