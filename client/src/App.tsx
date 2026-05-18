@@ -10,6 +10,7 @@ import { VolunteeringHistoryPage } from './pages/VolunteeringHistoryPage';
 import { ManageProfilePage } from './pages/ManageProfilePage';
 import { ManageListingPage } from './pages/ManageListingPage';
 import { ManageVolunteerApplicationPage } from './pages/ManageVolunteerApplicationPage';
+import { ManageUserAccountPage } from './pages/ManageUserAccountPage';
 
 function App() {
   return (
@@ -26,6 +27,8 @@ function App() {
         <Route path="manage-profile" element={<ManageProfilePage />}></Route>
         <Route path="manage-listing" element={<ManageListingPage />}></Route>
         <Route path="manage-applications" element={<ManageVolunteerApplicationPage />} />
+        <Route path="manage-user-account" element={<ManageUserAccountPage />} />
+
       </Routes>
     </AuthProvider>
   )

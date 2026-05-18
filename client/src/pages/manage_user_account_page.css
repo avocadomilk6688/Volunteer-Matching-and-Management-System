@@ -1,0 +1,188 @@
+/* --- Dashboard Layout Architecture Structure --- */
+.admin-dashboard-wrapper {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    background-color: #ffffff;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+.admin-dashboard-container {
+    display: flex;
+    flex: 1;
+    position: relative;
+}
+
+/* --- Left Accent Orange Sidebar Navigation Panel (Image Match) --- */
+.admin-sidebar {
+    width: 280px;
+    background-color: #FF8C42;
+    /* Clean profile match to design primary color choice */
+    min-height: calc(100vh - 70px);
+    padding-top: 40px;
+    box-sizing: border-box;
+}
+
+.admin-sidebar ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.admin-sidebar ul li {
+    padding: 16px 24px;
+    color: #ffffff;
+    font-size: 1.15rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.2s ease, padding-left 0.2s ease;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.admin-sidebar ul li:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+    padding-left: 30px;
+}
+
+.admin-sidebar ul li.active {
+    background-color: rgba(255, 255, 255, 0.2);
+    font-weight: 700;
+    border-left: 6px solid #ffffff;
+    padding-left: 18px;
+}
+
+/* --- Main Work Area Layout Frame --- */
+.admin-main-content {
+    flex: 1;
+    padding: 50px 60px;
+    background-color: #ffffff;
+    box-sizing: border-box;
+}
+
+.admin-main-title {
+    font-size: 2.8rem;
+    font-weight: 800;
+    color: #000000;
+    margin: 0 0 35px 0;
+    letter-spacing: -0.5px;
+}
+
+/* --- Action Control Toolbar Custom Flex Parameters --- */
+.admin-action-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 40px;
+    width: 100%;
+}
+
+.admin-search-box-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+    width: 450px;
+}
+
+.admin-search-input {
+    width: 100%;
+    padding: 12px 45px 12px 16px;
+    font-size: 1.1rem;
+    border: 2px solid #000000;
+    border-radius: 0px;
+    /* Sharp corners straight out of mockup design frame */
+    outline: none;
+    box-sizing: border-box;
+}
+
+.admin-search-icon {
+    position: absolute;
+    right: 14px;
+    font-size: 1.6rem;
+    color: #000000;
+    cursor: pointer;
+}
+
+.admin-add-account-btn {
+    padding: 11px 45px;
+    font-size: 1.15rem;
+    font-weight: 600;
+    background-color: #FF8C42;
+    color: #ffffff;
+    border: none;
+    border-radius: 0px;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+
+.admin-add-account-btn:hover {
+    background-color: #e5762d;
+}
+
+/* --- Content Data Table View Modifications --- */
+.custom-table-container {
+    width: 100%;
+    overflow-x: auto;
+    margin-top: 10px;
+}
+
+.custom-table {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: left;
+    font-size: 1.05rem;
+}
+
+.custom-table th {
+    background-color: #FF8C42;
+    color: #ffffff;
+    padding: 14px 18px;
+    font-weight: 600;
+    font-size: 1.1rem;
+    border: none;
+}
+
+.custom-table td {
+    padding: 18px;
+    border-bottom: 1px solid #eef2f5;
+    color: #333333;
+    vertical-align: middle;
+}
+
+.admin-cell-username {
+    font-weight: 500;
+    color: #000000;
+}
+
+.admin-cell-action {
+    width: 120px;
+}
+
+/* --- Destruction Delete Button Execution Layout Component --- */
+.admin-delete-btn {
+    width: 100%;
+    padding: 8px 16px;
+    background-color: #FF8C42;
+    color: #ffffff;
+    border: none;
+    font-weight: 500;
+    font-size: 1rem;
+    border-radius: 0px;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+
+.admin-delete-btn:hover {
+    background-color: #e5762d;
+}
+
+.admin-loading-placeholder,
+.admin-empty-table-fallback {
+    padding: 40px;
+    text-align: center;
+    font-size: 1.2rem;
+    color: #666666;
+    font-style: italic;
+}

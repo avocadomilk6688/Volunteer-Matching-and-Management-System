@@ -42,7 +42,7 @@ export function LoginPage() {
             if (role === 'volunteer') {
                 navigate('/volunteer-home');
             } else if (role === 'admin') {
-                alert('Admin dashboard coming soon!');
+                navigate('/manage-user-account')
             } else {
                 navigate('/manage-listing');
             }
