@@ -9,6 +9,7 @@ import { useNavigate } from 'react-router';
 import axios from 'axios';
 import { useAuth } from '../context/auth/useAuth';
 import { ChatWindow } from './ChatWindow';
+import { socket } from '../services/socket'; // Import socket instance directly
 
 // --- Constants ---
 const API_BASE_URL = "http://localhost:3000";
@@ -44,15 +45,15 @@ const DateBox = forwardRef<HTMLDivElement, DateBoxProps>(({ value, onClick, plac
     </div>
 ));
 
-// --- Draggable Chat Button Sub-Component ---
-const DraggableChatButton = ({ onClick }: { onClick: () => void }) => {
+// --- Draggable Chat Button Sub-Component (UPDATED WITH UNREAD STATE) ---
+const DraggableChatButton = ({ onClick, hasUnread }: { onClick: () => void; hasUnread: boolean }) => {
     const [position, setPosition] = useState({
         x: window.innerWidth - 120,
         y: window.innerHeight - 120
     });
     const [dragging, setDragging] = useState(false);
     const dragOffset = useRef({ x: 0, y: 0 });
-    const startPos = useRef({ x: 0, y: 0 }); // To detect click vs drag
+    const startPos = useRef({ x: 0, y: 0 });
 
     const handleMouseDown = (e: React.MouseEvent) => {
         setDragging(true);
@@ -76,10 +77,8 @@ const DraggableChatButton = ({ onClick }: { onClick: () => void }) => {
         setPosition({ x: newX, y: newY });
     }, [dragging]);
 
-    // Fixed: Properly typed for window event listener (using Global MouseEvent)
     const handleMouseUp = useCallback((e: MouseEvent) => {
         setDragging(false);
-        // If movement is less than 5px, it's considered a click
         const moveX = Math.abs(e.clientX - startPos.current.x);
         const moveY = Math.abs(e.clientY - startPos.current.y);
         if (moveX < 5 && moveY < 5) {
@@ -107,10 +106,28 @@ const DraggableChatButton = ({ onClick }: { onClick: () => void }) => {
             onMouseDown={handleMouseDown}
             style={{
                 left: `${position.x}px`,
-                top: `${position.y}px`
+                top: `${position.y}px`,
+                position: 'fixed' // Ensure proper relative context alignment
             }}
         >
             <AiOutlineMessage />
+            {/* --- RED INDICATOR DOT --- */}
+            {hasUnread && (
+                <span
+                    className="chat-notification-dot"
+                    style={{
+                        position: 'absolute',
+                        top: '2px',
+                        right: '2px',
+                        width: '14px',
+                        height: '14px',
+                        backgroundColor: '#FF3B30',
+                        borderRadius: '50%',
+                        border: '2px solid #fff',
+                        boxShadow: '0 2px 5px rgba(0,0,0,0.2)'
+                    }}
+                />
+            )}
         </div>
     );
 };
@@ -124,7 +141,10 @@ export function VolunteerHomePage() {
     const [loading, setLoading] = useState(true);
     const [allSkills, setAllSkills] = useState<{ id: string, skill_name: string }[]>([]);
     const [allInterests, setAllInterests] = useState<{ id: string, interest_name: string }[]>([]);
-    const [isChatOpen, setIsChatOpen] = useState(false); // State to toggle chat
+    const [isChatOpen, setIsChatOpen] = useState(false);
+
+    // --- NEW: STATE FOR UNREAD MESSAGE INDICATOR ---
+    const [hasUnread, setHasUnread] = useState(false);
 
     // --- Type-safe session storage helper ---
     const getStored = <T,>(key: string, defaultValue: T): T => {
@@ -161,6 +181,30 @@ export function VolunteerHomePage() {
     const [isInterestOpen, setIsInterestOpen] = useState(false);
     const [totalPages, setTotalPages] = useState(1);
     const itemsPerPage = 6;
+
+    // --- NEW: BACKGROUND NOTIFICATION LISTENER EFFECT ---
+    useEffect(() => {
+        if (!user?.id) return;
+
+        if (!socket.connected) socket.connect();
+
+        // Join user's personal private room to receive background notifications
+        socket.emit('join_private_room', { userId: user.id });
+
+        const handleIncomingNotification = (data: { type: string, from: string }) => {
+            console.log("DEBUG: Background notification received on home page:", data);
+            // Only toggle badge if the chat sidebar module is currently closed
+            if (!isChatOpen) {
+                setHasUnread(true);
+            }
+        };
+
+        socket.on('new_notification', handleIncomingNotification);
+
+        return () => {
+            socket.off('new_notification', handleIncomingNotification);
+        };
+    }, [user?.id, isChatOpen]);
 
     // --- SAVE TO SESSION STORAGE ---
     const persistFilters = useCallback((page: number) => {
@@ -416,15 +460,21 @@ export function VolunteerHomePage() {
                 </div>
             </div>
 
-            {/* Draggable Chat Button */}
-            <DraggableChatButton onClick={() => setIsChatOpen(!isChatOpen)} />
+            {/* Draggable Chat Button with notification logic */}
+            <DraggableChatButton
+                onClick={() => {
+                    setIsChatOpen(!isChatOpen);
+                    setHasUnread(false); // Automatically clear unread badge when chat window opens
+                }}
+                hasUnread={hasUnread}
+            />
 
-            {/* Conditionally Render Chat Window at Fixed Position (handled by its own CSS) */}
+            {/* Conditionally Render Chat Window at Fixed Position */}
             {isChatOpen && (
                 <ChatWindow
                     onClose={() => setIsChatOpen(false)}
                     senderId={user?.id || ""}
-                    receiverId="" // Default receiver or system ID can go here
+                    receiverId=""
                 />
             )}
         </div>

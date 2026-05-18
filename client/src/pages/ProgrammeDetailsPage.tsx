@@ -6,6 +6,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/auth/useAuth';
 import axios from 'axios';
 import { ChatWindow } from './ChatWindow';
+import { socket } from '../services/socket'; // Import socket instance directly
 
 // --- Interfaces ---
 interface TagItem { id: string; name: string; }
@@ -96,6 +97,9 @@ export function ProgrammeDetailsPage() {
     const [showChatWindow, setShowChatWindow] = useState(false);
     const resumeInputRef = useRef<HTMLInputElement>(null);
 
+    // --- NEW: STATE FOR THREAD SPECIFIC UNREAD NOTIFICATION BADGE ---
+    const [hasUnread, setHasUnread] = useState(false);
+
     const formatFileName = (url: string) => {
         if (!url) return "No resume uploaded";
         const parts = url.split('/');
@@ -161,6 +165,30 @@ export function ProgrammeDetailsPage() {
         };
         initLoad();
     }, [programmeId, user?.id]);
+
+    // --- NEW: BACKGROUND MESSAGE NOTIFICATION LISTENER ---
+    useEffect(() => {
+        if (!user?.id || !programme?.organization?.user?.id || !programmeId) return;
+
+        if (!socket.connected) socket.connect();
+
+        // Connect client instance directly to personal private notify tracking room
+        socket.emit('join_private_room', { userId: user.id });
+
+        const handleIncomingNotification = (data: { type: string, from: string, programmeId: string | null }) => {
+            console.log("DEBUG: Detail page received notification parameter:", data);
+            // Light indicator up if window is closed and message targets this explicit organization context thread
+            if (!showChatWindow && data.from === programme.organization.user.id && data.programmeId === programmeId) {
+                setHasUnread(true);
+            }
+        };
+
+        socket.on('new_notification', handleIncomingNotification);
+
+        return () => {
+            socket.off('new_notification', handleIncomingNotification);
+        };
+    }, [user?.id, programme?.organization?.user?.id, programmeId, showChatWindow]);
 
     const handleToggleSave = async () => {
         if (!user) {
@@ -252,9 +280,36 @@ export function ProgrammeDetailsPage() {
                     <div className="header-row">
                         <div className="programme-name">{programme.title}</div>
                         <div className="tool-bar">
-                            <button className="chat-button" onClick={() => setShowChatWindow(true)}>Chat</button>
+                            {/* --- CHAT BUTTON RECONFIGURED WITH ABSOLUTE RED DOT BADGE --- */}
                             <button
-                                className="join-button ${enrollmentStatus ? 'applied-disabled' : ''}"
+                                className="chat-button"
+                                onClick={() => {
+                                    setShowChatWindow(true);
+                                    setHasUnread(false); // Clear notification instantly on display
+                                }}
+                                style={{ position: 'relative' }}
+                            >
+                                Chat
+                                {hasUnread && (
+                                    <span
+                                        className="chat-unread-dot-indicator"
+                                        style={{
+                                            position: 'absolute',
+                                            top: '-4px',
+                                            right: '-4px',
+                                            width: '12px',
+                                            height: '12px',
+                                            backgroundColor: '#FF3B30',
+                                            borderRadius: '50%',
+                                            border: '2px solid #fff',
+                                            boxShadow: '0 1px 3px rgba(0,0,0,0.15)'
+                                        }}
+                                    />
+                                )}
+                            </button>
+
+                            <button
+                                className={`join-button ${enrollmentStatus ? 'applied-disabled' : ''}`}
                                 onClick={() => !enrollmentStatus && setShowModal(true)}
                                 disabled={!!enrollmentStatus}
                             >
@@ -387,7 +442,7 @@ export function ProgrammeDetailsPage() {
                 </div>
             )}
 
-            {/* --- FIX: DYNAMIC CHAT WINDOW PROP SYNC & ISOLATION KEY --- */}
+            {/* Dynamic Chat Window integration with unique structural Key isolation context */}
             {showChatWindow && (
                 <ChatWindow
                     key={`${programme.organization.user.id}_${programme.id}`}

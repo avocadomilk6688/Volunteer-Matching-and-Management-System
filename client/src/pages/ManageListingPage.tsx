@@ -6,6 +6,7 @@ import { GenericTable } from './Table';
 import { useAuth } from '../context/auth/useAuth';
 import { AiOutlineMessage } from 'react-icons/ai';
 import { ChatWindow } from './ChatWindow';
+import { socket } from '../services/socket'; // Import socket instance directly
 
 // --- Explicit TypeScript Interfaces ---
 interface TagItem { id: string; name: string; }
@@ -42,8 +43,8 @@ interface TagSelectionProps {
     type: 'skill' | 'interest';
 }
 
-// --- Draggable Chat Button Sub-Component ---
-const DraggableChatButton = ({ onClick }: { onClick: () => void }) => {
+// --- Draggable Chat Button Sub-Component (UPDATED WITH UNREAD STATE) ---
+const DraggableChatButton = ({ onClick, hasUnread }: { onClick: () => void; hasUnread: boolean }) => {
     const [position, setPosition] = useState({
         x: window.innerWidth - 120,
         y: window.innerHeight - 120
@@ -103,10 +104,28 @@ const DraggableChatButton = ({ onClick }: { onClick: () => void }) => {
             onMouseDown={handleMouseDown}
             style={{
                 left: `${position.x}px`,
-                top: `${position.y}px`
+                top: `${position.y}px`,
+                position: 'fixed'
             }}
         >
             <AiOutlineMessage />
+            {/* --- RED INDICATOR DOT --- */}
+            {hasUnread && (
+                <span
+                    className="chat-notification-dot"
+                    style={{
+                        position: 'absolute',
+                        top: '2px',
+                        right: '2px',
+                        width: '14px',
+                        height: '14px',
+                        backgroundColor: '#FF3B30',
+                        borderRadius: '50%',
+                        border: '2px solid #fff',
+                        boxShadow: '0 2px 5px rgba(0,0,0,0.2)'
+                    }}
+                />
+            )}
         </div>
     );
 };
@@ -134,6 +153,9 @@ export function ManageListingPage() {
     const [selectedImage, setSelectedImage] = useState<File | null>(null);
     const [isChatOpen, setIsChatOpen] = useState(false);
 
+    // --- STATE FOR UNREAD MESSAGE NOTIFICATION BADGE ---
+    const [hasUnread, setHasUnread] = useState(false);
+
     const [rowData, setRowData] = useState({
         title: '',
         description: '',
@@ -148,6 +170,30 @@ export function ManageListingPage() {
     useEffect(() => {
         if (user?.id) fetchInitialData();
     }, [user?.id]);
+
+    // --- BACKGROUND NOTIFICATION LISTENER EFFECT ---
+    useEffect(() => {
+        if (!user?.id) return;
+
+        if (!socket.connected) socket.connect();
+
+        // Connect client instance directly to personal private notify tracking room
+        socket.emit('join_private_room', { userId: user.id });
+
+        const handleIncomingNotification = (data: { type: string, from: string }) => {
+            console.log("DEBUG: Background notification received on manage listing page:", data);
+            // Only flip indicator dot on if the actual chat view wrapper layout is closed
+            if (!isChatOpen) {
+                setHasUnread(true);
+            }
+        };
+
+        socket.on('new_notification', handleIncomingNotification);
+
+        return () => {
+            socket.off('new_notification', handleIncomingNotification);
+        };
+    }, [user?.id, isChatOpen]);
 
     const fetchInitialData = async () => {
         const token = localStorage.getItem('token');
@@ -386,13 +432,21 @@ export function ManageListingPage() {
                 </main>
             </div>
 
-            <DraggableChatButton onClick={() => setIsChatOpen(!isChatOpen)} />
+            {/* Draggable Chat Button linked with notification tracking */}
+            <DraggableChatButton
+                onClick={() => {
+                    setIsChatOpen(!isChatOpen);
+                    setHasUnread(false); // Clear red dot indicator instantly when chat window launches
+                }}
+                hasUnread={hasUnread}
+            />
 
+            {/* General Inbox Sidebar Chat Integration */}
             {isChatOpen && (
                 <ChatWindow
                     onClose={() => setIsChatOpen(false)}
                     senderId={user?.id || ""}
-                    receiverId="" // Default empty, sidebar handles contact selection
+                    receiverId=""
                 />
             )}
         </div>
