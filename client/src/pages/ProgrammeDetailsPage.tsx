@@ -40,6 +40,7 @@ interface ProgrammeDetailsData {
         profile_picture_url: string;
         contact_number: string;
         user: {
+            id: string; // Added user ID for chat routing
             username: string;
             email: string;
         }
@@ -92,7 +93,7 @@ export function ProgrammeDetailsPage() {
     const [showModal, setShowModal] = useState(false);
     const [showSkillBox, setShowSkillBox] = useState(false);
     const [showInterestBox, setShowInterestBox] = useState(false);
-    const [showChatWindow, setShowChatWindow] = useState(false); // Added for Chat Window
+    const [showChatWindow, setShowChatWindow] = useState(false);
     const resumeInputRef = useRef<HTMLInputElement>(null);
 
     const formatFileName = (url: string) => {
@@ -253,7 +254,7 @@ export function ProgrammeDetailsPage() {
                         <div className="tool-bar">
                             <button className="chat-button" onClick={() => setShowChatWindow(true)}>Chat</button>
                             <button
-                                className={`join-button ${enrollmentStatus ? 'applied-disabled' : ''}`}
+                                className="join-button ${enrollmentStatus ? 'applied-disabled' : ''}"
                                 onClick={() => !enrollmentStatus && setShowModal(true)}
                                 disabled={!!enrollmentStatus}
                             >
@@ -386,7 +387,19 @@ export function ProgrammeDetailsPage() {
                 </div>
             )}
 
-            {showChatWindow && <ChatWindow onClose={() => setShowChatWindow(false)} />}
+            {/* --- FIX: DYNAMIC CHAT WINDOW PROP SYNC & ISOLATION KEY --- */}
+            {showChatWindow && (
+                <ChatWindow
+                    key={`${programme.organization.user.id}_${programme.id}`}
+                    onClose={() => setShowChatWindow(false)}
+                    senderId={user?.id || ""}
+                    receiverId={programme.organization.user.id}
+                    receiverName={programme.organization.user.username}
+                    receiverImage={programme.organization.profile_picture_url}
+                    programmeId={programme.id}
+                    programmeName={programme.title}
+                />
+            )}
         </div>
     );
 }

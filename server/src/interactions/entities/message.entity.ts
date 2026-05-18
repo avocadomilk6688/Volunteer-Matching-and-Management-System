@@ -6,6 +6,7 @@ import {
   PrimaryColumn,
 } from 'typeorm';
 import { User } from '../../users/entities/user.entity';
+import { Programme } from '../../programmes/entities/programme.entity';
 
 @Entity()
 export class Message {
@@ -20,6 +21,9 @@ export class Message {
 
   @ManyToOne(() => User)
   receiver!: User;
+
+  @ManyToOne(() => Programme, { nullable: true })
+  programme!: Programme;
 
   @CreateDateColumn()
   timestamp!: Date;

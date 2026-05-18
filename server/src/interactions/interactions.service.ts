@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, IsNull } from 'typeorm'; // FIX: Imported IsNull to handle strict separation
 
 // Entities
 import { Message } from './entities/message.entity';
@@ -10,6 +10,7 @@ import { Rating } from './entities/rating.entity';
 import { SupportTicket } from './entities/support_ticket.entity';
 import { Application } from '../applications/entities/application.entity';
 import { User } from '../users/entities/user.entity';
+import { Programme } from '../programmes/entities/programme.entity';
 
 // DTOs
 import {
@@ -31,6 +32,8 @@ export interface RecentContact {
   lastMessage: string;
   timestamp: Date;
   role: string;
+  programmeId: string | null;
+  programmeName: string | null;
 }
 
 @Injectable()
@@ -70,28 +73,54 @@ export class InteractionsService {
   }
 
   // --- Messaging Logic ---
-  async createMessage(dto: CreateMessageDto): Promise<Message> {
+
+  /**
+   * Creates a single message.
+   * Links to a programme if programmeId is provided in the request.
+   */
+  async createMessage(
+    dto: CreateMessageDto & { programmeId?: string },
+  ): Promise<Message> {
     const id = await generateCustomId(this.messageRepo, 'M');
+
     const newMessage = this.messageRepo.create({
       id,
       content: dto.content,
       sender: { id: dto.senderId } as User,
       receiver: { id: dto.receiverId } as User,
+      // Map the programme if it exists, otherwise keep it undefined for DeepPartial compatibility
+      programme: dto.programmeId
+        ? ({ id: dto.programmeId } as Programme)
+        : undefined,
     });
+
     return await this.messageRepo.save(newMessage);
   }
 
   /**
-   * Fetches full history with deep relations to get profile pictures for chat bubbles.
+   * Fetches history filtered by both users AND the specific programme.
+   * FIX: Uses IsNull() to cleanly isolate general conversations from project-bound threads.
    */
   async getConversationHistory(
     user1: string,
     user2: string,
+    programmeId?: string,
   ): Promise<Message[]> {
+    // If programmeId is missing or an empty string, explicitly check for IsNull()
+    const programmeCondition = programmeId ? { id: programmeId } : IsNull();
+
     return await this.messageRepo.find({
       where: [
-        { sender: { id: user1 }, receiver: { id: user2 } },
-        { sender: { id: user2 }, receiver: { id: user1 } },
+        {
+          sender: { id: user1 },
+          receiver: { id: user2 },
+          programme: programmeCondition,
+        },
+        {
+          sender: { id: user2 },
+          receiver: { id: user1 },
+          programme: programmeCondition,
+        },
       ],
       order: { timestamp: 'ASC' },
       relations: [
@@ -101,13 +130,14 @@ export class InteractionsService {
         'receiver',
         'receiver.volunteer',
         'receiver.organization',
+        'programme',
       ],
     });
   }
 
   /**
-   * Strictly typed recent contacts fetcher for the Sidebar.
-   * Resolves the profile picture by checking user roles and associated tables.
+   * Fetches unique recent contacts grouped by Partner + Programme.
+   * This allows separated chat threads for different programmes with the same org.
    */
   async getRecentContacts(userId: string): Promise<RecentContact[]> {
     const messages = await this.messageRepo.find({
@@ -120,6 +150,7 @@ export class InteractionsService {
         'receiver',
         'receiver.volunteer',
         'receiver.organization',
+        'programme',
       ],
     });
 
@@ -127,24 +158,28 @@ export class InteractionsService {
 
     for (const msg of messages) {
       const partner = msg.sender.id === userId ? msg.receiver : msg.sender;
+      const progId = msg.programme?.id || 'general';
 
-      if (!contactsMap.has(partner.id)) {
+      const uniqueThreadKey = `${partner.id}_${progId}`;
+
+      if (!contactsMap.has(uniqueThreadKey)) {
         let profilePic: string | null = null;
 
-        // Drill down into sub-tables based on role
         if (partner.role === 'volunteer') {
           profilePic = partner.volunteer?.profile_picture_url ?? null;
         } else if (partner.role === 'organization') {
           profilePic = partner.organization?.profile_picture_url ?? null;
         }
 
-        contactsMap.set(partner.id, {
+        contactsMap.set(uniqueThreadKey, {
           partnerId: partner.id,
           username: partner.username,
           profilePic: profilePic,
           lastMessage: msg.content,
           timestamp: msg.timestamp,
           role: partner.role,
+          programmeId: msg.programme?.id ?? null,
+          programmeName: msg.programme?.title ?? 'General Inquiry',
         });
       }
     }
@@ -173,6 +208,7 @@ export class InteractionsService {
           content,
           sender: { id: senderId } as User,
           receiver: { id: receiverId } as User,
+          programme: { id: programmeId } as Programme,
         });
       }),
     );
@@ -205,7 +241,7 @@ export class InteractionsService {
 
   async findAll(): Promise<Message[]> {
     return await this.messageRepo.find({
-      relations: ['sender', 'receiver'],
+      relations: ['sender', 'receiver', 'programme'],
       order: { timestamp: 'ASC' },
     });
   }

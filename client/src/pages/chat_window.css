@@ -24,6 +24,10 @@
     align-items: center;
     padding-top: 12px;
     gap: 12px;
+    overflow-y: auto;
+    overflow-x: hidden !important; 
+    resize: none !important;        
+    user-select: none;
 }
 
 .profile-circle {
@@ -37,14 +41,24 @@
 .sidebar-profile-item {
     padding: 4px;
     cursor: pointer;
+    transition: opacity 0.2s;
+}
+
+.sidebar-profile-item:hover {
+    opacity: 0.8;
 }
 
 .sidebar-profile-item.active {
     border-bottom: 2px solid #ff8c42;
-    /* Changed color to match header */
     width: 80%;
     display: flex;
     justify-content: center;
+}
+
+.sidebar-empty {
+    font-size: 10px;
+    color: #ccc;
+    margin-top: 10px;
 }
 
 .chat-main {
@@ -57,7 +71,6 @@
     background-color: #ff8c42;
     color: white;
     padding: 8px 12px;
-    /* Slimmer padding */
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -67,6 +80,12 @@
     display: flex;
     align-items: center;
     gap: 8px;
+}
+
+.header-info-stack {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
 }
 
 .header-profile-pic {
@@ -80,7 +99,13 @@
 .header-name {
     font-weight: 500;
     font-size: 14px;
-    /* Reduced from 16px */
+    line-height: 1.2;
+}
+
+.header-prog-name {
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.9);
+    font-style: italic;
 }
 
 .header-close-btn {
@@ -95,7 +120,6 @@
 .chat-messages {
     flex-grow: 1;
     padding: 15px;
-    /* Reduced padding */
     overflow-y: auto;
     display: flex;
     flex-direction: column;
@@ -142,7 +166,6 @@
 .message-bubble p {
     margin: 0;
     font-size: 12.5px;
-    /* Reduced for smaller window */
     line-height: 1.4;
 }
 

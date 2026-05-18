@@ -3,9 +3,10 @@ import './manage_volunteer_application.css';
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router';
 import { GenericTable } from './Table';
-import { AiFillStar } from 'react-icons/ai';
+import { AiFillStar, AiOutlineMessage } from 'react-icons/ai';
 import { BiFilterAlt } from 'react-icons/bi';
 import { useAuth } from '../context/auth/useAuth';
+import { ChatWindow } from './ChatWindow';
 
 // --- Interfaces ---
 interface Skill { id: string; skill_name: string; }
@@ -25,7 +26,10 @@ interface VolunteerApplication {
         id: string;
         rating: number;
         resume_url: string | null;
-        user: { username: string };
+        user: {
+            id: string;
+            username: string
+        };
         skills: Skill[];
         interests: Interest[];
     };
@@ -51,6 +55,16 @@ export function ManageVolunteerApplicationPage() {
     const [loading, setLoading] = useState(true);
     const [selectedProgrammeId, setSelectedProgrammeId] = useState<string>('All');
     const [isFilterOpen, setIsFilterOpen] = useState(false);
+
+    // --- CHAT STATES FIXED ---
+    // Tracks both user context and specific programme context to prevent conversation leakages
+    const [isChatOpen, setIsChatOpen] = useState(false);
+    const [selectedVolunteer, setSelectedVolunteer] = useState<{
+        vId: string;
+        vName: string;
+        pId: string;
+        pTitle: string;
+    } | null>(null);
 
     const headers = ['Volunteer', 'Current skills', 'Current interests', 'Resume', 'Programme applied', 'Action'];
 
@@ -95,6 +109,17 @@ export function ManageVolunteerApplicationPage() {
         fetchData();
     }, [user?.id]);
 
+    // --- HANDLER CAPTURES COMPLETE THREAD DATA ---
+    const handleOpenChat = (vId: string, vName: string, pId: string, pTitle: string) => {
+        setSelectedVolunteer({
+            vId: vId,
+            vName: vName,
+            pId: pId,
+            pTitle: pTitle
+        });
+        setIsChatOpen(true);
+    };
+
     const filterOptions = useMemo(() => {
         const options = allProgrammes.map(prog => {
             const count = applications.filter(app => app.programme.id === prog.id).length;
@@ -118,9 +143,6 @@ export function ManageVolunteerApplicationPage() {
         return selected ? selected.title : 'Programme';
     }, [selectedProgrammeId, filterOptions]);
 
-    /**
-     * Updated: Approve becomes 'upcoming', Reject becomes 'rejected'
-     */
     const handleUpdateStatus = async (id: string, action: 'approve' | 'reject') => {
         const token = localStorage.getItem('token');
         const newStatus = action === 'approve' ? 'upcoming' : 'rejected';
@@ -139,7 +161,7 @@ export function ManageVolunteerApplicationPage() {
 
             if (response.ok) {
                 alert(`Application ${action === 'approve' ? 'Approved' : 'Rejected'}! Notification sent.`);
-                fetchData(); // Refresh list
+                fetchData();
             } else {
                 alert("Failed to update application status.");
             }
@@ -237,6 +259,19 @@ export function ManageVolunteerApplicationPage() {
                                     </td>
                                     <td className="col-action">
                                         <div className="action-buttons">
+                                            <button
+                                                className="chat-btn"
+                                                onClick={() => handleOpenChat(
+                                                    app.volunteer.user.id,
+                                                    app.volunteer.user.username,
+                                                    app.programme.id,
+                                                    app.programme.title
+                                                )}
+                                                style={{ backgroundColor: '#2196F3', color: 'white', padding: '5px 10px', borderRadius: '4px', border: 'none', display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer' }}
+                                            >
+                                                <AiOutlineMessage /> Chat
+                                            </button>
+
                                             <button className="approve-btn" onClick={() => handleUpdateStatus(app.id, 'approve')}>Approve</button>
                                             <button className="reject-btn" onClick={() => handleUpdateStatus(app.id, 'reject')}>Reject</button>
                                         </div>
@@ -247,6 +282,22 @@ export function ManageVolunteerApplicationPage() {
                     )}
                 </main>
             </div>
+
+            {/* --- CRITICAL UNIQUE COMPOSITE KEY APPLIED HERE --- */}
+            {isChatOpen && selectedVolunteer && (
+                <ChatWindow
+                    key={`${selectedVolunteer.vId}_${selectedVolunteer.pId}`}
+                    onClose={() => {
+                        setIsChatOpen(false);
+                        setSelectedVolunteer(null);
+                    }}
+                    senderId={user?.id || ""}
+                    receiverId={selectedVolunteer.vId}
+                    receiverName={selectedVolunteer.vName}
+                    programmeId={selectedVolunteer.pId}
+                    programmeName={selectedVolunteer.pTitle}
+                />
+            )}
         </div>
     );
 }

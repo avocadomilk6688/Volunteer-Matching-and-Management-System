@@ -76,10 +76,10 @@ const DraggableChatButton = ({ onClick }: { onClick: () => void }) => {
         setPosition({ x: newX, y: newY });
     }, [dragging]);
 
-    // Fixed: Properly typed for window event listener to avoid "any" error
+    // Fixed: Properly typed for window event listener (using Global MouseEvent)
     const handleMouseUp = useCallback((e: MouseEvent) => {
         setDragging(false);
-        // If movement is less than 5px, it's a click
+        // If movement is less than 5px, it's considered a click
         const moveX = Math.abs(e.clientX - startPos.current.x);
         const moveY = Math.abs(e.clientY - startPos.current.y);
         if (moveX < 5 && moveY < 5) {
@@ -419,8 +419,14 @@ export function VolunteerHomePage() {
             {/* Draggable Chat Button */}
             <DraggableChatButton onClick={() => setIsChatOpen(!isChatOpen)} />
 
-            {/* Conditionally Render Chat Window at Fixed Position */}
-            {isChatOpen && <ChatWindow onClose={() => setIsChatOpen(false)} />}
+            {/* Conditionally Render Chat Window at Fixed Position (handled by its own CSS) */}
+            {isChatOpen && (
+                <ChatWindow
+                    onClose={() => setIsChatOpen(false)}
+                    senderId={user?.id || ""}
+                    receiverId="" // Default receiver or system ID can go here
+                />
+            )}
         </div>
     );
 }

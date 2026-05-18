@@ -33,7 +33,6 @@ interface BackendResponse {
     total: number;
 }
 
-// --- NEW: Interface for the TagSelection props to remove 'any' ---
 interface TagSelectionProps {
     toggleTag: (item: TagItem, type: 'skill' | 'interest') => void;
     myTags: TagItem[];
@@ -51,7 +50,7 @@ const DraggableChatButton = ({ onClick }: { onClick: () => void }) => {
     });
     const [dragging, setDragging] = useState(false);
     const dragOffset = useRef({ x: 0, y: 0 });
-    const startPos = useRef({ x: 0, y: 0 }); // To detect click vs drag
+    const startPos = useRef({ x: 0, y: 0 });
 
     const handleMouseDown = (e: React.MouseEvent) => {
         setDragging(true);
@@ -75,10 +74,8 @@ const DraggableChatButton = ({ onClick }: { onClick: () => void }) => {
         setPosition({ x: newX, y: newY });
     }, [dragging]);
 
-    // Fixed: Properly typed for window event listener to avoid "any" error
     const handleMouseUp = useCallback((e: MouseEvent) => {
         setDragging(false);
-        // If movement is less than 5px, it's a click
         const moveX = Math.abs(e.clientX - startPos.current.x);
         const moveY = Math.abs(e.clientY - startPos.current.y);
         if (moveX < 5 && moveY < 5) {
@@ -135,7 +132,7 @@ export function ManageListingPage() {
     const [editingId, setEditingId] = useState<string | null>(null);
     const [isAdding, setIsAdding] = useState<boolean>(false);
     const [selectedImage, setSelectedImage] = useState<File | null>(null);
-    const [isChatOpen, setIsChatOpen] = useState(false); // State to toggle chat
+    const [isChatOpen, setIsChatOpen] = useState(false);
 
     const [rowData, setRowData] = useState({
         title: '',
@@ -299,7 +296,6 @@ export function ManageListingPage() {
                         <div className="loading-state">Loading...</div>
                     ) : (
                         <GenericTable headers={headers}>
-                            {/* --- ADD NEW ROW --- */}
                             {isAdding && (
                                 <tr className="adding-row">
                                     <td><input type="text" value={rowData.title} onChange={e => setRowData({ ...rowData, title: e.target.value })} /></td>
@@ -329,7 +325,6 @@ export function ManageListingPage() {
                                 </tr>
                             )}
 
-                            {/* --- LISTINGS ROWS --- */}
                             {listings.map((item) => (
                                 editingId === item.id ? (
                                     <tr key={item.id} className="editing-row">
@@ -390,16 +385,21 @@ export function ManageListingPage() {
                     )}
                 </main>
             </div>
-            {/* Draggable Chat Button */}
+
             <DraggableChatButton onClick={() => setIsChatOpen(!isChatOpen)} />
 
-            {/* Conditionally Render Chat Window at Fixed Position */}
-            {isChatOpen && <ChatWindow onClose={() => setIsChatOpen(false)} />}
+            {isChatOpen && (
+                <ChatWindow
+                    onClose={() => setIsChatOpen(false)}
+                    senderId={user?.id || ""}
+                    receiverId="" // Default empty, sidebar handles contact selection
+                />
+            )}
         </div>
     );
 }
 
-// --- SUB-COMPONENT
+// --- SUB-COMPONENT ---
 function TagSelection({ toggleTag, myTags, allTags, isOpen, setIsOpen, type }: TagSelectionProps) {
     return (
         <div className="tags-container">

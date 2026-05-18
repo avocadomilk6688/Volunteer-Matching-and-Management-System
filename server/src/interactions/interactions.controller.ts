@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Query } from '@nestjs/common';
 import { InteractionsService, RecentContact } from './interactions.service';
 import { QuestionAnswer } from './entities/question_answer.entity';
 import {
@@ -24,16 +24,25 @@ export class InteractionsController {
   }
 
   @Post('message')
-  createMessage(@Body() createMessageDto: CreateMessageDto) {
+  createMessage(
+    @Body() createMessageDto: CreateMessageDto & { programmeId?: string },
+  ) {
     return this.interactionsService.createMessage(createMessageDto);
   }
 
+  /**
+   * Fetches conversation history.
+   * Path: GET /interactions/history/USR1/USR2?programmeId=PROG1
+   */
   @Get('history/:user1/:user2')
-  async getHistory(@Param('user1') u1: string, @Param('user2') u2: string) {
-    return await this.interactionsService.getConversationHistory(u1, u2);
+  async getHistory(
+    @Param('user1') u1: string,
+    @Param('user2') u2: string,
+    @Query('programmeId') pId?: string,
+  ) {
+    return await this.interactionsService.getConversationHistory(u1, u2, pId);
   }
 
-  // Updated to include the explicit return type
   @Get('contacts/:userId')
   async getContacts(@Param('userId') userId: string): Promise<RecentContact[]> {
     return await this.interactionsService.getRecentContacts(userId);

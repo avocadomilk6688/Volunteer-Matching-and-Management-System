@@ -49,39 +49,48 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   /**
    * For 1-on-1 Active Chat Windows.
-   * Joins a room shared by two specific users (e.g., "USR001_USR002").
+   * FIX: Joins a room shared by two specific users AND isolated by a specific programme ID (e.g., "USR001_USR002_PROG001").
    */
   @SubscribeMessage('join_chat_session')
   handleJoinChat(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: { senderId: string; receiverId: string },
+    @MessageBody()
+    data: { senderId: string; receiverId: string; programmeId?: string },
   ) {
-    const roomId = [data.senderId, data.receiverId].sort().join('_');
+    const progId = data.programmeId || 'general';
+    const roomId =
+      [data.senderId, data.receiverId].sort().join('_') + `_${progId}`;
+
     client.join(roomId);
-    console.log(`Chat session started in room: ${roomId}`);
+    console.log(`Chat session started in isolated room: ${roomId}`);
   }
 
   /**
    * Standard 1-on-1 Messaging.
+   * FIX: Accepts the extra `programmeId` property to ensure database saving and socket grouping accuracy.
    */
   @SubscribeMessage('send_message')
-  async handleMessage(@MessageBody() dto: CreateMessageDto) {
+  async handleMessage(
+    @MessageBody() dto: CreateMessageDto & { programmeId?: string },
+  ) {
     try {
-      // 1. Save to DB using existing service method
+      // 1. Save to DB - passing the full dto object (which now includes programmeId)
       const savedMsg = await this.interactionsService.createMessage(dto);
 
-      // 2. Identify the private chat room
-      const roomId = [dto.senderId, dto.receiverId].sort().join('_');
+      // 2. Identify the isolated chat room using user combinations and programme context
+      const progId = dto.programmeId || 'general';
+      const roomId =
+        [dto.senderId, dto.receiverId].sort().join('_') + `_${progId}`;
 
-      // 3. Emit to the shared chat room (for the active chat window)
+      // 3. Emit to the shared chat room (for the active chat window stream)
       this.server.to(roomId).emit('receive_message', savedMsg);
 
-      // 4. Also emit directly to the receiver's private ID room
-      // (in case they don't have the specific chat window open yet)
+      // 4. Also emit directly to the receiver's private ID room for notifications
       this.server.to(dto.receiverId).emit('new_notification', {
         type: 'CHAT',
         from: dto.senderId,
         content: dto.content,
+        programmeId: dto.programmeId || null,
       });
     } catch (error) {
       console.error('Error in send_message:', error);
