@@ -94,7 +94,7 @@ export function ManageUserAccountPage() {
                 <aside className="admin-sidebar">
                     <nav>
                         <ul>
-                            <li className={location.pathname === '/admin/manage-users' || location.pathname === '/manage-users' ? 'active' : ''} onClick={() => navigate('/manage-users')}>
+                            <li className={location.pathname === '/admin/manage-users-account' || location.pathname === '/manage-users' ? 'active' : ''} onClick={() => navigate('/manage-users')}>
                                 Manage user account
                             </li>
                             <li className={location.pathname === '/admin/verify-orgs' ? 'active' : ''} onClick={() => navigate('/admin/verify-orgs')}>
