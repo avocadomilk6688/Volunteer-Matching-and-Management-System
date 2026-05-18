@@ -1,0 +1,188 @@
+/* --- Common Admin Layout Baseline Architecture --- */
+.admin-dashboard-wrapper {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    background-color: #ffffff;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+.admin-dashboard-container {
+    display: flex;
+    flex: 1;
+}
+
+/* --- Left Solid Block Theme Navigation Control Track --- */
+.admin-sidebar {
+    width: 280px;
+    background-color: #FF8C42;
+    min-height: calc(100vh - 70px);
+    padding-top: 40px;
+    box-sizing: border-box;
+}
+
+.admin-sidebar ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.admin-sidebar ul li {
+    padding: 16px 24px;
+    color: #ffffff;
+    font-size: 1.15rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.admin-sidebar ul li:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.admin-sidebar ul li.active {
+    background-color: rgba(255, 255, 255, 0.2);
+    font-weight: 700;
+    border-left: 6px solid #ffffff;
+    padding-left: 18px;
+}
+
+/* --- Main View Content Space Sheet --- */
+.admin-main-content {
+    flex: 1;
+    padding: 50px 40px;
+    background-color: #ffffff;
+    box-sizing: border-box;
+    overflow-x: auto;
+}
+
+.admin-main-title {
+    font-size: 2.8rem;
+    font-weight: 800;
+    color: #000000;
+    margin: 0 0 35px 0;
+    letter-spacing: -0.5px;
+}
+
+/* --- Search Toolbar Construction Row --- */
+.admin-action-toolbar.text-left-only {
+    display: flex;
+    justify-content: flex-start;
+    margin-bottom: 45px;
+}
+
+.admin-search-box-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+    width: 410px;
+}
+
+.admin-search-input {
+    width: 100%;
+    padding: 11px 45px 11px 16px;
+    font-size: 1.1rem;
+    border: 2px solid #000000;
+    border-radius: 0px;
+    /* Sharp wireframe box corners strictly matched to image */
+    outline: none;
+    box-sizing: border-box;
+}
+
+.admin-search-icon {
+    position: absolute;
+    right: 14px;
+    font-size: 1.6rem;
+    color: #000000;
+    cursor: pointer;
+}
+
+/* --- Relational Generic Data Table Variations --- */
+.custom-table-container {
+    width: 100%;
+    margin-top: 10px;
+}
+
+.custom-table {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: left;
+    font-size: 1rem;
+}
+
+.custom-table th {
+    background-color: #FF8C42;
+    color: #ffffff;
+    padding: 14px 16px;
+    font-weight: 600;
+    font-size: 1.05rem;
+}
+
+.custom-table td {
+    padding: 24px 16px;
+    border-bottom: 1px solid #eef2f5;
+    color: #333333;
+    line-height: 1.45;
+    vertical-align: top;
+    /* Standardized description box dropdown structure */
+}
+
+.admin-cell-listing-title {
+    font-weight: 500;
+    color: #000000;
+    width: 240px;
+}
+
+.admin-cell-listing-org {
+    width: 220px;
+    color: #444444;
+}
+
+.admin-cell-listing-description {
+    max-width: 480px;
+    text-align: justify;
+    color: #555555;
+    padding-right: 25px !important;
+}
+
+.admin-image-filename-link {
+    color: #000000;
+    text-decoration: underline;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+/* --- Destruction Control Layout Element Button --- */
+.admin-cell-action {
+    width: 120px;
+}
+
+.admin-remove-listing-btn {
+    width: 100%;
+    padding: 9px 16px;
+    background-color: #FF8C42;
+    color: #ffffff;
+    border: none;
+    font-weight: 600;
+    font-size: 0.95rem;
+    border-radius: 0px;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+
+.admin-remove-listing-btn:hover {
+    background-color: #e5762d;
+}
+
+.admin-loading-placeholder,
+.admin-empty-table-fallback {
+    padding: 50px;
+    text-align: center;
+    font-size: 1.2rem;
+    color: #666666;
+    font-style: italic;
+}
