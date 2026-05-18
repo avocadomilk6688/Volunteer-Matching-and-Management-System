@@ -13,6 +13,7 @@ import { ManageVolunteerApplicationPage } from './pages/ManageVolunteerApplicati
 import { ManageUserAccountPage } from './pages/ManageUserAccountPage';
 import { VerifyOrganizationRegistrationPage } from './pages/VerifyOrganizationRegistrationPage';
 import { AdminManageListingPage } from './pages/AdminManageListingPage';
+import { AdminManageQAPage } from './pages/AdminManageQAPage';
 
 function App() {
   return (
@@ -32,6 +33,7 @@ function App() {
         <Route path="manage-user-account" element={<ManageUserAccountPage />} />
         <Route path="verify-organization-registration" element={<VerifyOrganizationRegistrationPage />} />
         <Route path="admin-manage-listing" element={<AdminManageListingPage />} />
+        <Route path="admin-manage-qa" element={<AdminManageQAPage />} />
       </Routes>
     </AuthProvider>
   )
