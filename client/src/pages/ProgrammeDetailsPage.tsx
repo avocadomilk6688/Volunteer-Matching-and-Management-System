@@ -97,7 +97,7 @@ export function ProgrammeDetailsPage() {
     const [showChatWindow, setShowChatWindow] = useState(false);
     const resumeInputRef = useRef<HTMLInputElement>(null);
 
-    // --- NEW: STATE FOR THREAD SPECIFIC UNREAD NOTIFICATION BADGE ---
+    // --- STATE FOR THREAD SPECIFIC UNREAD NOTIFICATION BADGE ---
     const [hasUnread, setHasUnread] = useState(false);
 
     const formatFileName = (url: string) => {
@@ -166,7 +166,7 @@ export function ProgrammeDetailsPage() {
         initLoad();
     }, [programmeId, user?.id]);
 
-    // --- NEW: BACKGROUND MESSAGE NOTIFICATION LISTENER ---
+    // --- BACKGROUND MESSAGE NOTIFICATION LISTENER ---
     useEffect(() => {
         if (!user?.id || !programme?.organization?.user?.id || !programmeId) return;
 
@@ -212,6 +212,36 @@ export function ProgrammeDetailsPage() {
         } catch (error: unknown) {
             console.error("Save error:", error);
             alert("Failed to update save status.");
+        }
+    };
+
+    // --- SYSTEM INCIDENT REPORT DISPATCH HANDLER ---
+    const handleReportProgramme = async () => {
+        if (!user) {
+            alert("Please log in to report this listing.");
+            return;
+        }
+
+        const isConfirmed = window.confirm(`Are you sure you want to report the programme listing "${programme?.title}" to the system administrator?`);
+        if (!isConfirmed) return;
+
+        try {
+            const token = localStorage.getItem('token');
+            const reportPayload = {
+                type: 'programme_report',
+                content: `Emergency Incident Report: The volunteer "${user.username || 'Anonymous'}" has filed a formal safety complaint against the programme listing titled "${programme?.title}" (ID: ${programmeId}). Please evaluate immediately.`,
+                programmeId: programmeId
+            };
+
+            // FIX: Target your active base controller endpoint mapping layout directly
+            await axios.post(`${API_BASE_URL}/interactions/notification`, reportPayload, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+
+            alert("Thank you. Your report has been securely dispatched to the system administrators for processing.");
+        } catch (error: unknown) {
+            console.error("Failed to submit system report log:", error);
+            alert("Your ticket could not be dispatched automatically. Please contact our system support desk directly.");
         }
     };
 
@@ -280,12 +310,11 @@ export function ProgrammeDetailsPage() {
                     <div className="header-row">
                         <div className="programme-name">{programme.title}</div>
                         <div className="tool-bar">
-                            {/* --- CHAT BUTTON RECONFIGURED WITH ABSOLUTE RED DOT BADGE --- */}
                             <button
                                 className="chat-button"
                                 onClick={() => {
                                     setShowChatWindow(true);
-                                    setHasUnread(false); // Clear notification instantly on display
+                                    setHasUnread(false);
                                 }}
                                 style={{ position: 'relative' }}
                             >
@@ -324,7 +353,7 @@ export function ProgrammeDetailsPage() {
                                 )}
                             </div>
 
-                            <AiOutlineFlag className="report-button" />
+                            <AiOutlineFlag className="report-button" onClick={handleReportProgramme} style={{ cursor: 'pointer' }} />
                         </div>
                     </div>
 
@@ -442,7 +471,6 @@ export function ProgrammeDetailsPage() {
                 </div>
             )}
 
-            {/* Dynamic Chat Window integration with unique structural Key isolation context */}
             {showChatWindow && (
                 <ChatWindow
                     key={`${programme.organization.user.id}_${programme.id}`}

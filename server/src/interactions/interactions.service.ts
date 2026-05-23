@@ -1,6 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, IsNull } from 'typeorm'; // FIX: Imported IsNull to handle strict separation
+import { Repository, IsNull } from 'typeorm';
 
 // Entities
 import { Message } from './entities/message.entity';
@@ -24,7 +24,6 @@ import {
 // Utils
 import { generateCustomId } from '../common/utils/id_generator.util';
 
-// --- Interface for Frontend Recent Contacts List ---
 export interface RecentContact {
   partnerId: string;
   username: string;
@@ -44,6 +43,9 @@ export class InteractionsService {
 
     @InjectRepository(Notification)
     private readonly notificationRepo: Repository<Notification>,
+
+    @InjectRepository(User)
+    private readonly userRepo: Repository<User>,
 
     @InjectRepository(QuestionAnswer)
     private readonly qaRepo: Repository<QuestionAnswer>,
@@ -73,11 +75,6 @@ export class InteractionsService {
   }
 
   // --- Messaging Logic ---
-
-  /**
-   * Creates a single message.
-   * Links to a programme if programmeId is provided in the request.
-   */
   async createMessage(
     dto: CreateMessageDto & { programmeId?: string },
   ): Promise<Message> {
@@ -88,7 +85,6 @@ export class InteractionsService {
       content: dto.content,
       sender: { id: dto.senderId } as User,
       receiver: { id: dto.receiverId } as User,
-      // Map the programme if it exists, otherwise keep it undefined for DeepPartial compatibility
       programme: dto.programmeId
         ? ({ id: dto.programmeId } as Programme)
         : undefined,
@@ -97,16 +93,11 @@ export class InteractionsService {
     return await this.messageRepo.save(newMessage);
   }
 
-  /**
-   * Fetches history filtered by both users AND the specific programme.
-   * FIX: Uses IsNull() to cleanly isolate general conversations from project-bound threads.
-   */
   async getConversationHistory(
     user1: string,
     user2: string,
     programmeId?: string,
   ): Promise<Message[]> {
-    // If programmeId is missing or an empty string, explicitly check for IsNull()
     const programmeCondition = programmeId ? { id: programmeId } : IsNull();
 
     return await this.messageRepo.find({
@@ -135,10 +126,6 @@ export class InteractionsService {
     });
   }
 
-  /**
-   * Fetches unique recent contacts grouped by Partner + Programme.
-   * This allows separated chat threads for different programmes with the same org.
-   */
   async getRecentContacts(userId: string): Promise<RecentContact[]> {
     const messages = await this.messageRepo.find({
       where: [{ sender: { id: userId } }, { receiver: { id: userId } }],
@@ -217,7 +204,7 @@ export class InteractionsService {
     return { participantUserIds, messages };
   }
 
-  // --- General Interactions ---
+  // --- General Interactions & Relational Notification Logic ---
   async createRating(dto: CreateRatingDto): Promise<string> {
     const id = await generateCustomId(this.ratingRepo, 'R');
     const newRating = this.ratingRepo.create({ id, ...dto });
@@ -225,11 +212,71 @@ export class InteractionsService {
     return `Rating ${id} submitted successfully`;
   }
 
-  async createNotification(dto: CreateNotificationDto): Promise<string> {
-    const id = await generateCustomId(this.notificationRepo, 'N');
-    const newNotification = this.notificationRepo.create({ id, ...dto });
-    await this.notificationRepo.save(newNotification);
-    return `Notification ${id} created`;
+  /**
+   * Safe Notification dispatch handler tailored to your specific User relational entity setup.
+   * Cleans string artifacts and saves entities sequentially to fully eliminate key assignment race conditions.
+   */
+  async createNotification(
+    dto: CreateNotificationDto & { type?: string; receiverId?: string },
+  ): Promise<any> {
+    // 1. Sanitize 'NNaN' text anomalies sent over from frontend mutations
+    let cleanedContent = dto.content;
+    if (cleanedContent && cleanedContent.startsWith('NNaN')) {
+      cleanedContent = cleanedContent.replace(/^NNaN/, '');
+    }
+
+    // 2. Multi-Admin Broadcast Logic path
+    if (dto.type === 'programme_report' || !dto.receiverId) {
+      const administrators = await this.userRepo.find({
+        where: { role: 'admin' },
+      });
+
+      if (administrators.length === 0) {
+        console.warn(
+          'Broadcast canceled: No admin rows detected in user repository.',
+        );
+        return { success: false, message: 'No administrative accounts found.' };
+      }
+
+      // --- FIXED: Process admin rows in sequence to stop generateCustomId overlapping duplicates ---
+      for (const admin of administrators) {
+        const customId = await generateCustomId(this.notificationRepo, 'NOT');
+
+        const notif = this.notificationRepo.create({
+          id: customId,
+          content: cleanedContent,
+          receiver: admin,
+        });
+        notif.createdAt = new Date();
+
+        // Must await save directly within iteration loop to lock ID state before creating the next row
+        await this.notificationRepo.save(notif);
+      }
+
+      return `Notification broadcasted to ${administrators.length} administrators successfully`;
+    }
+
+    // 3. Fallback path for normal single target row notifications
+    const singleCustomId = await generateCustomId(this.notificationRepo, 'NOT');
+
+    const targetUser = await this.userRepo.findOne({
+      where: { id: dto.receiverId },
+    });
+    if (!targetUser) {
+      throw new NotFoundException(
+        `Notification target user with ID ${dto.receiverId} not found`,
+      );
+    }
+
+    const standaloneNotification = this.notificationRepo.create({
+      id: singleCustomId,
+      content: cleanedContent,
+      receiver: targetUser,
+    });
+    standaloneNotification.createdAt = new Date();
+
+    await this.notificationRepo.save(standaloneNotification);
+    return `Notification ${singleCustomId} created`;
   }
 
   async createSupportTicket(dto: CreateSupportTicketDto): Promise<string> {
