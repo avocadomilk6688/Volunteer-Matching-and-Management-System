@@ -9,7 +9,7 @@ import { useNavigate } from 'react-router';
 import axios from 'axios';
 import { useAuth } from '../context/auth/useAuth';
 import { ChatWindow } from './ChatWindow';
-import { socket } from '../services/socket'; // Import socket instance directly
+import { socket } from '../services/socket';
 
 // --- Constants ---
 const API_BASE_URL = "http://localhost:3000";
@@ -45,7 +45,7 @@ const DateBox = forwardRef<HTMLDivElement, DateBoxProps>(({ value, onClick, plac
     </div>
 ));
 
-// --- Draggable Chat Button Sub-Component (UPDATED WITH UNREAD STATE) ---
+// --- Draggable Chat Button Sub-Component ---
 const DraggableChatButton = ({ onClick, hasUnread }: { onClick: () => void; hasUnread: boolean }) => {
     const [position, setPosition] = useState({
         x: window.innerWidth - 120,
@@ -54,15 +54,6 @@ const DraggableChatButton = ({ onClick, hasUnread }: { onClick: () => void; hasU
     const [dragging, setDragging] = useState(false);
     const dragOffset = useRef({ x: 0, y: 0 });
     const startPos = useRef({ x: 0, y: 0 });
-
-    const handleMouseDown = (e: React.MouseEvent) => {
-        setDragging(true);
-        startPos.current = { x: e.clientX, y: e.clientY };
-        dragOffset.current = {
-            x: e.clientX - position.x,
-            y: e.clientY - position.y
-        };
-    };
 
     const handleMouseMove = useCallback((e: MouseEvent) => {
         if (!dragging) return;
@@ -86,6 +77,15 @@ const DraggableChatButton = ({ onClick, hasUnread }: { onClick: () => void; hasU
         }
     }, [onClick]);
 
+    const handleMouseDown = (e: React.MouseEvent) => {
+        setDragging(true);
+        startPos.current = { x: e.clientX, y: e.clientY };
+        dragOffset.current = {
+            x: e.clientX - position.x,
+            y: e.clientY - position.y
+        };
+    };
+
     useEffect(() => {
         if (dragging) {
             window.addEventListener('mousemove', handleMouseMove);
@@ -107,11 +107,10 @@ const DraggableChatButton = ({ onClick, hasUnread }: { onClick: () => void; hasU
             style={{
                 left: `${position.x}px`,
                 top: `${position.y}px`,
-                position: 'fixed' // Ensure proper relative context alignment
+                position: 'fixed'
             }}
         >
             <AiOutlineMessage />
-            {/* --- RED INDICATOR DOT --- */}
             {hasUnread && (
                 <span
                     className="chat-notification-dot"
@@ -142,8 +141,6 @@ export function VolunteerHomePage() {
     const [allSkills, setAllSkills] = useState<{ id: string, skill_name: string }[]>([]);
     const [allInterests, setAllInterests] = useState<{ id: string, interest_name: string }[]>([]);
     const [isChatOpen, setIsChatOpen] = useState(false);
-
-    // --- NEW: STATE FOR UNREAD MESSAGE INDICATOR ---
     const [hasUnread, setHasUnread] = useState(false);
 
     // --- Type-safe session storage helper ---
@@ -182,18 +179,16 @@ export function VolunteerHomePage() {
     const [totalPages, setTotalPages] = useState(1);
     const itemsPerPage = 6;
 
-    // --- NEW: BACKGROUND NOTIFICATION LISTENER EFFECT ---
+    // Background Notification Listener Effect
     useEffect(() => {
         if (!user?.id) return;
 
         if (!socket.connected) socket.connect();
 
-        // Join user's personal private room to receive background notifications
         socket.emit('join_private_room', { userId: user.id });
 
         const handleIncomingNotification = (data: { type: string, from: string }) => {
             console.log("DEBUG: Background notification received on home page:", data);
-            // Only toggle badge if the chat sidebar module is currently closed
             if (!isChatOpen) {
                 setHasUnread(true);
             }
@@ -206,7 +201,7 @@ export function VolunteerHomePage() {
         };
     }, [user?.id, isChatOpen]);
 
-    // --- SAVE TO SESSION STORAGE ---
+    // Save Filters To Session Storage
     const persistFilters = useCallback((page: number) => {
         sessionStorage.setItem('v_loc', JSON.stringify(selectedLocations));
         sessionStorage.setItem('v_skill', JSON.stringify(selectedSkills));
@@ -262,6 +257,14 @@ export function VolunteerHomePage() {
             setLoading(false);
         }
     };
+
+    // --- FIXED: AUTO-REFRESH ON DROPDOWN SELECTION STATUS CHANGE ---
+    useEffect(() => {
+        // Prevent premature fetching during initial page load sequences
+        if (allSkills.length > 0 || allInterests.length > 0) {
+            handleSearch(1);
+        }
+    }, [saveStatus]);
 
     const handleReset = () => {
         sessionStorage.clear();
@@ -460,16 +463,14 @@ export function VolunteerHomePage() {
                 </div>
             </div>
 
-            {/* Draggable Chat Button with notification logic */}
             <DraggableChatButton
                 onClick={() => {
                     setIsChatOpen(!isChatOpen);
-                    setHasUnread(false); // Automatically clear unread badge when chat window opens
+                    setHasUnread(false);
                 }}
                 hasUnread={hasUnread}
             />
 
-            {/* Conditionally Render Chat Window at Fixed Position */}
             {isChatOpen && (
                 <ChatWindow
                     onClose={() => setIsChatOpen(false)}

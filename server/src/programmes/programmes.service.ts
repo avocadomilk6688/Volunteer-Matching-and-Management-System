@@ -120,8 +120,23 @@ export class ProgrammesService {
       );
     }
 
-    if (saved === 'saved' && userId) {
-      query.andWhere('savedByUsers.id = :userId', { userId });
+    // --- FIXED: Added distinct branches for 'saved' versus 'not-saved' parameters ---
+    if (userId) {
+      if (saved === 'saved') {
+        query.andWhere('savedByUsers.id = :userId', { userId });
+      } else if (saved === 'not-saved') {
+        // Generates an isolated subquery tracking all elements saved by the authenticated session
+        const savedSubQuery = this.programmeRepo
+          .createQueryBuilder('subProg')
+          .select('subProg.id')
+          .leftJoin('subProg.saved_by', 'subSavedBy')
+          .where('subSavedBy.id = :userId', { userId });
+
+        // Excludes all corresponding entries using a clean sql NOT IN block statement
+        query.andWhere(`programme.id NOT IN (${savedSubQuery.getQuery()})`, {
+          userId,
+        });
+      }
     }
 
     if (skill) {
@@ -151,7 +166,6 @@ export class ProgrammesService {
     userId: string | null,
     filterDto: FilterProgrammeParams,
   ) {
-    // Scoring logic (Simplified call to findAll for this full code block)
     return this.findAll(filterDto);
   }
 

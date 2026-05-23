@@ -7,6 +7,7 @@
     justify-content: space-between;
     height: 80px;
     background-color: #FF8C42;
+    z-index: 999;
 }
 
 .header-container .header-logo {
