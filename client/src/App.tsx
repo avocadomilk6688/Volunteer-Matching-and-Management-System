@@ -16,6 +16,7 @@ import { AdminManageListingPage } from './pages/AdminManageListingPage';
 import { AdminManageQAPage } from './pages/AdminManageQAPage';
 import { AdminManageTicketsPage } from './pages/AdminManageTicketsPage';
 import { OrganizationVerificationPage } from './pages/OrganizationVerificationPage';
+import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
 
 function App() {
   return (
@@ -38,6 +39,7 @@ function App() {
         <Route path="manage-qa" element={<AdminManageQAPage />} />
         <Route path="manage-tickets" element={<AdminManageTicketsPage />} />
         <Route path="organization-verification" element={<OrganizationVerificationPage />} />
+        <Route path="forgot-password" element={<ForgotPasswordPage />} />
       </Routes>
     </AuthProvider>
   )

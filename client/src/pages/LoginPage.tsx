@@ -117,7 +117,9 @@ export function LoginPage() {
                         </div>
                         <button type="submit" className="login-button">Login</button>
                     </form>
-                    <a className="forgot-password" href="#">Forgot password</a>
+
+                    <Link className="forgot-password" to="/forgot-password">Forgot password</Link>
+
                     <p className="sign-up">Don't have an account? <Link to="/sign-up">Sign Up</Link></p>
                 </div>
             </div>
