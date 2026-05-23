@@ -107,19 +107,19 @@ export function AdminManageTicketsPage() {
                 <aside className="admin-sidebar">
                     <nav>
                         <ul>
-                            <li className={location.pathname === '/manage-users' ? 'active' : ''} onClick={() => navigate('/manage-users')}>
+                            <li className={location.pathname === '/manage-user-account' ? 'active' : ''} onClick={() => navigate('/manage-user-account')}>
                                 Manage user account
                             </li>
-                            <li className={location.pathname === '/verify-orgs' ? 'active' : ''} onClick={() => navigate('/verify-orgs')}>
+                            <li className={location.pathname === '/verify-organization-registration' ? 'active' : ''} onClick={() => navigate('/verify-organization-registration')}>
                                 Verify organization registration
                             </li>
-                            <li className={location.pathname === '/manage-listings' ? 'active' : ''} onClick={() => navigate('/manage-listings')}>
+                            <li className={location.pathname === '/admin-manage-listing' ? 'active' : ''} onClick={() => navigate('/admin-manage-listing')}>
                                 Manage listing
                             </li>
                             <li className={location.pathname === '/manage-qa' ? 'active' : ''} onClick={() => navigate('/manage-qa')}>
                                 Manage Q&A section
                             </li>
-                            <li className={location.pathname === '/admin/manage-tickets' || location.pathname === '/manage-tickets' ? 'active' : ''} onClick={() => navigate('/manage-tickets')}>
+                            <li className={location.pathname === '/manage-tickets' || location.pathname === '/manage-tickets' ? 'active' : ''} onClick={() => navigate('/manage-tickets')}>
                                 Manage support ticket
                             </li>
                         </ul>

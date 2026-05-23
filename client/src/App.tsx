@@ -34,8 +34,8 @@ function App() {
         <Route path="manage-user-account" element={<ManageUserAccountPage />} />
         <Route path="verify-organization-registration" element={<VerifyOrganizationRegistrationPage />} />
         <Route path="admin-manage-listing" element={<AdminManageListingPage />} />
-        <Route path="admin-manage-qa" element={<AdminManageQAPage />} />
-        <Route path="admin-manage-tickets" element={<AdminManageTicketsPage />} />
+        <Route path="manage-qa" element={<AdminManageQAPage />} />
+        <Route path="manage-tickets" element={<AdminManageTicketsPage />} />
       </Routes>
     </AuthProvider>
   )

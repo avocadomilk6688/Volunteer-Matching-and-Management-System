@@ -98,24 +98,24 @@ export function AdminManageQAPage() {
         <div className="admin-dashboard-wrapper">
             <Header />
             <div className="admin-dashboard-container">
-                
+
                 {/* Left navigation sidebar matching architectural design layout layout standards */}
                 <aside className="admin-sidebar">
                     <nav>
                         <ul>
-                            <li className={location.pathname === '/manage-users' ? 'active' : ''} onClick={() => navigate('/manage-users')}>
+                            <li className={location.pathname === '/manage-user-account' ? 'active' : ''} onClick={() => navigate('/manage-user-account')}>
                                 Manage user account
                             </li>
-                            <li className={location.pathname === '/verify-orgs' ? 'active' : ''} onClick={() => navigate('/verify-orgs')}>
+                            <li className={location.pathname === '/verify-organization-registration' ? 'active' : ''} onClick={() => navigate('/verify-organization-registration')}>
                                 Verify organization registration
                             </li>
-                            <li className={location.pathname === '/manage-listings' ? 'active' : ''} onClick={() => navigate('/manage-listings')}>
+                            <li className={location.pathname === '/admin-manage-listing' ? 'active' : ''} onClick={() => navigate('/admin-manage-listing')}>
                                 Manage listing
                             </li>
-                            <li className={location.pathname === '/admin/manage-qa' || location.pathname === '/manage-qa' ? 'active' : ''} onClick={() => navigate('/manage-qa')}>
+                            <li className={location.pathname === '/manage-qa' || location.pathname === '/manage-qa' ? 'active' : ''} onClick={() => navigate('/manage-qa')}>
                                 Manage Q&A section
                             </li>
-                            <li className={location.pathname === '/admin/manage-tickets' ? 'active' : ''} onClick={() => navigate('/admin/manage-tickets')}>
+                            <li className={location.pathname === '/manage-tickets' ? 'active' : ''} onClick={() => navigate('/manage-tickets')}>
                                 Manage support ticket
                             </li>
                         </ul>
@@ -145,13 +145,13 @@ export function AdminManageQAPage() {
                                         <td className="admin-cell-qa-category">{row.category}</td>
                                         <td className="admin-cell-qa-actions">
                                             <div className="admin-qa-btn-group">
-                                                <button 
+                                                <button
                                                     className="admin-modify-qa-btn"
                                                     onClick={() => handleModify(row.id)}
                                                 >
                                                     Modify
                                                 </button>
-                                                <button 
+                                                <button
                                                     className="admin-delete-qa-btn"
                                                     onClick={() => handleDeleteQA(row.id, row.question)}
                                                 >

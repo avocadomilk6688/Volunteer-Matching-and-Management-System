@@ -94,19 +94,19 @@ export function ManageUserAccountPage() {
                 <aside className="admin-sidebar">
                     <nav>
                         <ul>
-                            <li className={location.pathname === '/admin/manage-users-account' || location.pathname === '/manage-users' ? 'active' : ''} onClick={() => navigate('/manage-users')}>
+                            <li className={location.pathname === '/manage-users-account' || location.pathname === '/manage-users' ? 'active' : ''} onClick={() => navigate('/manage-users')}>
                                 Manage user account
                             </li>
-                            <li className={location.pathname === '/admin/verify-orgs' ? 'active' : ''} onClick={() => navigate('/admin/verify-orgs')}>
+                            <li className={location.pathname === '/verify-organization-registration' ? 'active' : ''} onClick={() => navigate('/verify-organization-registration')}>
                                 Verify organization registration
                             </li>
-                            <li className={location.pathname === '/admin/manage-listings' ? 'active' : ''} onClick={() => navigate('/admin/manage-listings')}>
+                            <li className={location.pathname === '/admin-manage-listing' ? 'active' : ''} onClick={() => navigate('/admin-manage-listing')}>
                                 Manage listing
                             </li>
-                            <li className={location.pathname === '/admin/manage-qa' ? 'active' : ''} onClick={() => navigate('/admin/manage-qa')}>
+                            <li className={location.pathname === '/manage-qa' ? 'active' : ''} onClick={() => navigate('/manage-qa')}>
                                 Manage Q&A section
                             </li>
-                            <li className={location.pathname === '/admin/manage-tickets' ? 'active' : ''} onClick={() => navigate('/admin/manage-tickets')}>
+                            <li className={location.pathname === '/manage-tickets' ? 'active' : ''} onClick={() => navigate('/manage-tickets')}>
                                 Manage support ticket
                             </li>
                         </ul>
