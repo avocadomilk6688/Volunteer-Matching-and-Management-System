@@ -45,8 +45,12 @@ export function SignUpPage() {
 
             login(data.access_token || 'session_active', data.email);
 
+            // --- FIXED: REDIRECTION RULES FOR ROLES OPTIMIZED HERE ---
             if (role === "volunteer") {
                 navigate('/volunteer-home');
+            } else if (role === "organization") {
+                // Smoothly route them to your newly created verification layout
+                navigate('/organization-verification');
             } else {
                 alert('Coming soon.');
             }
