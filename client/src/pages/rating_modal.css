@@ -1,0 +1,208 @@
+/* Background Dimming Layer Overlay */
+.modal-portal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.4);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 2000;
+}
+
+/* Central Card Box Layout Container */
+.rating-modal-container {
+    background-color: #ffffff;
+    width: 100%;
+    max-width: 680px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    overflow: hidden;
+    font-family: 'Inter', sans-serif;
+}
+
+/* Orange Head Title Section */
+.rating-modal-header {
+    background-color: #FF8C42;
+    padding: 24px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+}
+
+.rating-modal-header h2 {
+    color: #ffffff;
+    margin: 0;
+    font-size: 28px;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+}
+
+.modal-close-icon-btn {
+    position: absolute;
+    right: 20px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: #ffffff;
+    font-size: 28px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+}
+
+.rating-modal-body {
+    padding: 35px 40px;
+}
+
+/* Dynamic Star List Row Styles */
+.stars-interactive-row {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+}
+
+.star-wrapper {
+    cursor: pointer;
+}
+
+.star-filled {
+    color: #FF8C42;
+}
+
+.star-empty {
+    color: #FF8C42;
+}
+
+/* --- IMAGE 1: ORG STYLING ELEMENTS --- */
+.org-rating-layout {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 25px;
+}
+
+.batch-rating-row {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.batch-label-text {
+    font-size: 22px;
+    font-weight: 500;
+    color: #000000;
+}
+
+.small-stars {
+    font-size: 26px;
+}
+
+.search-box-wrapper {
+    width: 100%;
+    max-width: 400px;
+}
+
+.search-input-field {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.search-input-field input {
+    width: 100%;
+    height: 40px;
+    border: 1px solid #000000;
+    padding: 0 40px 0 12px;
+    font-size: 16px;
+    color: #333333;
+    outline: none;
+}
+
+.search-input-field input::placeholder {
+    color: #8c8c8c;
+}
+
+.search-glass-icon {
+    position: absolute;
+    right: 12px;
+    font-size: 22px;
+    color: #000000;
+    pointer-events: none;
+}
+
+.no-result-placeholder {
+    margin: 15px 0;
+}
+
+.no-result-placeholder p {
+    font-size: 16px;
+    color: #000000;
+    margin: 0;
+}
+
+/* --- IMAGE 2: VOLUNTEER STYLING ELEMENTS --- */
+.volunteer-rating-layout {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 30px;
+    margin-bottom: 10px;
+}
+
+.target-profile-header {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.profile-circle-placeholder {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background-color: #d9d9d9;
+    background-size: cover;
+    background-position: center;
+}
+
+.target-profile-name {
+    font-size: 32px;
+    font-weight: 500;
+    color: #000000;
+}
+
+.large-stars {
+    font-size: 65px;
+    /* Large stars matching screenshot 2 */
+    gap: 14px;
+}
+
+/* --- UNIFIED BOTTOM UTILITY ACTIONS --- */
+.modal-submit-row {
+    display: flex;
+    justify-content: center;
+    margin-top: 30px;
+}
+
+.modal-orange-submit-btn {
+    background-color: #FF8C42;
+    color: #ffffff;
+    border: none;
+    font-size: 16px;
+    font-weight: 500;
+    padding: 10px 45px;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.modal-orange-submit-btn:hover {
+    background-color: #e07632;
+}
+
+.modal-orange-submit-btn:disabled {
+    background-color: #ffbf94;
+    cursor: not-allowed;
+}
