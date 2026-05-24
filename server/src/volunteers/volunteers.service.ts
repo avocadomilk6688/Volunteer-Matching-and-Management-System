@@ -21,7 +21,7 @@ export interface LocalMulterFile {
   filename: string;
 }
 
-// --- FIXED: Updated structural layout contract to align perfectly with frontend expectations ---
+// --- Define an Interface for the Update Payload ---
 export interface VolunteerHistory {
   rating: number;
   totalHours: number;
@@ -171,11 +171,7 @@ export class VolunteersService {
     return await this.monthlyRepo.save(monthlyRecord);
   }
 
-  /**
-   * FIX: Rewritten to dynamically fetch matching nested relations and generate totalHours contributors sum metric
-   */
   async getHistory(id: string): Promise<VolunteerHistory | null> {
-    // 1. Fetch deep relational database tables using exact string paths matching entity maps
     const volunteer = await this.volRepo.findOne({
       where: { id },
       relations: [
@@ -183,12 +179,11 @@ export class VolunteersService {
         'applications.programme',
         'applications.programme.schedule',
         'applications.programme.organization',
-        'applications.programme.organization.user', // Brings along organization usernames cleanly
+        'applications.programme.organization.user',
       ],
     });
     if (!volunteer) return null;
 
-    // 2. Fetch log history records to calculate overall cumulative hours dynamically
     const logRecords = await this.monthlyRepo.find({
       where: { volunteer: { id } },
     });
@@ -198,7 +193,6 @@ export class VolunteersService {
       0,
     );
 
-    // 3. Return objects context retaining database models hierarchy
     return {
       rating: Number(volunteer.rating) || 0,
       totalHours: cumulativeHours,
@@ -206,7 +200,19 @@ export class VolunteersService {
     };
   }
 
+  /**
+   * Safe cascading removal of volunteer rows and referenced child rows
+   */
   async remove(id: string): Promise<{ deleted: boolean }> {
+    const volunteer = await this.volRepo.findOne({ where: { id } });
+    if (!volunteer) {
+      throw new NotFoundException(`Volunteer profile with ID ${id} not found`);
+    }
+
+    // 1. CLEAR DEPENDENCIES: Delete matching relational records in volunteer_monthly_point first
+    await this.monthlyRepo.delete({ volunteer: { id } });
+
+    // 2. Clear the main volunteer entity record row safely
     const result = await this.volRepo.delete(id);
     return { deleted: (result.affected ?? 0) > 0 };
   }

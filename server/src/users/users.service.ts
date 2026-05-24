@@ -1,10 +1,10 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from './entities/user.entity';
 import { Volunteer } from '../volunteers/entities/volunteer.entity';
 import { Admin } from './entities/admin.entity';
-import { Organization } from '../organizations/entities/organization.entity'; // Ensure this path is correct
+import { Organization } from '../organizations/entities/organization.entity';
 import { CreateUserDto } from './dto/create-user.dto';
 import { generateCustomId } from '../common/utils/id_generator.util';
 
@@ -20,7 +20,6 @@ export class UsersService {
     @InjectRepository(Admin)
     private readonly adminRepo: Repository<Admin>,
 
-    // ADDED: Inject the Organization repository
     @InjectRepository(Organization)
     private readonly organizationRepo: Repository<Organization>,
   ) {}
@@ -51,7 +50,6 @@ export class UsersService {
 
   async findAll() {
     return await this.userRepo.find({
-      // Fetching all relations so the frontend sees the profile_picture_url
       relations: ['volunteer', 'organization', 'admin'],
     });
   }
@@ -59,7 +57,6 @@ export class UsersService {
   async findOne(id: string) {
     return await this.userRepo.findOne({
       where: { id },
-      // Fetching all relations so the frontend sees the profile_picture_url
       relations: ['volunteer', 'organization', 'admin'],
     });
   }
@@ -70,14 +67,23 @@ export class UsersService {
   }
 
   async remove(id: string) {
-    // 1. Delete associated profile records first (Referential Integrity)
-    await this.volunteerRepo.delete(id);
-    await this.adminRepo.delete(id);
+    const user = await this.userRepo.findOne({ where: { id } });
+    if (!user) {
+      throw new NotFoundException(`User with ID ${id} not found.`);
+    }
 
-    // Based on DB structure, Organization uses 'userId' as the link
-    await this.organizationRepo.delete({ userId: id } as any);
+    // 1. Clear profile child tables safely using TypeORM relationship matching syntax
+    // instead of flat 'userId' strings to fix the EntityPropertyNotFoundError
+    if (user.role === 'volunteer') {
+      await this.volunteerRepo.delete(id);
+    } else if (user.role === 'admin') {
+      await this.adminRepo.delete(id);
+    } else if (user.role === 'organization') {
+      // --- FIXED: Uses TypeORM object relation notation syntax matching target user ids ---
+      await this.organizationRepo.delete({ user: { id } });
+    }
 
-    // 2. Finally, delete the main User record
+    // 2. Finally, remove the master User registry record row line item
     const result = await this.userRepo.delete(id);
 
     return { deleted: (result.affected ?? 0) > 0 };

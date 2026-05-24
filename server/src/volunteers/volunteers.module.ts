@@ -20,6 +20,6 @@ import { Application } from '../applications/entities/application.entity';
   ],
   controllers: [VolunteersController],
   providers: [VolunteersService],
-  exports: [VolunteersService],
+  exports: [VolunteersService], // Exposes service to UsersModule perfectly
 })
 export class VolunteersModule {}

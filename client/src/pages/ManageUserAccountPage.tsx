@@ -10,8 +10,13 @@ interface UserAccount {
     id: string;
     username: string;
     email: string;
-    contact_number: string;
-    role: 'Admin' | 'Volunteer' | 'Organization';
+    role: 'admin' | 'volunteer' | 'organization';
+    volunteer?: {
+        contact_number: string | null;
+    } | null;
+    organization?: {
+        contact_number: string | null;
+    } | null;
 }
 
 const API_BASE_URL = "http://localhost:3000";
@@ -25,26 +30,21 @@ export function ManageUserAccountPage() {
     const [searchTerm, setSearchTerm] = useState<string>('');
     const [loading, setLoading] = useState<boolean>(true);
 
-    // Mock fallbacks exactly matching your screenshot image to guarantee operational views out-of-the-box
-    const mockUsers: UserAccount[] = [
-        { id: 'U001', username: 'EcoGuardians Malaysia', email: 'contact@ecoguardians.my', contact_number: '03-12345678', role: 'Organization' },
-        { id: 'U002', username: 'WellCare Community Alliance', email: 'contact@wcalliance.my', contact_number: '03-99997777', role: 'Organization' },
-        { id: 'U003', username: 'Johnson', email: 'johnson@gmail.com', contact_number: '012-6666888', role: 'Volunteer' },
-        { id: 'U004', username: 'Maggie', email: 'maggie@gmail.com', contact_number: '019-8765432', role: 'Volunteer' },
-        { id: 'U005', username: 'Lydia', email: 'lydia@gmail.com', contact_number: '011-2223333', role: 'Volunteer' }
-    ];
-
     const fetchUsers = async () => {
         try {
             setLoading(true);
             const token = localStorage.getItem('token');
-            const response = await axios.get<UserAccount[]>(`${API_BASE_URL}/admin/users`, {
+
+            const response = await axios.get<UserAccount[]>(`${API_BASE_URL}/users`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
-            setUsers(response.data.length > 0 ? response.data : mockUsers);
+
+            // --- FIXED: Filter out admin records completely so they never show up ---
+            const nonAdminUsers = response.data.filter(user => user.role !== 'admin');
+            setUsers(nonAdminUsers);
         } catch (error) {
-            console.warn("Backend dynamic fetch omitted, resolving view via mockup data channels:", error);
-            setUsers(mockUsers);
+            console.error("Backend fetch failed, clearing table grid view:", error);
+            setUsers([]);
         } finally {
             setLoading(false);
         }
@@ -61,15 +61,16 @@ export function ManageUserAccountPage() {
 
         try {
             const token = localStorage.getItem('token');
-            await axios.delete(`${API_BASE_URL}/admin/users/${userId}`, {
+
+            await axios.delete(`${API_BASE_URL}/users/${userId}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
+
             alert("User account successfully removed.");
             fetchUsers();
         } catch (error) {
             console.error("Deletion error:", error);
-            // Local state cleanup fallback if backend path is unconfigured
-            setUsers(prev => prev.filter(u => u.id !== userId));
+            alert("Failed to complete account deletion process from server.");
         }
     };
 
@@ -77,10 +78,9 @@ export function ManageUserAccountPage() {
         navigate('/admin/create-user');
     };
 
-    // Client-side live parsing filter tracking keyword values typed inside the lookups input
     const filteredUsers = users.filter(acc =>
-        acc.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        acc.email.toLowerCase().includes(searchTerm.toLowerCase())
+        (acc.username?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+        (acc.email?.toLowerCase() || '').includes(searchTerm.toLowerCase())
     );
 
     const headers = ['Username', 'Email Address', 'Contact Number', 'Role', 'Action'];
@@ -90,11 +90,11 @@ export function ManageUserAccountPage() {
             <Header />
             <div className="admin-dashboard-container">
 
-                {/* Left navigation sidebar exactly mirroring screenshot layout context grid styles */}
+                {/* Left Navigation Sidebar */}
                 <aside className="admin-sidebar">
                     <nav>
                         <ul>
-                            <li className={location.pathname === '/manage-users-account' || location.pathname === '/manage-users' ? 'active' : ''} onClick={() => navigate('/manage-users')}>
+                            <li className={location.pathname === '/manage-user-account' || location.pathname === '/manage-users' ? 'active' : ''} onClick={() => navigate('/manage-user-account')}>
                                 Manage user account
                             </li>
                             <li className={location.pathname === '/verify-organization-registration' ? 'active' : ''} onClick={() => navigate('/verify-organization-registration')}>
@@ -117,7 +117,6 @@ export function ManageUserAccountPage() {
                 <main className="admin-main-content">
                     <h1 className="admin-main-title">Manage user account</h1>
 
-                    {/* Action execution and lookup toolkit panel track */}
                     <div className="admin-action-toolbar">
                         <div className="admin-search-box-wrapper">
                             <input
@@ -139,22 +138,30 @@ export function ManageUserAccountPage() {
                     ) : (
                         <GenericTable headers={headers}>
                             {filteredUsers.length > 0 ? (
-                                filteredUsers.map((row) => (
-                                    <tr key={row.id}>
-                                        <td className="admin-cell-username">{row.username}</td>
-                                        <td>{row.email}</td>
-                                        <td>{row.contact_number || 'N/A'}</td>
-                                        <td>{row.role}</td>
-                                        <td className="admin-cell-action">
-                                            <button
-                                                className="admin-delete-btn"
-                                                onClick={() => handleDeleteUser(row.id, row.username)}
-                                            >
-                                                Delete
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))
+                                filteredUsers.map((row) => {
+                                    const contactNumber = row.role === 'volunteer'
+                                        ? row.volunteer?.contact_number
+                                        : row.organization?.contact_number;
+
+                                    const renderedRole = row.role ? row.role.charAt(0).toUpperCase() + row.role.slice(1) : 'N/A';
+
+                                    return (
+                                        <tr key={row.id}>
+                                            <td className="admin-cell-username">{row.username}</td>
+                                            <td>{row.email}</td>
+                                            <td>{contactNumber || 'N/A'}</td>
+                                            <td>{renderedRole}</td>
+                                            <td className="admin-cell-action">
+                                                <button
+                                                    className="admin-delete-btn"
+                                                    onClick={() => handleDeleteUser(row.id, row.username)}
+                                                >
+                                                    Delete
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    );
+                                })
                             ) : (
                                 <tr>
                                     <td colSpan={5} className="admin-empty-table-fallback">
