@@ -7,6 +7,7 @@ import {
   Delete,
   Patch,
   NotFoundException,
+  InternalServerErrorException,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -25,7 +26,16 @@ export class UsersController {
 
   @Post('volunteer')
   async createVolunteer(@Body() createUserDto: CreateUserDto) {
-    return await this.usersService.createVolunteer(createUserDto);
+    try {
+      return await this.usersService.createVolunteer(createUserDto);
+    } catch (error: unknown) {
+      // --- FIXED: Prevented unsafe assignment of an error-typed value (ESLint) ---
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Unknown exception occurred during creation';
+      throw new InternalServerErrorException(message);
+    }
   }
 
   @Get('volunteer')
@@ -69,9 +79,7 @@ export class UsersController {
     } else if (user.role === 'volunteer') {
       // Look up if a volunteer profile row matches this user row sequence
       const volunteers = await this.volunteersService.findAll();
-      const associatedVolunteer = volunteers.find(
-        (vol) => vol.id === user.id || vol.id === user.id,
-      ); // Matches your PRI structure
+      const associatedVolunteer = volunteers.find((vol) => vol.id === user.id);
 
       if (associatedVolunteer) {
         await this.volunteersService.remove(associatedVolunteer.id);
@@ -83,7 +91,11 @@ export class UsersController {
   }
 
   @Patch(':id')
-  async update(@Param('id') id: string, @Body() updateDto: any) {
+  async update(
+    @Param('id') id: string,
+    @Body() updateDto: Record<string, unknown>,
+  ) {
+    // --- FIXED: Replaced 'any' with a explicit record mapping to fulfill strict compilation configs ---
     return await this.usersService.update(id, updateDto);
   }
 }

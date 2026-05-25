@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router';
 import { Header } from './Header';
 import { GenericTable } from './Table';
@@ -30,16 +30,23 @@ export function ManageUserAccountPage() {
     const [searchTerm, setSearchTerm] = useState<string>('');
     const [loading, setLoading] = useState<boolean>(true);
 
+    // --- Inline Table Add Row Feature States ---
+    const [isAdding, setIsAdding] = useState<boolean>(false);
+    const [rowData, setRowData] = useState({
+        username: '',
+        email: '',
+        password: '',
+        contact_number: '', // Optional input value path tracking field
+        role: 'volunteer' as 'volunteer' | 'organization'
+    });
+
     const fetchUsers = async () => {
         try {
             setLoading(true);
             const token = localStorage.getItem('token');
-
             const response = await axios.get<UserAccount[]>(`${API_BASE_URL}/users`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
-
-            // --- FIXED: Filter out admin records completely so they never show up ---
             const nonAdminUsers = response.data.filter(user => user.role !== 'admin');
             setUsers(nonAdminUsers);
         } catch (error) {
@@ -58,14 +65,11 @@ export function ManageUserAccountPage() {
         if (!window.confirm(`Are you sure you want to permanently delete the user account for "${targetUsername}"?`)) {
             return;
         }
-
         try {
             const token = localStorage.getItem('token');
-
             await axios.delete(`${API_BASE_URL}/users/${userId}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
-
             alert("User account successfully removed.");
             fetchUsers();
         } catch (error) {
@@ -74,8 +78,49 @@ export function ManageUserAccountPage() {
         }
     };
 
-    const handleAddUserRedirect = () => {
-        navigate('/admin/create-user');
+    const resetForm = () => {
+        setRowData({
+            username: '',
+            email: '',
+            password: '',
+            contact_number: '',
+            role: 'volunteer'
+        });
+        setIsAdding(false);
+    };
+
+    const handleSave = async () => {
+        if (!rowData.username || !rowData.email || !rowData.password) {
+            alert("Username, Email, and Password are required fields.");
+            return;
+        }
+
+        try {
+            const token = localStorage.getItem('token');
+
+            // Clean out formatting dashes from phone input if written, otherwise keep it blank/null
+            const sanitizedContactNumber = rowData.contact_number.trim()
+                ? rowData.contact_number.replace(/[^\d+]/g, '')
+                : '';
+
+            // Post core dataset directly along with the nullable/optional contact number string
+            await axios.post(`${API_BASE_URL}/users/volunteer`, {
+                username: rowData.username,
+                email: rowData.email,
+                password: rowData.password,
+                contact_number: sanitizedContactNumber || null, // Passes clean string or explicitly sets null
+                role: rowData.role
+            }, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+
+            alert("User account created successfully!");
+            resetForm();
+            fetchUsers();
+        } catch (error) {
+            console.error("Error creating new user:", error);
+            alert("Failed to create user entry on database tables.");
+        }
     };
 
     const filteredUsers = users.filter(acc =>
@@ -113,7 +158,7 @@ export function ManageUserAccountPage() {
                     </nav>
                 </aside>
 
-                {/* Right side main active tracking dashboard canvas container */}
+                {/* Main Content Workspace Layout Canvas */}
                 <main className="admin-main-content">
                     <h1 className="admin-main-title">Manage user account</h1>
 
@@ -128,8 +173,8 @@ export function ManageUserAccountPage() {
                             />
                             <AiOutlineSearch className="admin-search-icon" />
                         </div>
-                        <button className="admin-add-account-btn" onClick={handleAddUserRedirect}>
-                            Add
+                        <button className="admin-add-account-btn" onClick={() => setIsAdding(!isAdding)}>
+                            {isAdding ? "Close" : "Add"}
                         </button>
                     </div>
 
@@ -137,6 +182,60 @@ export function ManageUserAccountPage() {
                         <div className="admin-loading-placeholder">Processing records feed...</div>
                     ) : (
                         <GenericTable headers={headers}>
+
+                            {/* --- INLINE USER CREATION ROW WITH PHONE CAPABILITIES --- */}
+                            {isAdding && (
+                                <tr className="adding-row">
+                                    <td>
+                                        <input
+                                            type="text"
+                                            value={rowData.username}
+                                            placeholder="Username"
+                                            onChange={e => setRowData({ ...rowData, username: e.target.value })}
+                                        />
+                                        <input
+                                            type="password"
+                                            value={rowData.password}
+                                            placeholder="Password"
+                                            style={{ marginTop: '4px', display: 'block' }}
+                                            onChange={e => setRowData({ ...rowData, password: e.target.value })}
+                                        />
+                                    </td>
+                                    <td>
+                                        <input
+                                            type="email"
+                                            value={rowData.email}
+                                            placeholder="Email Address"
+                                            onChange={e => setRowData({ ...rowData, email: e.target.value })}
+                                        />
+                                    </td>
+                                    <td>
+                                        <input
+                                            type="text"
+                                            value={rowData.contact_number}
+                                            placeholder="Contact Number (Optional)"
+                                            onChange={e => setRowData({ ...rowData, contact_number: e.target.value })}
+                                        />
+                                    </td>
+                                    <td>
+                                        <select
+                                            value={rowData.role}
+                                            onChange={e => setRowData({ ...rowData, role: e.target.value as 'volunteer' | 'organization' })}
+                                        >
+                                            <option value="volunteer">Volunteer</option>
+                                            <option value="organization">Organization</option>
+                                        </select>
+                                    </td>
+                                    <td>
+                                        <div className="action-buttons">
+                                            <button className="save-btn" onClick={handleSave}>Save</button>
+                                            <button className="cancel-btn" onClick={resetForm}>Cancel</button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            )}
+
+                            {/* --- CORE DATA ITERATION MAP BLOCKS --- */}
                             {filteredUsers.length > 0 ? (
                                 filteredUsers.map((row) => {
                                     const contactNumber = row.role === 'volunteer'
@@ -149,6 +248,7 @@ export function ManageUserAccountPage() {
                                         <tr key={row.id}>
                                             <td className="admin-cell-username">{row.username}</td>
                                             <td>{row.email}</td>
+                                            {/* Beautiful layout text context checking handles empty phone states */}
                                             <td>{contactNumber || 'N/A'}</td>
                                             <td>{renderedRole}</td>
                                             <td className="admin-cell-action">
@@ -163,11 +263,13 @@ export function ManageUserAccountPage() {
                                     );
                                 })
                             ) : (
-                                <tr>
-                                    <td colSpan={5} className="admin-empty-table-fallback">
-                                        No active user accounts matched your search keyword criteria.
-                                    </td>
-                                </tr>
+                                !isAdding && (
+                                    <tr>
+                                        <td colSpan={5} className="admin-empty-table-fallback">
+                                            No active user accounts matched your search keyword criteria.
+                                        </td>
+                                    </tr>
+                                )
                             )}
                         </GenericTable>
                     )}

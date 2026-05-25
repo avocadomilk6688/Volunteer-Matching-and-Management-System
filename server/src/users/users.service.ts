@@ -25,27 +25,71 @@ export class UsersService {
   ) {}
 
   async createVolunteer(dto: CreateUserDto) {
-    const sharedId = await generateCustomId(this.volunteerRepo, 'V');
+    const isOrg = dto.role === 'organization';
 
-    const newUser = this.userRepo.create({
-      id: sharedId,
-      username: dto.username,
-      email: dto.email,
-      password: dto.password,
-      role: 'volunteer',
-    });
-    const savedUser = await this.userRepo.save(newUser);
+    if (isOrg) {
+      // --- ORGANIZATION CREATION ARCHITECTURE ---
+      const orgId = await generateCustomId(this.organizationRepo as any, 'ORG');
+      const userId = await generateCustomId(this.userRepo as any, 'U');
 
-    const newVolunteer = this.volunteerRepo.create({
-      user: savedUser,
-    });
+      // 1. Commit identifiers to master core User table
+      const newUser = this.userRepo.create({
+        id: userId,
+        username: dto.username,
+        email: dto.email,
+        password: dto.password,
+        role: 'organization',
+      });
+      const savedUser = await this.userRepo.save(newUser);
 
-    await this.volunteerRepo.save(newVolunteer);
+      // 2. Commit profile parameters directly to the organization entity layout
+      // --- FIXED: Removed the invalid 'userId' property to satisfy DeepPartial constraints ---
+      const newOrg = this.organizationRepo.create({
+        id: orgId,
+        user: savedUser, // TypeORM handles mapping this down to your 'userId' column behind the scenes!
+        contact_number: dto.contact_number || '',
+        rating: 0.0,
+        description: '',
+        profile_picture_url: '/uploads/avatars/default-org.png',
+      });
+      await this.organizationRepo.save(newOrg);
 
-    return {
-      id: sharedId,
-      message: 'Volunteer account and profile created successfully',
-    };
+      return {
+        id: orgId,
+        message: 'Organization account and profile created successfully',
+      };
+    } else {
+      // --- VOLUNTEER CREATION ARCHITECTURE (SHARED PRIMARY KEY) ---
+      const sharedId = await generateCustomId(this.volunteerRepo as any, 'V');
+
+      // 1. Commit identifiers to master core User table
+      const newUser = this.userRepo.create({
+        id: sharedId,
+        username: dto.username,
+        email: dto.email,
+        password: dto.password,
+        role: 'volunteer',
+      });
+      const savedUser = await this.userRepo.save(newUser);
+
+      // 2. Commit profile parameters directly to the volunteer entity layout
+      const newVolunteer = this.volunteerRepo.create({
+        id: sharedId, // Share the exact same ID value string as the parent user record
+        user: savedUser,
+        contact_number: dto.contact_number || '',
+        gender: '',
+        location: '',
+        rating: 0.0,
+        points: 0,
+        profile_picture_url: '',
+      });
+      await this.volunteerRepo.save(newVolunteer);
+
+      return {
+        id: sharedId,
+        message: 'Volunteer account and profile created successfully',
+      };
+    }
   }
 
   async findAll() {
@@ -61,7 +105,7 @@ export class UsersService {
     });
   }
 
-  async update(id: string, updateDto: any) {
+  async update(id: string, updateDto: Record<string, unknown>) {
     await this.userRepo.update(id, updateDto);
     return this.findOne(id);
   }
@@ -72,18 +116,16 @@ export class UsersService {
       throw new NotFoundException(`User with ID ${id} not found.`);
     }
 
-    // 1. Clear profile child tables safely using TypeORM relationship matching syntax
-    // instead of flat 'userId' strings to fix the EntityPropertyNotFoundError
+    // Clear profile child tables safely using TypeORM relationship matching syntax
     if (user.role === 'volunteer') {
       await this.volunteerRepo.delete(id);
     } else if (user.role === 'admin') {
       await this.adminRepo.delete(id);
     } else if (user.role === 'organization') {
-      // --- FIXED: Uses TypeORM object relation notation syntax matching target user ids ---
       await this.organizationRepo.delete({ user: { id } });
     }
 
-    // 2. Finally, remove the master User registry record row line item
+    // Finally, remove the master User registry record row line item
     const result = await this.userRepo.delete(id);
 
     return { deleted: (result.affected ?? 0) > 0 };

@@ -23,7 +23,11 @@ export class CreateUserDto {
 
   @IsEnum(['admin', 'volunteer', 'organization'])
   @IsOptional()
-  role?: string;
+  role?: 'admin' | 'volunteer' | 'organization'; // --- CHANGED: Strongly typed string literal union instead of generic string ---
+
+  @IsString()
+  @IsOptional()
+  contact_number?: string; // --- ADDED: Declared parameter property matching frontend form streams safely ---
 }
 
 export class CreateAdminDto {
