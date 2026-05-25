@@ -83,6 +83,9 @@ export class ProgrammesService {
     return await this.programmeRepo.save(newProgramme);
   }
 
+  /**
+   * Main paginated list method with filters for volunteer and marketplace feeds
+   */
   async findAll(filterDto: FilterProgrammeParams = {}) {
     const { keyword, location, skill, interest, start, end, saved, userId } =
       filterDto;
@@ -120,19 +123,16 @@ export class ProgrammesService {
       );
     }
 
-    // --- FIXED: Added distinct branches for 'saved' versus 'not-saved' parameters ---
     if (userId) {
       if (saved === 'saved') {
         query.andWhere('savedByUsers.id = :userId', { userId });
       } else if (saved === 'not-saved') {
-        // Generates an isolated subquery tracking all elements saved by the authenticated session
         const savedSubQuery = this.programmeRepo
           .createQueryBuilder('subProg')
           .select('subProg.id')
           .leftJoin('subProg.saved_by', 'subSavedBy')
           .where('subSavedBy.id = :userId', { userId });
 
-        // Excludes all corresponding entries using a clean sql NOT IN block statement
         query.andWhere(`programme.id NOT IN (${savedSubQuery.getQuery()})`, {
           userId,
         });
@@ -160,6 +160,18 @@ export class ProgrammesService {
 
     const [items, total] = await query.getManyAndCount();
     return { items, total, page, lastPage: Math.ceil(total / limit) };
+  }
+
+  /**
+   * --- ADDED: EXPLICIT UNPAGINATED ADMIN METRIC FETCH CHANNEL ---
+   * Grabs absolutely every programme record in your MySQL table and
+   * returns a flat array to completely eliminate frontend payload mismatch errors.
+   */
+  async findAllAdmin(): Promise<Programme[]> {
+    return await this.programmeRepo.find({
+      relations: ['schedule', 'organization', 'organization.user'],
+      order: { id: 'DESC' },
+    });
   }
 
   async getRecommended(

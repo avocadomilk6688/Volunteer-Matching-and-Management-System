@@ -82,6 +82,19 @@ export class ProgrammesController {
 
   @Get()
   async findAll(@Query() filterDto: FilterProgrammeParams) {
+    // --- FIXED: If an admin request is made or no paginated filter criteria are passed,
+    // provide the clean flat array to satisfy the admin workspace table expectations natively.
+    if (
+      !filterDto.page &&
+      !filterDto.keyword &&
+      !filterDto.location &&
+      !filterDto.skill &&
+      !filterDto.interest
+    ) {
+      return await this.programmesService.findAllAdmin();
+    }
+
+    // Fall back to original standard filtered/paginated layout object for user-facing features
     return await this.programmesService.findAll(filterDto);
   }
 

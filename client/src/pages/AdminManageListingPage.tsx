@@ -6,12 +6,18 @@ import { AiOutlineSearch } from 'react-icons/ai';
 import axios from 'axios';
 import './admin_manage_listing_page.css';
 
-interface AdminListing {
+interface BackendProgramme {
     id: string;
     title: string;
-    organizationName: string;
     description: string;
-    imageUrl: string;
+    image_url?: string;
+    imageUrl?: string;
+    organization?: {
+        id: string;
+        user?: {
+            username: string;
+        } | null;
+    } | null;
 }
 
 const API_BASE_URL = "http://localhost:3000";
@@ -21,40 +27,33 @@ export function AdminManageListingPage() {
     const location = useLocation();
 
     // Data tracking states
-    const [listings, setListings] = useState<AdminListing[]>([]);
+    const [listings, setListings] = useState<BackendProgramme[]>([]);
     const [searchTerm, setSearchTerm] = useState<string>('');
     const [loading, setLoading] = useState<boolean>(true);
-
-    // Mock dataset directly extracted from your screenshot image for out-of-the-box operation
-    const mockListings: AdminListing[] = [
-        {
-            id: 'PROG001',
-            title: 'Green Earth Clean-Up Drive',
-            organizationName: 'EcoGuardians Malaysia',
-            description: 'A community initiative focused on environmental sustainability. Volunteers gather to clean public spaces, plant trees, and raise awareness about waste management. The programme emphasizes teamwork, eco-education, and long-term impact on local ecosystems.',
-            imageUrl: '/uploads/programmes/image.png'
-        },
-        {
-            id: 'PROG002',
-            title: 'Bright Minds Tutoring Sessions',
-            organizationName: 'BrightPath Learning Foundation',
-            description: 'A volunteer programme dedicated to animal welfare. Participants assist with feeding, cleaning, and caring for rescued animals, while also helping with adoption drives and fundraising events. The initiative highlights compassion and responsible pet ownership.',
-            imageUrl: '/uploads/programmes/image.jpg'
-        }
-    ];
 
     const fetchListings = async () => {
         try {
             setLoading(true);
             const token = localStorage.getItem('token');
-            // Assuming your endpoint structure aggregates standard program arrays for the master admin
-            const response = await axios.get<AdminListing[]>(`${API_BASE_URL}/admin/programmes`, {
+
+            const response = await axios.get(`${API_BASE_URL}/programmes`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
-            setListings(response.data.length > 0 ? response.data : mockListings);
+
+            // --- FIXED: Defensive type checking to handle varied object wrapper payloads safely ---
+            if (Array.isArray(response.data)) {
+                setListings(response.data);
+            } else if (response.data && typeof response.data === 'object' && 'programmes' in response.data && Array.isArray((response.data as Record<string, unknown>).programmes)) {
+                setListings((response.data as { programmes: BackendProgramme[] }).programmes);
+            } else if (response.data && typeof response.data === 'object' && 'data' in response.data && Array.isArray((response.data as Record<string, unknown>).data)) {
+                setListings((response.data as { data: BackendProgramme[] }).data);
+            } else {
+                console.error("Received unexpected non-array format from backend:", response.data);
+                setListings([]);
+            }
         } catch (error) {
-            console.warn("Backend admin listings mapping skipped, rendering image fallbacks:", error);
-            setListings(mockListings);
+            console.error("Backend administration listings download failed:", error);
+            setListings([]);
         } finally {
             setLoading(false);
         }
@@ -71,23 +70,27 @@ export function AdminManageListingPage() {
 
         try {
             const token = localStorage.getItem('token');
-            await axios.delete(`${API_BASE_URL}/admin/programmes/${id}`, {
+            await axios.delete(`${API_BASE_URL}/programmes/${id}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
+
             alert("Listing has been successfully removed.");
             fetchListings();
         } catch (error) {
-            console.error("Removal failure:", error);
-            // Local fallback cleanup to optimize frontend validation workflow
-            setListings(prev => prev.filter(item => item.id !== id));
+            console.error("Removal failure on server endpoint context:", error);
+            alert("Failed to drop program entity record row safely from system.");
         }
     };
 
-    // Filters down active dashboard array strings against client-side keyword metrics
-    const filteredListings = listings.filter(item =>
-        item.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.organizationName.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    // --- FIXED: Fallback safeguard added to prevent filter crashes under any condition ---
+    const activeListingsArray = Array.isArray(listings) ? listings : [];
+
+    const filteredListings = activeListingsArray.filter(item => {
+        const titleMatch = (item.title || '').toLowerCase().includes(searchTerm.toLowerCase());
+        const orgUsername = item.organization?.user?.username || 'N/A';
+        const orgMatch = orgUsername.toLowerCase().includes(searchTerm.toLowerCase());
+        return titleMatch || orgMatch;
+    });
 
     const headers = ['Title', 'Organization', 'Description', 'Cover Image', 'Action'];
 
@@ -96,7 +99,7 @@ export function AdminManageListingPage() {
             <Header />
             <div className="admin-dashboard-container">
 
-                {/* Left accent sidebar container matching administrative console paths */}
+                {/* Left Side Sidebar Navigation Track */}
                 <aside className="admin-sidebar">
                     <nav>
                         <ul>
@@ -106,7 +109,7 @@ export function AdminManageListingPage() {
                             <li className={location.pathname === '/verify-organization-registration' ? 'active' : ''} onClick={() => navigate('/verify-organization-registration')}>
                                 Verify organization registration
                             </li>
-                            <li className={location.pathname === '/admin-manage-listing' || location.pathname === '/admin-manage-listing' ? 'active' : ''} onClick={() => navigate('/admin-manage-listing')}>
+                            <li className={location.pathname === '/admin-manage-listing' ? 'active' : ''} onClick={() => navigate('/admin-manage-listing')}>
                                 Manage listing
                             </li>
                             <li className={location.pathname === '/manage-qa' ? 'active' : ''} onClick={() => navigate('/manage-qa')}>
@@ -119,16 +122,15 @@ export function AdminManageListingPage() {
                     </nav>
                 </aside>
 
-                {/* Right central work dashboard block panel area */}
+                {/* Right Central Workspace Canvas */}
                 <main className="admin-main-content">
                     <h1 className="admin-main-title">Manage listing</h1>
 
-                    {/* Search manipulation asset deck (Mirrors image search layout frame precisely) */}
                     <div className="admin-action-toolbar text-left-only">
                         <div className="admin-search-box-wrapper">
                             <input
                                 type="text"
-                                placeholder="Search by title"
+                                placeholder="Search by title or organization"
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                                 className="admin-search-input"
@@ -142,35 +144,45 @@ export function AdminManageListingPage() {
                     ) : (
                         <GenericTable headers={headers}>
                             {filteredListings.length > 0 ? (
-                                filteredListings.map((row) => (
-                                    <tr key={row.id}>
-                                        <td className="admin-cell-listing-title">{row.title}</td>
-                                        <td className="admin-cell-listing-org">{row.organizationName}</td>
-                                        <td className="admin-cell-listing-description">{row.description}</td>
-                                        <td>
-                                            <a
-                                                href={`${API_BASE_URL}${row.imageUrl}`}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="admin-image-filename-link"
-                                            >
-                                                {row.imageUrl.split('/').pop() || 'image.png'}
-                                            </a>
-                                        </td>
-                                        <td className="admin-cell-action">
-                                            <button
-                                                className="admin-remove-listing-btn"
-                                                onClick={() => handleRemoveListing(row.id, row.title)}
-                                            >
-                                                Remove
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))
+                                filteredListings.map((row) => {
+                                    const activeImgUrl = row.image_url || row.imageUrl || '';
+                                    const filenameDisplay = activeImgUrl.split('/').pop() || 'cover_image.png';
+                                    const renderedOrgName = row.organization?.user?.username || 'N/A';
+
+                                    return (
+                                        <tr key={row.id}>
+                                            <td className="admin-cell-listing-title">{row.title}</td>
+                                            <td className="admin-cell-listing-org">{renderedOrgName}</td>
+                                            <td className="admin-cell-listing-description">{row.description}</td>
+                                            <td>
+                                                {activeImgUrl ? (
+                                                    <a
+                                                        href={`${API_BASE_URL}${activeImgUrl}`}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="admin-image-filename-link"
+                                                    >
+                                                        {filenameDisplay}
+                                                    </a>
+                                                ) : (
+                                                    <span style={{ color: '#999', fontSize: '13px' }}>No image uploaded</span>
+                                                )}
+                                            </td>
+                                            <td className="admin-cell-action">
+                                                <button
+                                                    className="admin-remove-listing-btn"
+                                                    onClick={() => handleRemoveListing(row.id, row.title)}
+                                                >
+                                                    Remove
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    );
+                                })
                             ) : (
                                 <tr>
                                     <td colSpan={5} className="admin-empty-table-fallback">
-                                        No dynamic organization program listings matched your search string.
+                                        No active organization program listings matched your search criteria.
                                     </td>
                                 </tr>
                             )}
