@@ -6,13 +6,18 @@ import { ChatWindow } from './ChatWindow';
 import axios from 'axios';
 import './admin_manage_tickets_page.css';
 
+// --- UPDATED: Interface maps your database properties and nested entity relations perfectly ---
 interface SupportTicket {
     id: string;
-    description: string;
-    userId: string; // Used as the receiverId for the chat interface context
-    username: string;
-    role: 'Volunteer' | 'Organization' | 'Admin';
-    submissionTime: string;
+    content: string; // Matches your raw database column name 'content'
+    status: string;
+    submissionTime: string; // datetime template format string
+    userId: string | null;
+    user?: {
+        id: string;
+        username: string;
+        role: 'volunteer' | 'organization' | 'admin' | string;
+    } | null;
 }
 
 const API_BASE_URL = "http://localhost:3000";
@@ -28,61 +33,25 @@ export function AdminManageTicketsPage() {
     // Chat modal routing states
     const [activeChatTicket, setActiveChatTicket] = useState<SupportTicket | null>(null);
 
-    // Mock dataset directly extracted from your screenshot image for instantaneous out-of-the-box previewing
-    const mockTickets: SupportTicket[] = [
-        {
-            id: 'TCK001',
-            description: 'I registered with the wrong email address.',
-            userId: 'USR_ECO',
-            username: 'EcoGuardians Malaysia',
-            role: 'Organization',
-            submissionTime: '23/10/2025 11:30pm'
-        },
-        {
-            id: 'TCK002',
-            description: "I forgot my password and the reset link isn't working.",
-            userId: 'USR_ALICE',
-            username: 'Alice',
-            role: 'Volunteer',
-            submissionTime: '10/11/2025 8:22pm'
-        },
-        {
-            id: 'TCK003',
-            description: 'My points on the leaderboard seems too less.',
-            userId: 'USR_BETTY',
-            username: 'Betty',
-            role: 'Volunteer',
-            submissionTime: '13/11/2025 7:07am'
-        },
-        {
-            id: 'TCK004',
-            description: 'I want to change my role from volunteer to coordinator',
-            userId: 'USR_BEN',
-            username: 'Benjamin',
-            role: 'Volunteer',
-            submissionTime: '2/12/2025 6:29pm'
-        },
-        {
-            id: 'TCK005',
-            description: 'I signed up for the wrong programme. Can you transfer me to the correct one?',
-            userId: 'USR_ADAM',
-            username: 'Adam',
-            role: 'Volunteer',
-            submissionTime: '4/12/2025 2:56pm'
-        }
-    ];
-
     const fetchTickets = async () => {
         try {
             setLoading(true);
             const token = localStorage.getItem('token');
-            const response = await axios.get<SupportTicket[]>(`${API_BASE_URL}/admin/tickets/pending`, {
+
+            // --- FIXED: Connects directly to your live support ticket database index endpoint ---
+            const response = await axios.get<SupportTicket[]>(`${API_BASE_URL}/interactions/support-ticket`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
-            setTickets(response.data.length > 0 ? response.data : mockTickets);
+
+            // Filters down rows to isolate active/open ticket profiles exclusively
+            const activeTickets = Array.isArray(response.data)
+                ? response.data.filter(t => t.status?.toLowerCase() === 'open')
+                : [];
+
+            setTickets(activeTickets);
         } catch (error) {
-            console.warn("Backend dynamic tickets controller unconfigured, pulling mock dashboard entries:", error);
-            setTickets(mockTickets);
+            console.error("Error downloading live administrative support logs:", error);
+            setTickets([]);
         } finally {
             setLoading(false);
         }
@@ -119,7 +88,7 @@ export function AdminManageTicketsPage() {
                             <li className={location.pathname === '/manage-qa' ? 'active' : ''} onClick={() => navigate('/manage-qa')}>
                                 Manage Q&A section
                             </li>
-                            <li className={location.pathname === '/manage-tickets' || location.pathname === '/manage-tickets' ? 'active' : ''} onClick={() => navigate('/manage-tickets')}>
+                            <li className={location.pathname === '/manage-tickets' ? 'active' : ''} onClick={() => navigate('/manage-tickets')}>
                                 Manage support ticket
                             </li>
                         </ul>
@@ -130,27 +99,39 @@ export function AdminManageTicketsPage() {
                 <main className="admin-main-content">
                     <h1 className="admin-main-title">Manage support ticket</h1>
 
-                    {loading ? (
+                    {location.pathname === '/manage-tickets' && loading ? (
                         <div className="admin-loading-placeholder">Compiling help desk queues...</div>
                     ) : (
                         <GenericTable headers={headers}>
                             {tickets.length > 0 ? (
-                                tickets.map((row) => (
-                                    <tr key={row.id}>
-                                        <td className="admin-cell-ticket-description">{row.description}</td>
-                                        <td className="admin-cell-ticket-user">{row.username}</td>
-                                        <td className="admin-cell-ticket-role">{row.role}</td>
-                                        <td className="admin-cell-ticket-time">{row.submissionTime}</td>
-                                        <td className="admin-cell-action">
-                                            <button
-                                                className="admin-ticket-chat-btn"
-                                                onClick={() => handleOpenSupportChat(row)}
-                                            >
-                                                Chat
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))
+                                tickets.map((row) => {
+                                    // Extract nested profile credentials safely with crisp fallbacks
+                                    const renderedUsername = row.user?.username || row.userId || 'Unknown User';
+
+                                    const roleRaw = row.user?.role || 'User';
+                                    const renderedRole = roleRaw.charAt(0).toUpperCase() + roleRaw.slice(1);
+
+                                    const formattedTime = row.submissionTime
+                                        ? new Date(row.submissionTime).toLocaleString()
+                                        : 'N/A';
+
+                                    return (
+                                        <tr key={row.id}>
+                                            <td className="admin-cell-ticket-description">{row.content}</td>
+                                            <td className="admin-cell-ticket-user">{renderedUsername}</td>
+                                            <td className="admin-cell-ticket-role">{renderedRole}</td>
+                                            <td className="admin-cell-ticket-time">{formattedTime}</td>
+                                            <td className="admin-cell-action">
+                                                <button
+                                                    className="admin-ticket-chat-btn"
+                                                    onClick={() => handleOpenSupportChat(row)}
+                                                >
+                                                    Chat
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    );
+                                })
                             ) : (
                                 <tr>
                                     <td colSpan={5} className="admin-empty-table-fallback">
@@ -169,9 +150,9 @@ export function AdminManageTicketsPage() {
                 <ChatWindow
                     key={`ticket_chat_${activeChatTicket.id}`}
                     onClose={() => setActiveChatTicket(null)}
-                    senderId="ADMIN_SYSTEM_ID" // Can be substituted dynmically with user?.id via auth hook
-                    receiverId={activeChatTicket.userId}
-                    receiverName={activeChatTicket.username}
+                    senderId={localStorage.getItem('userId') || "ADMIN_SYSTEM_ID"}
+                    receiverId={activeChatTicket.user?.id || activeChatTicket.userId || ""}
+                    receiverName={activeChatTicket.user?.username || "Help Desk Client"}
                 />
             )}
         </div>
