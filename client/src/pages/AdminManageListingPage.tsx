@@ -40,7 +40,7 @@ export function AdminManageListingPage() {
                 headers: { Authorization: `Bearer ${token}` }
             });
 
-            // --- FIXED: Defensive type checking to handle varied object wrapper payloads safely ---
+            // Defensive type checking to handle varied object wrapper payloads safely
             if (Array.isArray(response.data)) {
                 setListings(response.data);
             } else if (response.data && typeof response.data === 'object' && 'programmes' in response.data && Array.isArray((response.data as Record<string, unknown>).programmes)) {
@@ -82,13 +82,14 @@ export function AdminManageListingPage() {
         }
     };
 
-    // --- FIXED: Fallback safeguard added to prevent filter crashes under any condition ---
     const activeListingsArray = Array.isArray(listings) ? listings : [];
 
+    // --- FIXED: Updated to dynamically match search terms against program titles AND live organization usernames ---
     const filteredListings = activeListingsArray.filter(item => {
         const titleMatch = (item.title || '').toLowerCase().includes(searchTerm.toLowerCase());
-        const orgUsername = item.organization?.user?.username || 'N/A';
+        const orgUsername = item.organization?.user?.username || '';
         const orgMatch = orgUsername.toLowerCase().includes(searchTerm.toLowerCase());
+
         return titleMatch || orgMatch;
     });
 

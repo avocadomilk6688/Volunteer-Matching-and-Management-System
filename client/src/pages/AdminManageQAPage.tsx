@@ -5,11 +5,13 @@ import { GenericTable } from './Table';
 import axios from 'axios';
 import './admin_manage_qa_page.css';
 
+// Interface matches your exact database schema model properties precisely
 interface QAItem {
     id: string;
     question: string;
     answer: string;
-    category: 'Volunteer' | 'Organization' | 'Admin';
+    category: 'Volunteer' | 'Organization' | 'Admin' | string;
+    adminId?: string | null;
 }
 
 const API_BASE_URL = "http://localhost:3000";
@@ -22,39 +24,19 @@ export function AdminManageQAPage() {
     const [qaItems, setQaItems] = useState<QAItem[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
 
-    // Mock dataset directly extracted from your screenshot image for immediate functionality
-    const mockQaItems: QAItem[] = [
-        {
-            id: 'QA001',
-            question: 'How does the system recommend volunteering programs to me?',
-            answer: 'The VMMS uses a smart matching and discovery feature. It analyzes your specific skills, interests, location, and availability to provide personalized recommendations that align with your profile.',
-            category: 'Volunteer'
-        },
-        {
-            id: 'QA002',
-            question: 'How is my contribution recognized on the platform?',
-            answer: 'To keep volunteers motivated, the system features a monthly leaderboard. Top-performing volunteers are highlighted based on their participation frequency or the ratings they receive from organization upon program completion.',
-            category: 'Volunteer'
-        },
-        {
-            id: 'QA003',
-            question: 'Can I manage which volunteers join my program?',
-            answer: 'Yes. Organizations have the functionality to manage volunteer applications directly. You can review volunteer details and have the authority to accept or remove registered volunteers from your programs as needed.',
-            category: 'Organization'
-        }
-    ];
-
     const fetchQaItems = async () => {
         try {
             setLoading(true);
             const token = localStorage.getItem('token');
-            const response = await axios.get<QAItem[]>(`${API_BASE_URL}/admin/qa`, {
+
+            // --- FIXED: Combined standard route mapping to use your real modular interactions path ---
+            const response = await axios.get<QAItem[]>(`${API_BASE_URL}/interactions/qa`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
-            setQaItems(response.data.length > 0 ? response.data : mockQaItems);
+            setQaItems(response.data);
         } catch (error) {
-            console.warn("Backend dynamic fetch omitted, using mockup dataset channels:", error);
-            setQaItems(mockQaItems);
+            console.error("Backend dynamic fetch failed, clearing table row displays:", error);
+            setQaItems([]);
         } finally {
             setLoading(false);
         }
@@ -76,15 +58,15 @@ export function AdminManageQAPage() {
 
         try {
             const token = localStorage.getItem('token');
-            await axios.delete(`${API_BASE_URL}/admin/qa/${id}`, {
+            // --- FIXED: Routed deletion query directly to the interactions module parameters path ---
+            await axios.delete(`${API_BASE_URL}/interactions/qa/${id}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             alert("FAQ item successfully removed.");
             fetchQaItems();
         } catch (error) {
-            console.error("Deletion error:", error);
-            // Local state cleanup fallback if backend path is unconfigured
-            setQaItems(prev => prev.filter(item => item.id !== id));
+            console.error("Deletion error on database context mapping:", error);
+            alert("Failed to drop record item from database tables.");
         }
     };
 
@@ -99,7 +81,7 @@ export function AdminManageQAPage() {
             <Header />
             <div className="admin-dashboard-container">
 
-                {/* Left navigation sidebar matching architectural design layout layout standards */}
+                {/* Left Navigation Sidebar */}
                 <aside className="admin-sidebar">
                     <nav>
                         <ul>
@@ -112,7 +94,7 @@ export function AdminManageQAPage() {
                             <li className={location.pathname === '/admin-manage-listing' ? 'active' : ''} onClick={() => navigate('/admin-manage-listing')}>
                                 Manage listing
                             </li>
-                            <li className={location.pathname === '/manage-qa' || location.pathname === '/manage-qa' ? 'active' : ''} onClick={() => navigate('/manage-qa')}>
+                            <li className={location.pathname === '/manage-qa' ? 'active' : ''} onClick={() => navigate('/manage-qa')}>
                                 Manage Q&A section
                             </li>
                             <li className={location.pathname === '/manage-tickets' ? 'active' : ''} onClick={() => navigate('/manage-tickets')}>
@@ -126,7 +108,7 @@ export function AdminManageQAPage() {
                 <main className="admin-main-content">
                     <h1 className="admin-main-title">Manage Q&A section</h1>
 
-                    {/* Action Toolbar Block Panel containing specific sharp corner Add Button */}
+                    {/* Action Toolbar Panel */}
                     <div className="admin-action-toolbar left-btn-only">
                         <button className="admin-add-qa-btn" onClick={handleAddRedirect}>
                             Add
@@ -138,29 +120,35 @@ export function AdminManageQAPage() {
                     ) : (
                         <GenericTable headers={headers}>
                             {qaItems.length > 0 ? (
-                                qaItems.map((row) => (
-                                    <tr key={row.id}>
-                                        <td className="admin-cell-qa-question">{row.question}</td>
-                                        <td className="admin-cell-qa-answer">{row.answer}</td>
-                                        <td className="admin-cell-qa-category">{row.category}</td>
-                                        <td className="admin-cell-qa-actions">
-                                            <div className="admin-qa-btn-group">
-                                                <button
-                                                    className="admin-modify-qa-btn"
-                                                    onClick={() => handleModify(row.id)}
-                                                >
-                                                    Modify
-                                                </button>
-                                                <button
-                                                    className="admin-delete-qa-btn"
-                                                    onClick={() => handleDeleteQA(row.id, row.question)}
-                                                >
-                                                    Delete
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))
+                                qaItems.map((row) => {
+                                    const categoryDisplay = row.category
+                                        ? row.category.charAt(0).toUpperCase() + row.category.slice(1)
+                                        : 'N/A';
+
+                                    return (
+                                        <tr key={row.id}>
+                                            <td className="admin-cell-qa-question">{row.question}</td>
+                                            <td className="admin-cell-qa-answer">{row.answer || 'No text provided'}</td>
+                                            <td className="admin-cell-qa-category">{categoryDisplay}</td>
+                                            <td className="admin-cell-qa-actions">
+                                                <div className="admin-qa-btn-group">
+                                                    <button
+                                                        className="admin-modify-qa-btn"
+                                                        onClick={() => handleModify(row.id)}
+                                                    >
+                                                        Modify
+                                                    </button>
+                                                    <button
+                                                        className="admin-delete-qa-btn"
+                                                        onClick={() => handleDeleteQA(row.id, row.question)}
+                                                    >
+                                                        Delete
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })
                             ) : (
                                 <tr>
                                     <td colSpan={4} className="admin-empty-table-fallback">
