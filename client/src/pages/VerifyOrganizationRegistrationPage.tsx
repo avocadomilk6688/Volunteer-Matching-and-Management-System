@@ -5,13 +5,16 @@ import { GenericTable } from './Table';
 import axios from 'axios';
 import './verify_organization_registration_page.css';
 
+// --- UPDATED: Interface matches your exact database columns precisely ---
 interface OrgRegistration {
     id: string;
-    organizationName: string;
-    documentUrl: string;
-    authorizedPerson: string;
+    name: string;
+    submitted_documents: string;
+    authorized_person: string;
+    submission_time: string; // datetime string format
+    status: string;
     description: string;
-    submissionTime: string;
+    address?: string | null;
 }
 
 const API_BASE_URL = "http://localhost:3000";
@@ -24,37 +27,19 @@ export function VerifyOrganizationRegistrationPage() {
     const [registrations, setRegistrations] = useState<OrgRegistration[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
 
-    // Mock records mapped exactly from your screenshot to ensure active fallback displays
-    const mockRegistrations: OrgRegistration[] = [
-        {
-            id: 'REG001',
-            organizationName: 'EcoGuardians Malaysia',
-            documentUrl: '/uploads/documents/doc1.pdf',
-            authorizedPerson: 'Maria',
-            description: 'EcoGuardians Malaysia is a grassroots environmental organization dedicated to promoting sustainable living and community-based conservation efforts. They organize clean-up drives, tree-planting campaigns, and eco-education workshops across urban and rural areas.',
-            submissionTime: '12/11/2025 10:35am'
-        },
-        {
-            id: 'REG002',
-            organizationName: 'WellCare Community Alliance',
-            documentUrl: '/uploads/documents/doc2.pdf',
-            authorizedPerson: 'Peter',
-            description: 'WellCare Community Alliance focuses on public health awareness and wellness outreach, especially in underserved communities. Their initiatives include fitness campaigns, nutrition education, and mental health support programs designed to empower healthier lifestyles.',
-            submissionTime: '21/12/2025 3:10pm'
-        }
-    ];
-
     const fetchRegistrations = async () => {
         try {
             setLoading(true);
             const token = localStorage.getItem('token');
+
+            // Fetch live pending registrations from your endpoint pipeline
             const response = await axios.get<OrgRegistration[]>(`${API_BASE_URL}/admin/registrations/pending`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
-            setRegistrations(response.data.length > 0 ? response.data : mockRegistrations);
+            setRegistrations(response.data);
         } catch (error) {
-            console.warn("Dynamic endpoint unconfigured, rendering screenshot mock layout data:", error);
-            setRegistrations(mockRegistrations);
+            console.error("Error retrieving active verification list records:", error);
+            setRegistrations([]);
         } finally {
             setLoading(false);
         }
@@ -77,11 +62,10 @@ export function VerifyOrganizationRegistrationPage() {
                 { headers: { Authorization: `Bearer ${token}` } }
             );
             alert(`Organization has been successfully ${actionType}d.`);
-            fetchRegistrations();
+            fetchRegistrations(); // Instantly pull updated table datasets
         } catch (error) {
             console.error("Verification modification error:", error);
-            // Local fallback cleanup to show interaction behavior
-            setRegistrations(prev => prev.filter(item => item.id !== id));
+            alert("Failed to modify verification state on server.");
         }
     };
 
@@ -92,14 +76,14 @@ export function VerifyOrganizationRegistrationPage() {
             <Header />
             <div className="admin-dashboard-container">
 
-                {/* Left accent orange sidebar navigation panel mirroring screenshot configuration */}
+                {/* Left Navigation Sidebar */}
                 <aside className="admin-sidebar">
                     <nav>
                         <ul>
                             <li className={location.pathname === '/manage-user-account' ? 'active' : ''} onClick={() => navigate('/manage-user-account')}>
                                 Manage user account
                             </li>
-                            <li className={location.pathname === '/verify-organization-registration' || location.pathname === '/verify-organization-registration' ? 'active' : ''} onClick={() => navigate('/verify-organization-registration')}>
+                            <li className={location.pathname === '/verify-organization-registration' ? 'active' : ''} onClick={() => navigate('/verify-organization-registration')}>
                                 Verify organization registration
                             </li>
                             <li className={location.pathname === '/admin-manage-listing' ? 'active' : ''} onClick={() => navigate('/admin-manage-listing')}>
@@ -124,40 +108,47 @@ export function VerifyOrganizationRegistrationPage() {
                     ) : (
                         <GenericTable headers={headers}>
                             {registrations.length > 0 ? (
-                                registrations.map((row) => (
-                                    <tr key={row.id}>
-                                        <td className="admin-cell-org-name">{row.organizationName}</td>
-                                        <td>
-                                            <a
-                                                href={`${API_BASE_URL}${row.documentUrl}`}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="admin-document-link"
-                                            >
-                                                document.pdf
-                                            </a>
-                                        </td>
-                                        <td>{row.authorizedPerson}</td>
-                                        <td className="admin-cell-description">{row.description}</td>
-                                        <td className="admin-cell-time">{row.submissionTime}</td>
-                                        <td className="admin-cell-verify-actions">
-                                            <div className="admin-verify-btn-group">
-                                                <button
-                                                    className="admin-approve-btn"
-                                                    onClick={() => handleAction(row.id, 'approve', row.organizationName)}
+                                registrations.map((row) => {
+                                    // Helper block to present datetime strings cleanly inside your layout rows
+                                    const formattedTime = row.submission_time
+                                        ? new Date(row.submission_time).toLocaleString()
+                                        : 'N/A';
+
+                                    return (
+                                        <tr key={row.id}>
+                                            <td className="admin-cell-org-name">{row.name}</td>
+                                            <td>
+                                                <a
+                                                    href={`${API_BASE_URL}${row.submitted_documents}`}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="admin-document-link"
                                                 >
-                                                    Approve
-                                                </button>
-                                                <button
-                                                    className="admin-reject-btn"
-                                                    onClick={() => handleAction(row.id, 'reject', row.organizationName)}
-                                                >
-                                                    Reject
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))
+                                                    document.pdf
+                                                </a>
+                                            </td>
+                                            <td>{row.authorized_person}</td>
+                                            <td className="admin-cell-description">{row.description}</td>
+                                            <td className="admin-cell-time">{formattedTime}</td>
+                                            <td className="admin-cell-verify-actions">
+                                                <div className="admin-verify-btn-group">
+                                                    <button
+                                                        className="admin-approve-btn"
+                                                        onClick={() => handleAction(row.id, 'approve', row.name)}
+                                                    >
+                                                        Approve
+                                                    </button>
+                                                    <button
+                                                        className="admin-reject-btn"
+                                                        onClick={() => handleAction(row.id, 'reject', row.name)}
+                                                    >
+                                                        Reject
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })
                             ) : (
                                 <tr>
                                     <td colSpan={6} className="admin-empty-table-fallback">
