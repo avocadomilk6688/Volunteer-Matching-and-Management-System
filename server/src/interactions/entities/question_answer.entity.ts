@@ -1,5 +1,4 @@
-import { Entity, Column, PrimaryColumn, ManyToOne } from 'typeorm';
-import { Admin } from '../../users/entities/admin.entity';
+import { Entity, Column, PrimaryColumn } from 'typeorm';
 
 @Entity()
 export class QuestionAnswer {
@@ -14,7 +13,4 @@ export class QuestionAnswer {
 
   @Column()
   category!: string;
-
-  @ManyToOne(() => Admin)
-  admin!: Admin;
 }

@@ -74,6 +74,39 @@ export class InteractionsService {
     return `QA ${id} added`;
   }
 
+  // --- FIXED: ADDED THE EXPLICIT UPDATE ENTRY LOGIC TO PREVENT FRONTEND 404 CRASHES ---
+  async updateQA(
+    id: string,
+    dto: Partial<CreateQuestionAnswerDto>,
+  ): Promise<QuestionAnswer> {
+    const existingQA = await this.qaRepo.findOne({ where: { id } });
+    if (!existingQA) {
+      throw new NotFoundException(
+        `Q&A record with item identifier ID "${id}" does not exist inside the server primary registry.`,
+      );
+    }
+
+    // Merge modified properties safely over top of existing row layout parameters
+    const updatedQA = this.qaRepo.merge(existingQA, dto);
+    return await this.qaRepo.save(updatedQA);
+  }
+
+  // --- FIXED: ADDED THE EXPLICIT DELETION ENTRY LOGIC TO PREVENT FRONTEND 404 CRASHES ---
+  async removeQA(id: string): Promise<{ deleted: boolean; message: string }> {
+    const existingQA = await this.qaRepo.findOne({ where: { id } });
+    if (!existingQA) {
+      throw new NotFoundException(
+        `Q&A record with item identifier ID "${id}" does not exist inside the server primary registry.`,
+      );
+    }
+
+    await this.qaRepo.delete(id);
+    return {
+      deleted: true,
+      message: `FAQ entity row matching key "${id}" dropped successfully.`,
+    };
+  }
+
   // --- Messaging Logic ---
   async createMessage(
     dto: CreateMessageDto & { programmeId?: string },
@@ -219,13 +252,11 @@ export class InteractionsService {
   async createNotification(
     dto: CreateNotificationDto & { type?: string; receiverId?: string },
   ): Promise<any> {
-    // 1. Sanitize 'NNaN' text anomalies sent over from frontend mutations
     let cleanedContent = dto.content;
     if (cleanedContent && cleanedContent.startsWith('NNaN')) {
       cleanedContent = cleanedContent.replace(/^NNaN/, '');
     }
 
-    // 2. Multi-Admin Broadcast Logic path
     if (dto.type === 'programme_report' || !dto.receiverId) {
       const administrators = await this.userRepo.find({
         where: { role: 'admin' },
@@ -238,7 +269,6 @@ export class InteractionsService {
         return { success: false, message: 'No administrative accounts found.' };
       }
 
-      // --- FIXED: Process admin rows in sequence to stop generateCustomId overlapping duplicates ---
       for (const admin of administrators) {
         const customId = await generateCustomId(this.notificationRepo, 'NOT');
 
@@ -249,14 +279,12 @@ export class InteractionsService {
         });
         notif.createdAt = new Date();
 
-        // Must await save directly within iteration loop to lock ID state before creating the next row
         await this.notificationRepo.save(notif);
       }
 
       return `Notification broadcasted to ${administrators.length} administrators successfully`;
     }
 
-    // 3. Fallback path for normal single target row notifications
     const singleCustomId = await generateCustomId(this.notificationRepo, 'NOT');
 
     const targetUser = await this.userRepo.findOne({

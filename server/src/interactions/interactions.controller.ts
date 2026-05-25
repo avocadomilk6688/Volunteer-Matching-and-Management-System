@@ -1,4 +1,13 @@
-import { Controller, Get, Post, Body, Param, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Delete,
+  Body,
+  Param,
+  Query,
+} from '@nestjs/common';
 import { InteractionsService, RecentContact } from './interactions.service';
 import { QuestionAnswer } from './entities/question_answer.entity';
 import {
@@ -21,6 +30,21 @@ export class InteractionsController {
   @Post('qa')
   createQA(@Body() createQuestionAnswerDto: CreateQuestionAnswerDto) {
     return this.interactionsService.createQA(createQuestionAnswerDto);
+  }
+
+  // --- FIXED: ADDED THE INLINE PATCH METHOD ROUTE HANDLER ---
+  @Patch('qa/:id')
+  async updateQA(
+    @Param('id') id: string,
+    @Body() updateDto: Partial<CreateQuestionAnswerDto>,
+  ) {
+    return await this.interactionsService.updateQA(id, updateDto);
+  }
+
+  // --- FIXED: ADDED THE INLINE DELETE METHOD ROUTE HANDLER ---
+  @Delete('qa/:id')
+  async removeQA(@Param('id') id: string) {
+    return await this.interactionsService.removeQA(id);
   }
 
   @Post('message')
