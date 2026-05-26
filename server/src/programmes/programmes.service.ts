@@ -29,6 +29,12 @@ export class FilterProgrammeParams {
   limit?: number;
 }
 
+interface RawSkillStat {
+  skillId: string;
+  participationCount: string | number;
+  totalHours: string | number;
+}
+
 @Injectable()
 export class ProgrammesService {
   constructor(
@@ -163,9 +169,7 @@ export class ProgrammesService {
   }
 
   /**
-   * --- ADDED: EXPLICIT UNPAGINATED ADMIN METRIC FETCH CHANNEL ---
-   * Grabs absolutely every programme record in your MySQL table and
-   * returns a flat array to completely eliminate frontend payload mismatch errors.
+   * Explicit unpaginated admin channel
    */
   async findAllAdmin(): Promise<Programme[]> {
     return await this.programmeRepo.find({
@@ -174,11 +178,205 @@ export class ProgrammesService {
     });
   }
 
+  /**
+   * --- SMART MATCH HYBRID RECOMMENDATION PIPELINE ---
+   * Safe from only_full_group_by restrictions, handles history behavior dynamically.
+   */
   async getRecommended(
     userId: string | null,
     filterDto: FilterProgrammeParams,
   ) {
-    return this.findAll(filterDto);
+    const page = Number(filterDto.page) || 1;
+    const limit = Number(filterDto.limit) || 6;
+    const skip = (page - 1) * limit;
+
+    const isGuest = !userId || userId === 'guest';
+
+    const volunteer = !isGuest
+      ? await this.volunteerRepo.findOne({
+          where: { user: { id: userId } },
+          relations: ['skills', 'interests'],
+        })
+      : null;
+
+    const statsMap = new Map<string, { count: number; hours: number }>();
+
+    if (volunteer) {
+      const skillStats: RawSkillStat[] = await this.programmeRepo.query(
+        `
+          SELECT 
+              ps.skillId, 
+              COUNT(app.id) AS participationCount, 
+              SUM(TIMESTAMPDIFF(HOUR, s.start_time, s.end_time)) AS totalHours
+          FROM application app
+          JOIN programme p ON app.programmeId = p.id
+          JOIN schedule s ON p.scheduleId = s.id 
+          JOIN programme_skills ps ON p.id = ps.programmeId
+          WHERE app.volunteerId = ? AND app.status = 'completed'
+          GROUP BY ps.skillId
+      `,
+        [volunteer.id],
+      );
+
+      skillStats.forEach((s) => {
+        statsMap.set(s.skillId, {
+          count:
+            typeof s.participationCount === 'string'
+              ? parseFloat(s.participationCount)
+              : s.participationCount || 0,
+          hours:
+            typeof s.totalHours === 'string'
+              ? parseFloat(s.totalHours)
+              : s.totalHours || 0,
+        });
+      });
+    }
+
+    // --- CRITICAL FIX: Changed to clean 'leftJoin' for many-to-many properties
+    // to shield them completely out of hidden SELECT grouping validations
+    const query = this.programmeRepo
+      .createQueryBuilder('programme')
+      .leftJoinAndSelect('programme.schedule', 'schedule')
+      .leftJoinAndSelect('programme.organization', 'organization')
+      .leftJoinAndSelect('organization.user', 'user')
+      .leftJoin('programme.saved_by', 'savedByUsers');
+
+    // SCORING ALGORITHM BASELINE
+    let scoreSql = `(COALESCE(organization.rating, 0) * 5) + 
+                    (CASE WHEN schedule.location LIKE :userLoc THEN 35 ELSE 0 END)`;
+
+    if (volunteer?.skills && volunteer.skills.length > 0) {
+      volunteer.skills.forEach((skill, index) => {
+        const sId = `skill_${index}`;
+        const stats = statsMap.get(skill.id) || { count: 0, hours: 0 };
+        const boost = stats.count * 5 + stats.hours * 0.5 + 10;
+
+        scoreSql += ` + (CASE WHEN EXISTS (
+            SELECT 1 FROM programme_skills psk 
+            WHERE psk.programmeId = programme.id AND psk.skillId = :${sId}
+        ) THEN ${boost} ELSE 0 END)`;
+
+        query.setParameter(sId, skill.id);
+      });
+    }
+
+    if (volunteer?.interests && volunteer.interests.length > 0) {
+      volunteer.interests.forEach((interest, index) => {
+        const iId = `interest_${index}`;
+        scoreSql += ` + (CASE WHEN EXISTS (
+            SELECT 1 FROM programme_interests pin 
+            WHERE pin.programmeId = programme.id AND pin.interestId = :${iId}
+        ) THEN 15 ELSE 0 END)`;
+
+        query.setParameter(iId, interest.id);
+      });
+    }
+
+    query.addSelect(scoreSql, 'relevance_score');
+    query.setParameter('userLoc', `%${filterDto.location || ''}%`);
+
+    // Manual Filters Layer
+    if (filterDto.keyword) {
+      query.andWhere(
+        '(programme.title LIKE :keyword OR programme.description LIKE :keyword)',
+        { keyword: `%${filterDto.keyword}%` },
+      );
+    }
+
+    if (filterDto.location) {
+      const locations = filterDto.location.split(',');
+      query.andWhere(
+        new Brackets((qb) => {
+          locations.forEach((loc, index) => {
+            const paramName = `filter_loc_${index}`;
+            qb.orWhere(`schedule.location LIKE :${paramName}`, {
+              [paramName]: `%${loc.trim()}%`,
+            });
+          });
+        }),
+      );
+    }
+
+    if (filterDto.start) {
+      query.andWhere('schedule.start_time >= :start', {
+        start: new Date(filterDto.start),
+      });
+    }
+    if (filterDto.end) {
+      query.andWhere('schedule.end_time <= :end', {
+        end: new Date(filterDto.end),
+      });
+    }
+
+    // Handles intentional search input parameters safely via independent isolation leftJoins
+    if (filterDto.skill) {
+      const skillIds = filterDto.skill.split(',');
+      query
+        .leftJoin('programme.related_skills', 'filter_skills')
+        .andWhere('filter_skills.id IN (:...skillIds)', { skillIds });
+    }
+
+    if (filterDto.interest) {
+      const interestIds = filterDto.interest.split(',');
+      query
+        .leftJoin('programme.related_interests', 'filter_interests')
+        .andWhere('filter_interests.id IN (:...interestIds)', { interestIds });
+    }
+
+    if (filterDto.userId && filterDto.saved) {
+      if (filterDto.saved === 'saved') {
+        query.andWhere('savedByUsers.id = :userId', {
+          userId: filterDto.userId,
+        });
+      } else if (filterDto.saved === 'not-saved') {
+        const savedSubQuery = this.programmeRepo
+          .createQueryBuilder('subProg')
+          .select('subProg.id')
+          .leftJoin('subProg.saved_by', 'subSavedBy')
+          .where('subSavedBy.id = :userId', { userId: filterDto.userId });
+
+        query.andWhere(`programme.id NOT IN (${savedSubQuery.getQuery()})`, {
+          userId: filterDto.userId,
+        });
+      }
+    }
+
+    // Explicit valid grouping constraints satisfy SQL mode standards precisely
+    query
+      .groupBy('programme.id')
+      .addGroupBy('schedule.id')
+      .addGroupBy('organization.id')
+      .addGroupBy('user.id');
+
+    query
+      .orderBy('relevance_score', 'DESC')
+      .addOrderBy('programme.id', 'ASC')
+      .skip(skip)
+      .take(limit);
+
+    const [items, total] = await query.getManyAndCount();
+
+    // SECOND PASS MAPPING LOAD ENGINE:
+    // If records exist, side-load relationship properties cleanly without clashing with the math aggregates!
+    if (items.length > 0) {
+      const itemIds = items.map((i) => i.id);
+      const fullRelationsData = await this.programmeRepo
+        .createQueryBuilder('programme')
+        .leftJoinAndSelect('programme.related_skills', 'skills')
+        .leftJoinAndSelect('programme.related_interests', 'interests')
+        .where('programme.id IN (:...itemIds)', { itemIds })
+        .getMany();
+
+      items.forEach((item) => {
+        const matchingRow = fullRelationsData.find((r) => r.id === item.id);
+        if (matchingRow) {
+          item.related_skills = matchingRow.related_skills;
+          item.related_interests = matchingRow.related_interests;
+        }
+      });
+    }
+
+    return { items, total, page, lastPage: Math.ceil(total / limit) };
   }
 
   async findOne(id: string) {

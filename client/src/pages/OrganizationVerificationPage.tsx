@@ -21,13 +21,13 @@ export function OrganizationVerificationPage() {
         address: '',
     });
 
-    const [supportingDocument, setSupportingDocument] = useState<File | null>(null);
+    // --- FIXED: Swapped out single File capture hook for an Array collection to store 1, 2, 3 or more uploads cleanly ---
+    const [supportingDocuments, setSupportingDocuments] = useState<File[]>([]);
     const [isDragging, setIsDragging] = useState<boolean>(false);
     const [submitting, setSubmitting] = useState<boolean>(false);
 
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // Dynamic field tracking updates
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
@@ -47,18 +47,26 @@ export function OrganizationVerificationPage() {
         e.preventDefault();
         setIsDragging(false);
         if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-            setSupportingDocument(e.dataTransfer.files[0]);
+            // Append newly dropped files into your tracking matrix arrays safely
+            const droppedFiles = Array.from(e.dataTransfer.files);
+            setSupportingDocuments(prev => [...prev, ...droppedFiles]);
         }
     };
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files.length > 0) {
-            setSupportingDocument(e.target.files[0]);
+            const selectedFiles = Array.from(e.target.files);
+            setSupportingDocuments(prev => [...prev, ...selectedFiles]);
         }
     };
 
     const triggerFileBrowse = () => {
         fileInputRef.current?.click();
+    };
+
+    // Helper block to clean single files out of list queue dynamically
+    const removeDocument = (indexToRemove: number) => {
+        setSupportingDocuments(prev => prev.filter((_, index) => index !== indexToRemove));
     };
 
     // --- Form Submission Pipeline ---
@@ -70,7 +78,7 @@ export function OrganizationVerificationPage() {
             return;
         }
 
-        if (!supportingDocument) {
+        if (supportingDocuments.length === 0) {
             alert("Please upload at least one valid supporting document (e.g., SSM or ROS Certificate).");
             return;
         }
@@ -84,7 +92,11 @@ export function OrganizationVerificationPage() {
             dataPayload.append('authorizedPersonName', formData.authorizedPersonName);
             dataPayload.append('description', formData.description);
             dataPayload.append('address', formData.address);
-            dataPayload.append('document', supportingDocument);
+
+            // --- FIXED: Appends multi-file arrays into FormData using identical multi-part array keys ('documents') ---
+            supportingDocuments.forEach((file) => {
+                dataPayload.append('documents', file);
+            });
 
             await axios.post(`${API_BASE_URL}/organizations/verify`, dataPayload, {
                 headers: {
@@ -97,7 +109,7 @@ export function OrganizationVerificationPage() {
 
             // Clear inputs upon success pass
             setFormData({ organizationName: '', authorizedPersonName: '', description: '', address: '' });
-            setSupportingDocument(null);
+            setSupportingDocuments([]);
         } catch (error: unknown) {
             console.error("Upload process crash error details:", error);
             alert("Failed to submit verification request. Please check system networks.");
@@ -176,7 +188,7 @@ export function OrganizationVerificationPage() {
                             </label>
 
                             <div
-                                className={`dropzone-container ${isDragging ? 'dragging' : ''} ${supportingDocument ? 'has-file' : ''}`}
+                                className={`dropzone-container ${isDragging ? 'dragging' : ''} ${supportingDocuments.length > 0 ? 'has-file' : ''}`}
                                 onDragOver={handleDragOver}
                                 onDragLeave={handleDragLeave}
                                 onDrop={handleDrop}
@@ -186,19 +198,36 @@ export function OrganizationVerificationPage() {
                                     ref={fileInputRef}
                                     onChange={handleFileChange}
                                     accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                                    multiple // --- FIXED: Added to allow clicking and batch picking multiple documents natively ---
                                     style={{ display: 'none' }}
                                 />
 
                                 <p className="dropzone-prompt-text">
-                                    {supportingDocument ? (
-                                        <span className="selected-file-name-display">Selected file: <strong>{supportingDocument.name}</strong></span>
-                                    ) : (
-                                        <>
-                                            Drag & Drop Your Files or <span className="browse-link-trigger" onClick={triggerFileBrowse}>Browse</span>
-                                        </>
-                                    )}
+                                    Drag & Drop Your Files or <span className="browse-link-trigger" onClick={triggerFileBrowse}>Browse</span>
                                 </p>
                             </div>
+
+                            {/* --- ADDED: Dynamic render queue block providing clean visualization of every single file selected --- */}
+                            {supportingDocuments.length > 0 && (
+                                <div className="uploaded-files-list-wrapper">
+                                    <h4 className="file-list-heading">Selected Files ({supportingDocuments.length}):</h4>
+                                    <ul className="file-preview-list">
+                                        {supportingDocuments.map((file, idx) => (
+                                            <li key={`${file.name}_${idx}`} className="file-preview-item">
+                                                <span className="file-name-string">{file.name}</span>
+                                                <button
+                                                    type="button"
+                                                    className="remove-file-item-btn"
+                                                    onClick={() => removeDocument(idx)}
+                                                    title="Remove document"
+                                                >
+                                                    &times;
+                                                </button>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
                         </div>
 
                         {/* Action Submit Control Row */}
