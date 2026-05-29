@@ -10,8 +10,6 @@ import {
 import { generateCustomId } from '../common/utils/id_generator.util';
 import { User } from '../users/entities/user.entity';
 
-// --- Define an Interface for the Update Payload ---
-// This tells TypeScript exactly what fields might come from the frontend
 interface UpdateOrgPayload {
   username?: string;
   email?: string;
@@ -20,6 +18,14 @@ interface UpdateOrgPayload {
   description?: string;
   contact_number?: string;
   profile_picture_url?: string;
+}
+
+interface CreateVerificationRegistrationDto {
+  organizationName: string;
+  authorizedPersonName: string;
+  description: string;
+  address: string;
+  supporting_documents: string[]; // Typed as array to perfectly match our simple-array schema
 }
 
 @Injectable()
@@ -34,6 +40,26 @@ export class OrganizationsService {
 
   // --- Registration Record Methods ---
 
+  /**
+   * Handles multi-file verification form submissions natively and securely
+   */
+  async createVerificationRegistration(dto: CreateVerificationRegistrationDto) {
+    const id = await generateCustomId(this.regRepo, 'REG');
+
+    const newReg = this.regRepo.create({
+      id,
+      organizationName: dto.organizationName,
+      authorizedPersonName: dto.authorizedPersonName,
+      description: dto.description,
+      address: dto.address,
+      supporting_documents: dto.supporting_documents,
+      submission_time: new Date(),
+      status: 'pending',
+    });
+
+    return await this.regRepo.save(newReg);
+  }
+
   async createRegistration(dto: CreateOrganizationRegistrationDto) {
     const id = await generateCustomId(this.regRepo, 'REG');
     const newReg = this.regRepo.create({
@@ -41,7 +67,7 @@ export class OrganizationsService {
       ...dto,
       submission_time: new Date(),
       status: 'pending',
-    });
+    } as any);
     return await this.regRepo.save(newReg);
   }
 
@@ -59,7 +85,7 @@ export class OrganizationsService {
     id: string,
     updateDto: Partial<CreateOrganizationRegistrationDto>,
   ) {
-    await this.regRepo.update(id, updateDto);
+    await this.regRepo.update(id, updateDto as any);
     return await this.findOneRegistration(id);
   }
 
@@ -110,7 +136,6 @@ export class OrganizationsService {
     if (!org) throw new NotFoundException('Organization not found');
 
     // 1. Handle User Table Updates
-    // We use Partial<User> to ensure type safety
     const userData: Partial<User> = {};
     if (updateDto.username) userData.username = updateDto.username;
     if (updateDto.email) userData.email = updateDto.email;
