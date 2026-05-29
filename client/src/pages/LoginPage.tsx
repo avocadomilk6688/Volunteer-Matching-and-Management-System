@@ -1,9 +1,29 @@
 import { useNavigate } from 'react-router';
 import { Link } from 'react-router';
 import { Header } from './Header';
-import './login_page.css';
 import { useState } from 'react';
 import { useAuth } from '../context/auth/useAuth';
+import './login_page.css';
+
+const API_BASE_URL = "http://localhost:3000";
+
+// --- Explicit Interface definitions for clean type-safety handling ---
+interface ProfileRelation {
+    profile_picture_url?: string;
+    registrationRecord?: {
+        status: string;
+    };
+}
+
+interface LoginResponseData {
+    access_token: string;
+    id: string;
+    username: string;
+    role: 'admin' | 'volunteer' | 'organization';
+    volunteer?: ProfileRelation;
+    organization?: ProfileRelation;
+    message?: string;
+}
 
 export function LoginPage() {
     const navigate = useNavigate();
@@ -17,32 +37,43 @@ export function LoginPage() {
         e.preventDefault();
 
         try {
-            const response = await fetch('http://localhost:3000/auth/login', {
+            const response = await fetch(`${API_BASE_URL}/auth/login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email, password, role }),
             });
 
-            const data = await response.json();
+            const data = (await response.json()) as LoginResponseData;
 
-            // This log will now show the organization/volunteer objects if the backend is fixed
             console.log("DEBUG: Full response from server:", data);
 
             if (!response.ok) {
                 throw new Error(data.message || 'Login failed');
             }
 
-            // --- THE FIX ---
-            // Pass the entire 'data' object. 
-            // Because we fixed the backend 'AuthService', this 'data' now contains 
-            // the 'organization' or 'volunteer' keys needed for the profile picture.
-            login(data.access_token, data);
+            // --- FIXED: Spreads the data and injects the local 'email' state variable 
+            // to satisfy the strict requirements of your Context User contract ---
+            login(data.access_token, {
+                ...data,
+                email: email,
+            });
 
-            // --- Navigation Logic ---
+            // --- Navigation Interceptor Logic Matrix ---
             if (role === 'volunteer') {
                 navigate('/volunteer-home');
             } else if (role === 'admin') {
-                navigate('/manage-user-account')
+                navigate('/manage-user-account');
+            } else if (role === 'organization') {
+                // Safely read the custom nested registration verification status value from response payload
+                const registrationStatus = data.organization?.registrationRecord?.status || 'pending';
+
+                if (registrationStatus === 'pending') {
+                    // REDIRECT INTERCEPT: Forces pending accounts to stay on the pending approval notice path
+                    navigate('/pending-approval');
+                } else {
+                    // Approved organizations get full workspace access smoothly
+                    navigate('/manage-listing');
+                }
             } else {
                 navigate('/manage-listing');
             }

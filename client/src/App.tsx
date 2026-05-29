@@ -18,6 +18,7 @@ import { AdminManageTicketsPage } from './pages/AdminManageTicketsPage';
 import { OrganizationVerificationPage } from './pages/OrganizationVerificationPage';
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
 import { ResetPasswordPage } from './pages/ResetPasswordPage';
+import { PendingApprovalPage } from './pages/PendingApprovalPage';
 
 function App() {
   return (
@@ -42,6 +43,7 @@ function App() {
         <Route path="organization-verification" element={<OrganizationVerificationPage />} />
         <Route path="forgot-password" element={<ForgotPasswordPage />} />
         <Route path="reset-password" element={<ResetPasswordPage />} />
+        <Route path="pending-approval" element={<PendingApprovalPage />} />
       </Routes>
     </AuthProvider>
   )
