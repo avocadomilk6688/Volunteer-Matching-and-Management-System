@@ -7,11 +7,13 @@ import { Skill } from './entities/skill.entity';
 import { Interest } from './entities/interest.entity';
 import { VolunteerMonthlyPoint } from './entities/volunteer-monthly-point.entity';
 import { Application } from '../applications/entities/application.entity';
+import { User } from '../users/entities/user.entity';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([
       Volunteer,
+      User,
       Skill,
       Interest,
       VolunteerMonthlyPoint,
@@ -20,6 +22,6 @@ import { Application } from '../applications/entities/application.entity';
   ],
   controllers: [VolunteersController],
   providers: [VolunteersService],
-  exports: [VolunteersService], // Exposes service to UsersModule perfectly
+  exports: [VolunteersService],
 })
 export class VolunteersModule {}

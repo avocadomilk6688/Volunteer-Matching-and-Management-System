@@ -3,11 +3,11 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { User } from '../users/entities/user.entity';
+import { MailModule } from '../mail/mail.module'; // 👈 Imported the new MailModule wrapper
 
-// AuthModule bundles the authentication logic and database dependencies.
+// AuthModule bundles the authentication logic, mail utilities, and database dependencies.
 @Module({
-  // Imports the User entity to allow the repository to be injected into the service.
-  imports: [TypeOrmModule.forFeature([User])],
+  imports: [TypeOrmModule.forFeature([User]), MailModule],
   // Registers the controller to handle incoming HTTP requests.
   controllers: [AuthController],
   // Registers the service to handle the business logic and database work.

@@ -27,6 +27,10 @@ export class User {
   // Use a union type here for better autocomplete/safety
   role!: 'admin' | 'volunteer' | 'organization';
 
+  // ─── FIXED TYPEORM UNION COLUMN TYPE HERE ───
+  @Column({ type: 'varchar', nullable: true, name: 'reset_password_token' }) // 👈 Added type: 'varchar' explicitly
+  resetPasswordToken?: string | null;
+
   // Relation<> helps fix that "Error typed value" linter bug
   @OneToOne(() => Volunteer, (volunteer) => volunteer.user, { eager: true })
   volunteer?: Relation<Volunteer>;

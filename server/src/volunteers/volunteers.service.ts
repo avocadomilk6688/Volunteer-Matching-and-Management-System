@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Volunteer } from './entities/volunteer.entity';
+import { User } from '../users/entities/user.entity'; // 👈 Imported for cross-repo persistence
 import { Skill } from './entities/skill.entity';
 import { Interest } from './entities/interest.entity';
 import { VolunteerMonthlyPoint } from './entities/volunteer-monthly-point.entity';
@@ -10,6 +11,7 @@ import { generateCustomId } from '../common/utils/id_generator.util';
 
 export class UpdateProfileDto {
   username?: string;
+  email?: string;
   gender?: string;
   location?: string;
   contact_number?: string;
@@ -20,8 +22,6 @@ export class UpdateProfileDto {
 export interface LocalMulterFile {
   filename: string;
 }
-
-// --- Define an Interface for the Update Payload ---
 export interface VolunteerHistory {
   rating: number;
   totalHours: number;
@@ -33,6 +33,8 @@ export class VolunteersService {
   constructor(
     @InjectRepository(Volunteer)
     private readonly volRepo: Repository<Volunteer>,
+    @InjectRepository(User)
+    private readonly userRepo: Repository<User>, // 👈 Injected parent User repository
     @InjectRepository(Skill)
     private readonly skillRepo: Repository<Skill>,
     @InjectRepository(Interest)
@@ -103,8 +105,22 @@ export class VolunteersService {
     if (updateDto.location) volunteer.location = updateDto.location;
     if (updateDto.contact_number)
       volunteer.contact_number = updateDto.contact_number;
-    if (updateDto.username && volunteer.user)
-      volunteer.user.username = updateDto.username;
+
+    // ─── UPDATED: EXPLICIT CASCADING SAVES FOR CORE ACCOUNT PARAMETERS ───
+    if (volunteer.user) {
+      let userNeedsUpdate = false;
+      if (updateDto.username) {
+        volunteer.user.username = updateDto.username;
+        userNeedsUpdate = true;
+      }
+      if (updateDto.email) {
+        volunteer.user.email = updateDto.email; // Updates actual email column
+        userNeedsUpdate = true;
+      }
+      if (userNeedsUpdate) {
+        await this.userRepo.save(volunteer.user); // Persists updates directly to core user table
+      }
+    }
 
     if (updateDto.skills) {
       volunteer.skills =

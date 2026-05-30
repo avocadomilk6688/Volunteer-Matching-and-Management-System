@@ -135,7 +135,7 @@ export class OrganizationsService {
 
     if (!org) throw new NotFoundException('Organization not found');
 
-    // 1. Handle User Table Updates
+    // 1. Handle User Table Updates via the Transaction Manager
     const userData: Partial<User> = {};
     if (updateDto.username) userData.username = updateDto.username;
     if (updateDto.email) userData.email = updateDto.email;

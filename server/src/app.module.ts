@@ -26,10 +26,13 @@ import { ApplicationsModule } from './applications/applications.module';
 import { Application } from './applications/entities/application.entity';
 import { AuthModule } from './auth/auth.module';
 import { VolunteerMonthlyPoint } from './volunteers/entities/volunteer-monthly-point.entity';
+import { MailModule } from './mail/mail.module';
 
 @Module({
   imports: [
-    ConfigModule.forRoot(),
+    ConfigModule.forRoot({
+      isGlobal: true,
+    }),
     TypeOrmModule.forRoot({
       type: 'mysql',
       host: process.env.DB_HOST,
@@ -64,6 +67,7 @@ import { VolunteerMonthlyPoint } from './volunteers/entities/volunteer-monthly-p
     InteractionsModule,
     ApplicationsModule,
     AuthModule,
+    MailModule,
   ],
   controllers: [AppController],
   providers: [AppService],
