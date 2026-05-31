@@ -40,15 +40,18 @@ export function AdminManageListingPage() {
                 headers: { Authorization: `Bearer ${token}` }
             });
 
-            // Defensive type checking to handle varied object wrapper payloads safely
-            if (Array.isArray(response.data)) {
-                setListings(response.data);
-            } else if (response.data && typeof response.data === 'object' && 'programmes' in response.data && Array.isArray((response.data as Record<string, unknown>).programmes)) {
-                setListings((response.data as { programmes: BackendProgramme[] }).programmes);
-            } else if (response.data && typeof response.data === 'object' && 'data' in response.data && Array.isArray((response.data as Record<string, unknown>).data)) {
-                setListings((response.data as { data: BackendProgramme[] }).data);
-            } else {
-                console.error("Received unexpected non-array format from backend:", response.data);
+            console.log("DEBUG: Admin raw response data:", response.data);
+
+            // --- FIXED: Robust parsing for wrapped { items: [] } response ---
+            if (response.data && response.data.items && Array.isArray(response.data.items)) {
+                setListings(response.data.items as BackendProgramme[]);
+            }
+            // Fallback for standard arrays
+            else if (Array.isArray(response.data)) {
+                setListings(response.data as BackendProgramme[]);
+            }
+            else {
+                console.error("Received unexpected format:", response.data);
                 setListings([]);
             }
         } catch (error) {
@@ -82,14 +85,10 @@ export function AdminManageListingPage() {
         }
     };
 
-    const activeListingsArray = Array.isArray(listings) ? listings : [];
-
-    // --- FIXED: Updated to dynamically match search terms against program titles AND live organization usernames ---
-    const filteredListings = activeListingsArray.filter(item => {
+    const filteredListings = listings.filter(item => {
         const titleMatch = (item.title || '').toLowerCase().includes(searchTerm.toLowerCase());
         const orgUsername = item.organization?.user?.username || '';
         const orgMatch = orgUsername.toLowerCase().includes(searchTerm.toLowerCase());
-
         return titleMatch || orgMatch;
     });
 
@@ -99,8 +98,6 @@ export function AdminManageListingPage() {
         <div className="admin-dashboard-wrapper">
             <Header />
             <div className="admin-dashboard-container">
-
-                {/* Left Side Sidebar Navigation Track */}
                 <aside className="admin-sidebar">
                     <nav>
                         <ul>
@@ -123,7 +120,6 @@ export function AdminManageListingPage() {
                     </nav>
                 </aside>
 
-                {/* Right Central Workspace Canvas */}
                 <main className="admin-main-content">
                     <h1 className="admin-main-title">Manage listing</h1>
 
@@ -190,7 +186,6 @@ export function AdminManageListingPage() {
                         </GenericTable>
                     )}
                 </main>
-
             </div>
         </div>
     );
