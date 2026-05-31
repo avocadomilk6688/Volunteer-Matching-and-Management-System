@@ -6,12 +6,12 @@ import { ChatWindow } from './ChatWindow';
 import axios from 'axios';
 import './admin_manage_tickets_page.css';
 
-// --- UPDATED: Interface maps your database properties and nested entity relations perfectly ---
+// --- Interface maps database schema fields and eagerly joined user records cleanly ---
 interface SupportTicket {
     id: string;
-    content: string; // Matches your raw database column name 'content'
+    content: string; // Matches raw MySQL text body column 'content'
     status: string;
-    submissionTime: string; // datetime template format string
+    submissionTime: string; // Datetime string representation format
     userId: string | null;
     user?: {
         id: string;
@@ -26,11 +26,11 @@ export function AdminManageTicketsPage() {
     const navigate = useNavigate();
     const location = useLocation();
 
-    // Data tracking states
+    // Help desk queue states
     const [tickets, setTickets] = useState<SupportTicket[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
 
-    // Chat modal routing states
+    // Context overlay tracker for mounting customer support chat modal windows
     const [activeChatTicket, setActiveChatTicket] = useState<SupportTicket | null>(null);
 
     const fetchTickets = async () => {
@@ -38,12 +38,12 @@ export function AdminManageTicketsPage() {
             setLoading(true);
             const token = localStorage.getItem('token');
 
-            // --- FIXED: Connects directly to your live support ticket database index endpoint ---
+            // Hits explicit NestJS route handler returning eagerly joined table sets
             const response = await axios.get<SupportTicket[]>(`${API_BASE_URL}/interactions/support-ticket`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
 
-            // Filters down rows to isolate active/open ticket profiles exclusively
+            // Filters downstream queues to isolate non-resolved help requests
             const activeTickets = Array.isArray(response.data)
                 ? response.data.filter(t => t.status?.toLowerCase() === 'open')
                 : [];
@@ -72,7 +72,7 @@ export function AdminManageTicketsPage() {
             <Header />
             <div className="admin-dashboard-container">
 
-                {/* Left primary accent navigation menu column */}
+                {/* Left Primary System Workspace Navigation Sidebar */}
                 <aside className="admin-sidebar">
                     <nav>
                         <ul>
@@ -95,7 +95,7 @@ export function AdminManageTicketsPage() {
                     </nav>
                 </aside>
 
-                {/* Right data workspace sheet frame */}
+                {/* Right Help Desk Live Data Workspace Sheet Grid */}
                 <main className="admin-main-content">
                     <h1 className="admin-main-title">Manage support ticket</h1>
 
@@ -105,7 +105,7 @@ export function AdminManageTicketsPage() {
                         <GenericTable headers={headers}>
                             {tickets.length > 0 ? (
                                 tickets.map((row) => {
-                                    // Extract nested profile credentials safely with crisp fallbacks
+                                    // Resolves fallback identities if context relations parse unlinked
                                     const renderedUsername = row.user?.username || row.userId || 'Unknown User';
 
                                     const roleRaw = row.user?.role || 'User';
@@ -145,7 +145,7 @@ export function AdminManageTicketsPage() {
 
             </div>
 
-            {/* --- CORE INTEGRATION: LAUNCH SUPPORT CHAT INSTANTLY --- */}
+            {/* ─── LIVE RE-USE MATRIX: ROUTING THE HELP DESK METADATA AS A PROGRAM BLOCK ─── */}
             {activeChatTicket && (
                 <ChatWindow
                     key={`ticket_chat_${activeChatTicket.id}`}
@@ -153,6 +153,10 @@ export function AdminManageTicketsPage() {
                     senderId={localStorage.getItem('userId') || "ADMIN_SYSTEM_ID"}
                     receiverId={activeChatTicket.user?.id || activeChatTicket.userId || ""}
                     receiverName={activeChatTicket.user?.username || "Help Desk Client"}
+
+                    // Maps ticket codes to the programme window hooks to activate your custom customer service guards safely
+                    programmeId={activeChatTicket.id} // Forwarding ticket key (e.g. 'T001')
+                    programmeName={`Support Ticket #${activeChatTicket.id}: "${activeChatTicket.content}"`} // Context Header block payload
                 />
             )}
         </div>

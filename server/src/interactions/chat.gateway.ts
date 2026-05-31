@@ -67,20 +67,42 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   /**
    * Standard 1-on-1 Messaging.
-   * FIX: Accepts the extra `programmeId` property to ensure database saving and socket grouping accuracy.
+   * FIX: Sanitizes support ticket IDs before database writes to stop foreign key constraint crashes.
    */
   @SubscribeMessage('send_message')
   async handleMessage(
     @MessageBody() dto: CreateMessageDto & { programmeId?: string },
   ) {
     try {
-      // 1. Save to DB - passing the full dto object (which now includes programmeId)
-      const savedMsg = await this.interactionsService.createMessage(dto);
+      console.log(
+        'DEBUG: INCOMING WS MESSAGE PAYLOAD RECEIVED ON GATEWAY',
+        dto,
+      );
 
-      // 2. Identify the isolated chat room using user combinations and programme context
+      // ─── FIXED: TICKET FOREIGN KEY STRIP STRATEGY ───
+      // If the message is emitted from a support ticket channel context, it starts with a 'T'.
+      // We pass an overridden undefined field value to the DB service layer to clear MySQL validation bugs,
+      // saving this log into the tables as a general inquiry.
+      const isSupportTicket =
+        dto.programmeId && dto.programmeId.startsWith('T');
+
+      const dbPayload = {
+        ...dto,
+        programmeId: isSupportTicket ? undefined : dto.programmeId,
+      };
+
+      // 1. Save to DB using the sanitized database payload representation
+      const savedMsg = await this.interactionsService.createMessage(dbPayload);
+
+      // 2. Identify the isolated chat room using user combinations and original programme string context
+      // Note: We use the original dto.programmeId here to ensure we send to room_T002_... instead of general!
       const progId = dto.programmeId || 'general';
       const roomId =
         [dto.senderId, dto.receiverId].sort().join('_') + `_${progId}`;
+
+      console.log(
+        `DEBUG: BROADCASTING SAVED MESSAGE TO REAL-TIME ROOM: ${roomId}`,
+      );
 
       // 3. Emit to the shared chat room (for the active chat window stream)
       this.server.to(roomId).emit('receive_message', savedMsg);
@@ -93,7 +115,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         programmeId: dto.programmeId || null,
       });
     } catch (error) {
-      console.error('Error in send_message:', error);
+      console.error('Error in send_message compilation execution:', error);
     }
   }
 
