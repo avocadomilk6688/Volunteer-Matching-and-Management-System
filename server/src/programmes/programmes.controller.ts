@@ -21,6 +21,46 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
 
+// ─── EXPLICIT LINT-SAFE INTERFACES ───
+interface SkillEntity {
+  id: string;
+  skill_name: string;
+}
+interface InterestEntity {
+  id: string;
+  interest_name: string;
+}
+
+interface VolunteerRelation {
+  id: string;
+}
+
+interface ProgrammeEntityWithSavedBy {
+  id: string;
+  saved_by?: VolunteerRelation[];
+}
+
+interface ProgrammeResponseDto {
+  id: string;
+  title: string;
+  description: string;
+  imageUrl: string;
+  organization?: { id: string };
+  related_skills: SkillEntity[];
+  related_interests: InterestEntity[];
+  schedule: {
+    mode: string;
+    location: string;
+    start_time: string;
+    end_time: string;
+  };
+}
+
+interface WrappedBackendResponse {
+  items: ProgrammeResponseDto[];
+  total: number;
+}
+
 @Controller('programmes')
 export class ProgrammesController {
   constructor(private readonly programmesService: ProgrammesService) {}
@@ -42,7 +82,6 @@ export class ProgrammesController {
     @Body() createProgrammeDto: CreateProgrammeDto,
     @UploadedFile() file: Express.Multer.File,
   ) {
-    // Relative path for database consistency and browser security
     const imageUrl = file
       ? `/images/programmes/${file.filename}`
       : '/images/programmes/default.jpg';
@@ -81,21 +120,45 @@ export class ProgrammesController {
   }
 
   @Get()
-  async findAll(@Query() filterDto: FilterProgrammeParams) {
-    // --- FIXED: If an admin request is made or no paginated filter criteria are passed,
-    // provide the clean flat array to satisfy the admin workspace table expectations natively.
-    if (
-      !filterDto.page &&
-      !filterDto.keyword &&
-      !filterDto.location &&
-      !filterDto.skill &&
-      !filterDto.interest
-    ) {
-      return await this.programmesService.findAllAdmin();
+  async findAll(
+    @Query() filterDto: FilterProgrammeParams,
+  ): Promise<WrappedBackendResponse> {
+    let rawResult: unknown;
+
+    // Evaluate query parameters accurately
+    const hasFilters =
+      filterDto.page ||
+      filterDto.keyword ||
+      filterDto.location ||
+      filterDto.skill ||
+      filterDto.interest;
+
+    if (!hasFilters) {
+      rawResult = await this.programmesService.findAllAdmin();
+    } else {
+      rawResult = await this.programmesService.findAll(filterDto);
     }
 
-    // Fall back to original standard filtered/paginated layout object for user-facing features
-    return await this.programmesService.findAll(filterDto);
+    // ─── TYPE-SAFE MATRIX RE-CONSTRUCTION ───
+    if (Array.isArray(rawResult)) {
+      return {
+        items: rawResult as ProgrammeResponseDto[],
+        total: rawResult.length,
+      };
+    }
+
+    if (rawResult && typeof rawResult === 'object' && 'items' in rawResult) {
+      const castedResult = rawResult as WrappedBackendResponse;
+      return {
+        items: castedResult.items || [], // 👈 Cleaned up! No redundant type assertion here anymore.
+        total: typeof castedResult.total === 'number' ? castedResult.total : 0,
+      };
+    }
+
+    return {
+      items: [],
+      total: 0,
+    };
   }
 
   @Post(':id/save')
@@ -111,8 +174,15 @@ export class ProgrammesController {
     @Param('id') programmeId: string,
     @Param('userId') userId: string,
   ): Promise<{ isSaved: boolean }> {
-    const programme = await this.programmesService.findOne(programmeId);
-    const isSaved = programme.saved_by?.some((v) => v.id === userId) || false;
+    const programme = (await this.programmesService.findOne(
+      programmeId,
+    )) as unknown as ProgrammeEntityWithSavedBy;
+    const savedByArray = programme.saved_by;
+
+    const isSaved = Array.isArray(savedByArray)
+      ? savedByArray.some((v: VolunteerRelation) => v.id === userId)
+      : false;
+
     return { isSaved };
   }
 

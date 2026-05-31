@@ -7,17 +7,18 @@ import './login_page.css';
 
 const API_BASE_URL = "http://localhost:3000";
 
-// --- Explicit Interface definitions for clean type-safety handling ---
 interface ProfileRelation {
+    id: string; // E.g., O002
     profile_picture_url?: string;
     registrationRecord?: {
+        id: string;
         status: string;
     };
 }
 
 interface LoginResponseData {
     access_token: string;
-    id: string;
+    id: string; // Core tracking ID (O002)
     username: string;
     role: 'admin' | 'volunteer' | 'organization';
     volunteer?: ProfileRelation;
@@ -45,44 +46,62 @@ export function LoginPage() {
 
             const data = (await response.json()) as LoginResponseData;
 
-            console.log("DEBUG: Full response from server:", data);
+            console.log("DEBUG: Full login response from server payload:", data);
 
             if (!response.ok) {
                 throw new Error(data.message || 'Login failed');
             }
 
-            // ─── FIXED: EXPLICITLY PERSIST THE USER ID IN LOCALSTORAGE ───
-            // This ensures components like the QAPage support ticket modal can query the session active user id context cleanly.
+            // ─── CRITICAL MISSING LINK FIXED ───
+            // Explicitly persist the bearer authentication token inside localStorage.
+            // This ensures ManageListingPage can fetch protected relations securely!
+            localStorage.setItem('token', data.access_token);
+
+            // Keeps your clean ID tracking completely intact inside local storage
             localStorage.setItem('userId', data.id);
 
-            // --- spreads the data and injects the local 'email' state variable 
-            // to satisfy the strict requirements of your Context User contract ---
-            login(data.access_token, {
+            // ─── DATA STRUCTURE NORMALIZATION MATRIX ───
+            const unifiedAuthUserContext = {
                 ...data,
+                id: data.id, // "O002"
                 email: email,
-            });
+                organization: data.organization ? {
+                    ...data.organization,
+                    id: data.organization.id || data.id
+                } : undefined
+            };
 
-            // --- Navigation Interceptor Logic Matrix ---
+            // Propagate normalized data representation to Context
+            login(data.access_token, unifiedAuthUserContext);
+
+            // ─── NAV INTERCEPTOR LOGIC MATRIX ───
             if (role === 'volunteer') {
                 navigate('/volunteer-home');
             } else if (role === 'admin') {
                 navigate('/manage-user-account');
             } else if (role === 'organization') {
-                // Safely read the custom nested registration verification status value from response payload
-                const registrationStatus = data.organization?.registrationRecord?.status || 'pending';
 
-                if (registrationStatus === 'pending') {
-                    // REDIRECT INTERCEPT: Forces pending accounts to stay on the pending approval notice path
+                // Safely extract approval status out of the nested registrationRecord relation object
+                const rawStatus = data.organization?.registrationRecord?.status || 'pending';
+                const registrationStatus = rawStatus.trim().toLowerCase();
+
+                console.log("DEBUG: Normalized registration status evaluation:", registrationStatus);
+
+                if (registrationStatus === 'approved') {
+                    // Approved organizations bypass the lockout banner and hit operational features smoothly
+                    navigate('/manage-listing');
+                } else if (registrationStatus === 'pending') {
+                    // Explicitly pending accounts stay securely contained
                     navigate('/pending-approval');
                 } else {
-                    // Approved organizations get full workspace access smoothly
+                    // Safety fallback: allow redirection default safely
                     navigate('/manage-listing');
                 }
             } else {
                 navigate('/manage-listing');
             }
         } catch (error: unknown) {
-            console.error("Login error:", error);
+            console.error("Login error context logs:", error);
             if (error instanceof Error) {
                 alert(error.message);
             } else {

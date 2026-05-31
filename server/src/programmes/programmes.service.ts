@@ -169,18 +169,24 @@ export class ProgrammesService {
   }
 
   /**
-   * Explicit unpaginated admin channel
+   * ─── FIXED: FULL RELATION ADAPTATION CHANNEL ───
+   * Upgraded to QueryBuilder to match standard relational models eagerly.
+   * This guarantees skills and interests load flawlessly for your listings table.
    */
   async findAllAdmin(): Promise<Programme[]> {
-    return await this.programmeRepo.find({
-      relations: ['schedule', 'organization', 'organization.user'],
-      order: { id: 'DESC' },
-    });
+    return await this.programmeRepo
+      .createQueryBuilder('programme')
+      .leftJoinAndSelect('programme.schedule', 'schedule')
+      .leftJoinAndSelect('programme.organization', 'organization')
+      .leftJoinAndSelect('organization.user', 'user')
+      .leftJoinAndSelect('programme.related_skills', 'skills')
+      .leftJoinAndSelect('programme.related_interests', 'interests')
+      .orderBy('programme.id', 'DESC')
+      .getMany();
   }
 
   /**
-   * --- SMART MATCH HYBRID RECOMMENDATION PIPELINE ---
-   * Safe from only_full_group_by restrictions, handles history behavior dynamically.
+   * Smart Match Hybrid Recommendation Pipeline
    */
   async getRecommended(
     userId: string | null,
@@ -232,8 +238,6 @@ export class ProgrammesService {
       });
     }
 
-    // --- CRITICAL FIX: Changed to clean 'leftJoin' for many-to-many properties
-    // to shield them completely out of hidden SELECT grouping validations
     const query = this.programmeRepo
       .createQueryBuilder('programme')
       .leftJoinAndSelect('programme.schedule', 'schedule')
@@ -241,7 +245,6 @@ export class ProgrammesService {
       .leftJoinAndSelect('organization.user', 'user')
       .leftJoin('programme.saved_by', 'savedByUsers');
 
-    // SCORING ALGORITHM BASELINE
     let scoreSql = `(COALESCE(organization.rating, 0) * 5) + 
                     (CASE WHEN schedule.location LIKE :userLoc THEN 35 ELSE 0 END)`;
 
@@ -275,7 +278,6 @@ export class ProgrammesService {
     query.addSelect(scoreSql, 'relevance_score');
     query.setParameter('userLoc', `%${filterDto.location || ''}%`);
 
-    // Manual Filters Layer
     if (filterDto.keyword) {
       query.andWhere(
         '(programme.title LIKE :keyword OR programme.description LIKE :keyword)',
@@ -308,7 +310,6 @@ export class ProgrammesService {
       });
     }
 
-    // Handles intentional search input parameters safely via independent isolation leftJoins
     if (filterDto.skill) {
       const skillIds = filterDto.skill.split(',');
       query
@@ -341,7 +342,6 @@ export class ProgrammesService {
       }
     }
 
-    // Explicit valid grouping constraints satisfy SQL mode standards precisely
     query
       .groupBy('programme.id')
       .addGroupBy('schedule.id')
@@ -356,8 +356,6 @@ export class ProgrammesService {
 
     const [items, total] = await query.getManyAndCount();
 
-    // SECOND PASS MAPPING LOAD ENGINE:
-    // If records exist, side-load relationship properties cleanly without clashing with the math aggregates!
     if (items.length > 0) {
       const itemIds = items.map((i) => i.id);
       const fullRelationsData = await this.programmeRepo
