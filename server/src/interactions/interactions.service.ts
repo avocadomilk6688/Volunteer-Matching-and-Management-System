@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, IsNull } from 'typeorm';
 
@@ -307,9 +311,37 @@ export class InteractionsService {
     return `Notification ${singleCustomId} created`;
   }
 
+  // ─── REWRITTEN SUPPORT TICKET PIPELINE ───
   async createSupportTicket(dto: CreateSupportTicketDto): Promise<string> {
+    if (!dto.userId) {
+      throw new BadRequestException(
+        'Cannot log a support ticket without an active user ID context.',
+      );
+    }
+
+    // 1. Generate incremental alphanumeric custom identity code ('T001', 'T002', etc.)
     const id = await generateCustomId(this.ticketRepo, 'T');
-    const newTicket = this.ticketRepo.create({ id, ...dto });
+
+    // 2. Query the full User entity from the database using the tracked userId mapping
+    const userEntity = await this.userRepo.findOne({
+      where: { id: dto.userId },
+    });
+
+    if (!userEntity) {
+      throw new NotFoundException(
+        `Relational linkage failed: User record with ID "${dto.userId}" not found in the primary registry.`,
+      );
+    }
+
+    // 3. Assemble the record payload mapping fields explicitly to their entity parameters
+    const newTicket = this.ticketRepo.create({
+      id,
+      content: dto.content,
+      status: dto.status || 'open',
+      user: userEntity, // 👈 Explicitly binds the database entity relationship context cleanly
+    });
+
+    // 4. Save the completed ticket tuple into your MySQL schema
     await this.ticketRepo.save(newTicket);
     return `Ticket ${id} submitted`;
   }

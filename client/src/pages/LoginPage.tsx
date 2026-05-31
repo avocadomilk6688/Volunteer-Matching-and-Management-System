@@ -51,7 +51,11 @@ export function LoginPage() {
                 throw new Error(data.message || 'Login failed');
             }
 
-            // --- FIXED: Spreads the data and injects the local 'email' state variable 
+            // ─── FIXED: EXPLICITLY PERSIST THE USER ID IN LOCALSTORAGE ───
+            // This ensures components like the QAPage support ticket modal can query the session active user id context cleanly.
+            localStorage.setItem('userId', data.id);
+
+            // --- spreads the data and injects the local 'email' state variable 
             // to satisfy the strict requirements of your Context User contract ---
             login(data.access_token, {
                 ...data,

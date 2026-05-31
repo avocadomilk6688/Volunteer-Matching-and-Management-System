@@ -35,6 +35,7 @@ export class CreateNotificationDto {
   @IsOptional()
   isRead?: boolean;
 }
+
 export class CreateQuestionAnswerDto {
   @IsString()
   @IsNotEmpty()

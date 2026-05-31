@@ -1,3 +1,4 @@
+/* --- Base Layout Styles --- */
 .qa-wrapper {
     background-color: white;
     height: 100vh;
@@ -17,6 +18,7 @@
     margin-bottom: 50px;
 }
 
+/* --- Q&A Columns --- */
 .qa-columns {
     display: flex;
     justify-content: space-between;
@@ -37,6 +39,7 @@
     text-align: right;
 }
 
+/* --- Accordion Items --- */
 .qa-item {
     margin-bottom: 20px;
 }
@@ -70,13 +73,120 @@
     margin-top: 10px;
 }
 
+/* --- Footer & Links --- */
 .qa-footer {
     text-align: center;
     margin-top: 100px;
     font-size: 16px;
 }
 
-.qa-footer a {
+/* Styles the support ticket span to act exactly like an interactive link anchor */
+.ticket-link {
     color: #FF8C42;
     text-decoration: underline;
+    cursor: pointer;
+    font-weight: bold;
+}
+
+.ticket-link:hover {
+    opacity: 0.8;
+}
+
+/* --- Support Ticket Modal Window Styles --- */
+
+/* Frosted screen background overlay layer */
+.ticket-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: rgba(0, 0, 0, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+/* Clean, modern popup card container */
+.ticket-modal-box {
+    background-color: #ffffff;
+    padding: 30px;
+    width: 100%;
+    max-width: 450px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    border-radius: 4px;
+    /* Optional slight rounding for a cleaner UI layout */
+}
+
+.ticket-modal-box h3 {
+    margin-top: 0;
+    margin-bottom: 10px;
+    font-size: 22px;
+    color: #000000;
+    font-weight: bold;
+}
+
+.ticket-modal-box p {
+    font-size: 14px;
+    color: #555555;
+    margin-bottom: 15px;
+    line-height: 1.4;
+}
+
+.ticket-modal-box textarea {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #E0E0E0;
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    resize: none;
+    box-sizing: border-box;
+    margin-bottom: 20px;
+}
+
+.ticket-modal-box textarea:focus {
+    outline: 2px solid #FF8C42;
+}
+
+.modal-buttons-row {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+}
+
+.modal-cancel-btn {
+    background-color: #f5f5f5;
+    color: #333333;
+    border: none;
+    padding: 10px 20px;
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 14px;
+    transition: background-color 0.2s;
+}
+
+.modal-cancel-btn:hover {
+    background-color: #e5e5e5;
+}
+
+.modal-submit-btn {
+    background-color: #FF8C42;
+    color: #ffffff;
+    border: none;
+    padding: 10px 20px;
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 14px;
+    transition: opacity 0.2s;
+}
+
+.modal-submit-btn:hover {
+    opacity: 0.9;
+}
+
+.modal-submit-btn:disabled,
+.modal-cancel-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
 }

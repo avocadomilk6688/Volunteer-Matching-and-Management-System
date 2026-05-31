@@ -15,6 +15,11 @@ export function QAPage() {
     const [activeId, setActiveId] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
 
+    // ─── NEW STATE MANAGEMENT FOR SUPPORT TICKET MODAL WINDOW ───
+    const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
+    const [issueText, setIssueText] = useState<string>("");
+    const [submittingTicket, setSubmittingTicket] = useState<boolean>(false);
+
     const toggleQuestion = (id: string) => {
         setActiveId(activeId === id ? null : id);
     };
@@ -35,6 +40,43 @@ export function QAPage() {
 
         fetchQA();
     }, []);
+
+    // ─── HANDLER FOR CAPTURING AND CREATING A SUPPORT TICKET ───
+    const handleTicketSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+
+        // Dynamically reads the current logged-in user identity token from storage
+        const sessionUserId = localStorage.getItem('userId');
+
+        if (!sessionUserId) {
+            alert("Error: Active session contextual mapping not found. Please re-authenticate via the login interface.");
+            return;
+        }
+
+        if (!issueText.trim()) {
+            alert("Please enter details regarding your support issue before proceeding.");
+            return;
+        }
+
+        try {
+            setSubmittingTicket(true);
+
+            // Dispatches request payload structured to fit your backend DTO validation properties
+            await axios.post('http://localhost:3000/interactions/support-ticket', {
+                userId: sessionUserId,
+                content: issueText.trim()
+            });
+
+            alert("Support ticket successfully logged in the database registry! Administrators will evaluate your issue parameters.");
+            setIssueText(""); // Reset form text string buffer
+            setIsModalOpen(false); // Dismiss modal view container overlay
+        } catch (error) {
+            console.error("Support ticket production execution failed:", error);
+            alert("Failed to deliver your issue log down to the server API. Verify runtime configurations.");
+        } finally {
+            setSubmittingTicket(false);
+        }
+    };
 
     // Dynamically filter questions based on the 'category' column in the database
     const volunteerQuestions = questions.filter(q => q.category?.toLowerCase() === 'volunteer');
@@ -94,10 +136,51 @@ export function QAPage() {
 
                 <div className="qa-footer-section">
                     <p className="qa-footer">
-                        Didn't see your question? Let us know through a <a href="#">support ticket</a>.
+                        Didn't see your question? Let us know through a{' '}
+                        {/* ─── ATTACHED TRIGGER INTERACTION LINK FOR OPENING MODAL WINDOW ─── */}
+                        <span className="ticket-link" onClick={() => setIsModalOpen(true)}>
+                            support ticket
+                        </span>.
                     </p>
                 </div>
             </div>
+
+            {/* ─── DYNAMIC SUPPORT TICKET INTERFACE POP-UP MODAL WINDOW ─── */}
+            {isModalOpen && (
+                <div className="ticket-modal-overlay">
+                    <div className="ticket-modal-box">
+                        <h3>Submit Support Ticket</h3>
+                        <p>Describe the issue or system anomaly you are experiencing:</p>
+
+                        <form onSubmit={handleTicketSubmit}>
+                            <textarea
+                                value={issueText}
+                                onChange={(e) => setIssueText(e.target.value)}
+                                placeholder="Provide detailed description parameters here..."
+                                rows={5}
+                                required
+                            />
+                            <div className="modal-buttons-row">
+                                <button
+                                    type="button"
+                                    className="modal-cancel-btn"
+                                    onClick={() => { setIsModalOpen(false); setIssueText(""); }}
+                                    disabled={submittingTicket}
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="modal-submit-btn"
+                                    disabled={submittingTicket}
+                                >
+                                    {submittingTicket ? "Submitting..." : "Submit Ticket"}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
