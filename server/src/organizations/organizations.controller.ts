@@ -101,6 +101,12 @@ export class OrganizationsController {
     return await this.organizationsService.createRegistration(createRegDto);
   }
 
+  // --- NEW: Endpoint to fetch pending registrations ---
+  @Get('registration/pending')
+  async findAllPendingRegistrations() {
+    return await this.organizationsService.findAllPendingRegistrations();
+  }
+
   @Get('registration')
   async findAllRegistrations() {
     return await this.organizationsService.findAllRegistrations();

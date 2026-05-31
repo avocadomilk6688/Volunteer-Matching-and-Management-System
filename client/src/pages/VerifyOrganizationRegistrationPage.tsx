@@ -5,16 +5,16 @@ import { GenericTable } from './Table';
 import axios from 'axios';
 import './verify_organization_registration_page.css';
 
-// --- UPDATED: Interface matches your exact database columns precisely ---
+// --- Interface matches your exact TypeORM database entity properties precisely ---
 interface OrgRegistration {
     id: string;
-    name: string;
-    submitted_documents: string;
-    authorized_person: string;
-    submission_time: string; // datetime string format
+    organizationName: string;      // Matches entity property mapping
+    supporting_documents: string[]; // Matches TypeORM simple-array structure
+    authorizedPersonName: string;  // Matches entity property mapping
+    submission_time: string;       // datetime string format
     status: string;
     description: string;
-    address?: string | null;
+    address?: string | null;       // Entity address field hook
 }
 
 const API_BASE_URL = "http://localhost:3000";
@@ -33,7 +33,7 @@ export function VerifyOrganizationRegistrationPage() {
             const token = localStorage.getItem('token');
 
             // Fetch live pending registrations from your endpoint pipeline
-            const response = await axios.get<OrgRegistration[]>(`${API_BASE_URL}/admin/registrations/pending`, {
+            const response = await axios.get<OrgRegistration[]>(`${API_BASE_URL}/organizations/registration/pending`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setRegistrations(response.data);
@@ -57,7 +57,7 @@ export function VerifyOrganizationRegistrationPage() {
 
         try {
             const token = localStorage.getItem('token');
-            await axios.patch(`${API_BASE_URL}/admin/registrations/${id}/verify`,
+            await axios.patch(`${API_BASE_URL}/organizations/registration/${id}`,
                 { status: actionType === 'approve' ? 'approved' : 'rejected' },
                 { headers: { Authorization: `Bearer ${token}` } }
             );
@@ -69,7 +69,8 @@ export function VerifyOrganizationRegistrationPage() {
         }
     };
 
-    const headers = ['Organization', 'Submitted Documents', 'Authorized Person', 'Description', 'Submission Time', 'Action'];
+    // --- ADDED: 'Address' into the headers array ---
+    const headers = ['Organization', 'Submitted Documents', 'Authorized Person', 'Address', 'Description', 'Submission Time', 'Action'];
 
     return (
         <div className="admin-dashboard-wrapper">
@@ -114,33 +115,44 @@ export function VerifyOrganizationRegistrationPage() {
                                         ? new Date(row.submission_time).toLocaleString()
                                         : 'N/A';
 
+                                    // Safely isolates structural file items inside the multi-document wrapper array
+                                    const primaryDocumentPath = Array.isArray(row.supporting_documents) && row.supporting_documents.length > 0
+                                        ? row.supporting_documents[0]
+                                        : '';
+
                                     return (
                                         <tr key={row.id}>
-                                            <td className="admin-cell-org-name">{row.name}</td>
+                                            <td className="admin-cell-org-name">{row.organizationName}</td>
                                             <td>
-                                                <a
-                                                    href={`${API_BASE_URL}${row.submitted_documents}`}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="admin-document-link"
-                                                >
-                                                    document.pdf
-                                                </a>
+                                                {primaryDocumentPath ? (
+                                                    <a
+                                                        href={`${API_BASE_URL}${primaryDocumentPath}`}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="admin-document-link"
+                                                    >
+                                                        document.pdf
+                                                    </a>
+                                                ) : (
+                                                    <span style={{ color: '#999', fontSize: '13px' }}>No docs uploaded</span>
+                                                )}
                                             </td>
-                                            <td>{row.authorized_person}</td>
+                                            <td>{row.authorizedPersonName}</td>
+                                            {/* --- ADDED: Address Cell layout rendering column --- */}
+                                            <td className="admin-cell-address">{row.address || 'N/A'}</td>
                                             <td className="admin-cell-description">{row.description}</td>
                                             <td className="admin-cell-time">{formattedTime}</td>
                                             <td className="admin-cell-verify-actions">
                                                 <div className="admin-verify-btn-group">
                                                     <button
                                                         className="admin-approve-btn"
-                                                        onClick={() => handleAction(row.id, 'approve', row.name)}
+                                                        onClick={() => handleAction(row.id, 'approve', row.organizationName)}
                                                     >
                                                         Approve
                                                     </button>
                                                     <button
                                                         className="admin-reject-btn"
-                                                        onClick={() => handleAction(row.id, 'reject', row.name)}
+                                                        onClick={() => handleAction(row.id, 'reject', row.organizationName)}
                                                     >
                                                         Reject
                                                     </button>
@@ -151,7 +163,8 @@ export function VerifyOrganizationRegistrationPage() {
                                 })
                             ) : (
                                 <tr>
-                                    <td colSpan={6} className="admin-empty-table-fallback">
+                                    {/* --- FIXED: Bumped colSpan to 7 to safely cover our new column configuration --- */}
+                                    <td colSpan={7} className="admin-empty-table-fallback">
                                         No pending organization registration verifications in queue.
                                     </td>
                                 </tr>

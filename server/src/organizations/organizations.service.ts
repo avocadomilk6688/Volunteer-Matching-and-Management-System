@@ -71,6 +71,14 @@ export class OrganizationsService {
     return await this.regRepo.save(newReg);
   }
 
+  // --- FIXED: Added method to fetch pending registrations ---
+  async findAllPendingRegistrations() {
+    return await this.regRepo.find({
+      where: { status: 'pending' },
+      order: { submission_time: 'DESC' },
+    });
+  }
+
   async findAllRegistrations() {
     return await this.regRepo.find();
   }
