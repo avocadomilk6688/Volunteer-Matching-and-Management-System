@@ -338,12 +338,20 @@ export class InteractionsService {
       id,
       content: dto.content,
       status: dto.status || 'open',
-      user: userEntity, // 👈 Explicitly binds the database entity relationship context cleanly
+      user: userEntity, // Explicitly binds the database entity relationship context cleanly
     });
 
     // 4. Save the completed ticket tuple into your MySQL schema
     await this.ticketRepo.save(newTicket);
     return `Ticket ${id} submitted`;
+  }
+
+  // ─── ADDED: EXPLICIT QUEUES LOADING PIPELINE FOR ADMIN VIEW ───
+  async findAllTickets(): Promise<SupportTicket[]> {
+    return await this.ticketRepo.find({
+      relations: ['user'], // Eagerly joins relational user parameters (id, username, role) to populate tables
+      order: { submissionTime: 'DESC' }, // Pushes the most recent submissions to the top of the dashboard feed
+    });
   }
 
   async findAll(): Promise<Message[]> {

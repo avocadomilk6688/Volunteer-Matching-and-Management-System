@@ -98,6 +98,13 @@ export class InteractionsController {
     return this.interactionsService.createSupportTicket(createSupportTicketDto);
   }
 
+  // ─── FIXED: EXPLICIT ROUTE FOR FETCHING ALL SUPPORT TICKETS ───
+  // Handles incoming GET requests to /interactions/support-ticket for the Admin view.
+  @Get('support-ticket')
+  async findAllSupportTickets() {
+    return await this.interactionsService.findAllTickets();
+  }
+
   @Get()
   findAll() {
     return this.interactionsService.findAll();
