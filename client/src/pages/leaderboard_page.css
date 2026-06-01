@@ -110,3 +110,7 @@
 }
 .list-name { flex-grow: 1; }
 .list-score { width: 50px; text-align: right; }
+
+.empty-leaderboard {
+    text-align: center;
+}

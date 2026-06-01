@@ -4,7 +4,14 @@ import { useAuth } from '../context/auth/useAuth';
 import axios from 'axios';
 import './manage_profile.css';
 
+
 const API_BASE_URL = "http://localhost:3000";
+
+const MALAYSIAN_STATES = [
+    "Johor", "Kedah", "Kelantan", "Melaka", "Negeri Sembilan", "Pahang",
+    "Penang", "Perak", "Perlis", "Sabah", "Sarawak", "Selangor", "Terengganu",
+    "Kuala Lumpur", "Labuan", "Putrajaya"
+];
 
 // --- Strict Interfaces ---
 interface TagItem { id: string; name: string; }
@@ -257,9 +264,11 @@ export function ManageProfilePage() {
                                 <div className="form-group">
                                     <label>Location:</label>
                                     <select value={location} onChange={(e) => setLocation(e.target.value)}>
-                                        <option value="Selangor">Selangor</option>
-                                        <option value="Kuala Lumpur">Kuala Lumpur</option>
-                                        <option value="Melaka">Melaka</option>
+                                        {MALAYSIAN_STATES.map((state) => (
+                                            <option key={state} value={state}>
+                                                {state}
+                                            </option>
+                                        ))}
                                     </select>
                                 </div>
                                 <div className="form-group hidden-placeholder"></div>

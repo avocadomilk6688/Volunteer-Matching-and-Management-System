@@ -1,7 +1,6 @@
 import { Header } from './Header';
 import './leaderboard_page.css';
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router';
 import axios from 'axios';
 
 // Interfaces for the Backend Snapshot Data
@@ -28,7 +27,6 @@ interface VolunteerRank {
 export function LeaderboardPage() {
     const today = new Date();
     const currentYear = today.getFullYear();
-    const navigate = useNavigate();
 
     const [volunteers, setVolunteers] = useState<VolunteerRank[]>([]);
     const [selectedMonth, setSelectedMonth] = useState(today.getMonth() + 1);
@@ -157,9 +155,6 @@ export function LeaderboardPage() {
                 ) : (
                     <div className="empty-leaderboard">
                         <p>No activity recorded for {months[selectedMonth - 1]}.</p>
-                        <button className="cta-button" onClick={() => navigate('/volunteer-home')}>
-                            Find a Programme
-                        </button>
                     </div>
                 )}
             </div>
