@@ -53,17 +53,13 @@ export function LoginPage() {
             }
 
             // ─── CRITICAL MISSING LINK FIXED ───
-            // Explicitly persist the bearer authentication token inside localStorage.
-            // This ensures ManageListingPage can fetch protected relations securely!
             localStorage.setItem('token', data.access_token);
-
-            // Keeps your clean ID tracking completely intact inside local storage
             localStorage.setItem('userId', data.id);
 
             // ─── DATA STRUCTURE NORMALIZATION MATRIX ───
             const unifiedAuthUserContext = {
                 ...data,
-                id: data.id, // "O002"
+                id: data.id,
                 email: email,
                 organization: data.organization ? {
                     ...data.organization,
@@ -81,21 +77,29 @@ export function LoginPage() {
                 navigate('/manage-user-account');
             } else if (role === 'organization') {
 
-                // Safely extract approval status out of the nested registrationRecord relation object
-                const rawStatus = data.organization?.registrationRecord?.status || 'pending';
-                const registrationStatus = rawStatus.trim().toLowerCase();
+                // ─── FIXED: PERSISTENT VERIFICATION SUBMISSION INTERCEPTOR ───
+                // If they signed up but haven't submitted the document verification form,
+                // user.organization will either be completely missing, null, or an empty object.
+                const isFormUnsubmitted = !data.organization || Object.keys(data.organization).length === 0;
 
-                console.log("DEBUG: Normalized registration status evaluation:", registrationStatus);
-
-                if (registrationStatus === 'approved') {
-                    // Approved organizations bypass the lockout banner and hit operational features smoothly
-                    navigate('/manage-listing');
-                } else if (registrationStatus === 'pending') {
-                    // Explicitly pending accounts stay securely contained
-                    navigate('/pending-approval');
+                if (isFormUnsubmitted) {
+                    console.log("REDIRECT: Unsubmitted organization detected. Directing to form canvas.");
+                    navigate('/organization-verification');
                 } else {
-                    // Safety fallback: allow redirection default safely
-                    navigate('/manage-listing');
+                    // If the form exists, evaluate the administrative review workflow status safely
+                    const rawStatus = data.organization?.registrationRecord?.status || 'pending';
+                    const registrationStatus = rawStatus.trim().toLowerCase();
+
+                    console.log("DEBUG: Normalized registration status evaluation:", registrationStatus);
+
+                    if (registrationStatus === 'approved') {
+                        navigate('/manage-listing');
+                    } else if (registrationStatus === 'pending') {
+                        navigate('/pending-approval');
+                    } else {
+                        // Safety fallback
+                        navigate('/manage-listing');
+                    }
                 }
             } else {
                 navigate('/manage-listing');
