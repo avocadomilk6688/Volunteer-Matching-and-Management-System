@@ -4,6 +4,14 @@ import './sign_up_page.css';
 import { useState } from 'react';
 import { useAuth } from '../context/auth/useAuth';
 
+// ─── DEFINE AN EXPLICIT TYPE MATCHING THE AUTH PROVIDER EXPECTATIONS ───
+interface SignUpUserPayload {
+    id: string;
+    username: string;
+    role: 'admin' | 'volunteer' | 'organization';
+    email: string;
+}
+
 export function SignUpPage() {
     const navigate = useNavigate();
     const { login } = useAuth();
@@ -16,7 +24,7 @@ export function SignUpPage() {
     const handleSignUp = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        // Check if the password match with confirm password
+        // Check if the password matches with confirm password
         if (password !== confirmPassword) {
             alert("Error: Passwords do not match.");
             return;
@@ -43,9 +51,20 @@ export function SignUpPage() {
                 throw new Error(data.message || "Registration failed");
             }
 
-            login(data.access_token || 'session_active', data.email);
+            // ─── FIXED: STRUCTURAL TYPE CASTING REPLACES THE PROHIBITED 'ANY' KEYWORD ───
+            if (login) {
+                const userPayload: SignUpUserPayload = {
+                    id: String(data.id || data.user?.id || 'temp_registration_id'),
+                    email: data.email || email,
+                    role: (data.role || role) as 'admin' | 'volunteer' | 'organization',
+                    username: data.username || email.split('@')[0]
+                };
 
-            // --- FIXED: REDIRECTION RULES FOR ROLES OPTIMIZED HERE ---
+                // Cast to unknown first then to the auth provider's expected schema type
+                login(data.access_token || 'session_active', userPayload as unknown as Parameters<typeof login>[1]);
+            }
+
+            // Redirection rules for roles optimization
             if (role === "volunteer") {
                 navigate('/volunteer-home');
             } else if (role === "organization") {

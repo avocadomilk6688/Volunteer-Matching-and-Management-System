@@ -34,15 +34,36 @@ export function Header() {
     const [showNotifications, setShowNotifications] = useState(false);
     const [notifications, setNotifications] = useState<Notification[]>([]);
 
-    // --- FIXED: Tracker state to store the client-side read benchmark timestamp ---
+    // --- Tracker state to store the client-side read benchmark timestamp ---
     const [lastViewedNotifTime, setLastViewedNotifTime] = useState<number>(() => {
         const stored = localStorage.getItem('last_viewed_notifications_time');
         return stored ? parseInt(stored, 10) : 0;
     });
 
+    // ─── MOVE DECLARATIONS UP TO SATISFY BLOCK SCOPE DEPENDENCIES ───
+    const role = user?.role;
+    const isVolunteer = role === 'volunteer';
+    const isOrganization = role === 'organization';
+    const isAdmin = role === 'admin';
+
+    // ─── FIXED: BULLETPROOF SYSTEM CHECK FOR UNVERIFIED ORGANIZATIONS ───
+    const isUnverifiedOrg = isOrganization && (
+        !user?.organization ||
+        Object.keys(user.organization).length === 0
+    );
+
+    // Now safe to log after block scopes have resolved safely top-to-bottom
+    console.log("CRITICAL HEADER DEBUG:", {
+        rawUserRole: user?.role,
+        typeOfRole: typeof user?.role,
+        isOrgValid: isOrganization,
+        isUnverified: isUnverifiedOrg,
+        hasOrgObject: !!user?.organization
+    });
+
     // 1. Fetch real notifications from backend
     useEffect(() => {
-        if (isAuthenticated && user?.id) {
+        if (isAuthenticated && user?.id && !isUnverifiedOrg) {
             const fetchNotifications = async () => {
                 try {
                     const res = await axios.get(`${API_BASE_URL}/interactions/user/${user.id}`);
@@ -58,7 +79,7 @@ export function Header() {
             const interval = setInterval(fetchNotifications, 60000);
             return () => clearInterval(interval);
         }
-    }, [isAuthenticated, user?.id]);
+    }, [isAuthenticated, user?.id, isUnverifiedOrg]);
 
     const handleLogout = () => {
         logout();
@@ -67,8 +88,8 @@ export function Header() {
         navigate('/');
     };
 
-    // --- FIXED: When opening notifications, immediately set the last viewed baseline timestamp ---
     const toggleNotifications = () => {
+        if (isUnverifiedOrg) return;
         const nextState = !showNotifications;
         setShowNotifications(nextState);
         if (showProfileOptions) isShowProfileOptions(false);
@@ -85,7 +106,6 @@ export function Header() {
         if (showNotifications) setShowNotifications(false);
     };
 
-    // --- Helper: Format DB Date to "Time Ago" ---
     const formatTimeAgo = (dateString: string) => {
         const now = new Date();
         const past = new Date(dateString);
@@ -102,15 +122,13 @@ export function Header() {
         return `${days}d ago`;
     };
 
-    const role = user?.role;
-    const isVolunteer = role === 'volunteer';
-    const isOrganization = role === 'organization';
-    const isAdmin = role === 'admin';
-    const displayName = user?.username || (isAdmin ? 'Admin' : isOrganization ? 'Organization' : 'Volunteer');
+    const displayName = isUnverifiedOrg
+        ? "Organization"
+        : (user?.username || (isAdmin ? 'Admin' : isOrganization ? 'Organization' : 'Volunteer'));
 
     const getProfilePic = () => {
         const defaultPic = '/images/default_profile_pic.png';
-        if (!user || isAdmin) return defaultPic;
+        if (!user || isAdmin || isUnverifiedOrg) return defaultPic;
         const picUrl = isVolunteer ? user.volunteer?.profile_picture_url : user.organization?.profile_picture_url;
         if (!picUrl) return defaultPic;
         if (picUrl.startsWith('http') || picUrl.startsWith('blob:')) return picUrl;
@@ -120,11 +138,10 @@ export function Header() {
     const getLogoLink = () => {
         if (!isAuthenticated) return '/';
         if (isAdmin) return '/admin-dashboard';
-        if (isOrganization) return '/manage-listing';
+        if (isOrganization) return isUnverifiedOrg ? '#' : '/manage-listing';
         return '/volunteer-home';
     };
 
-    // --- FIXED: Evaluates dynamically if any fetched record is newer than our view benchmark ---
     const hasUnreadNotifications = notifications.some(notif => {
         const notifTime = new Date(notif.createdAt).getTime();
         return notifTime > lastViewedNotifTime;
@@ -132,18 +149,22 @@ export function Header() {
 
     return (
         <div className="header-container">
-            <Link to={getLogoLink()} className="header-logo">
+            <Link to={getLogoLink()} className="header-logo" style={{ pointerEvents: isUnverifiedOrg ? 'none' : 'auto' }}>
                 <h1>Volunteer Matching and Management System</h1>
             </Link>
 
             {isAuthenticated && (
                 <div className="header-actions">
                     <div className="logged-in-nav">
-                        {isVolunteer && <Link to="/leaderboard" className="nav-link">Leaderboard</Link>}
-                        {!isAdmin && <Link to="/qa" className="nav-link">Q&A</Link>}
+                        {!isUnverifiedOrg && (
+                            <>
+                                {isVolunteer && <Link to="/leaderboard" className="nav-link">Leaderboard</Link>}
+                                {!isAdmin && <Link to="/qa" className="nav-link">Q&A</Link>}
+                            </>
+                        )}
 
                         <div className="user-controls">
-                            <span className="greeting">Hi, {displayName}!</span>
+                            {!isUnverifiedOrg && <span className="greeting">Hi, {displayName}!</span>}
 
                             <button className="profile-icon" onClick={toggleProfile}>
                                 <div
@@ -156,21 +177,21 @@ export function Header() {
                                 ></div>
                             </button>
 
-                            <button className="notif-icon" onClick={toggleNotifications}>
-                                <MdNotifications size={24} color="white" />
-                                {/* --- FIXED Badge rule evaluates our unread check state instead of raw list length --- */}
-                                {hasUnreadNotifications && <span className="notif-badge"></span>}
-                            </button>
+                            {!isUnverifiedOrg && (
+                                <button className="notif-icon" onClick={toggleNotifications}>
+                                    <MdNotifications size={24} color="white" />
+                                    {hasUnreadNotifications && <span className="notif-badge"></span>}
+                                </button>
+                            )}
                         </div>
                     </div>
                 </div>
             )}
 
             {/* Dynamic Notification Dropdown */}
-            {showNotifications && (
+            {showNotifications && !isUnverifiedOrg && (
                 <div className="notification-dropdown">
                     {notifications.length > 0 ? (
-                        // Sort by latest first before mapping
                         [...notifications]
                             .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
                             .map((notif) => (
@@ -185,22 +206,30 @@ export function Header() {
                 </div>
             )}
 
-            {/* Profile Dropdown */}
+            {/* Profile Options Dropdown Menu */}
             {showProfileOptions && (
                 <div className="profile-options">
-                    {isVolunteer && (
+                    {isUnverifiedOrg ? (
+                        <div className="log-out" onClick={handleLogout} style={{ padding: '12px 16px', cursor: 'pointer' }}>
+                            Log out
+                        </div>
+                    ) : (
                         <>
-                            <Link to="/volunteering-history" className="view-volunteering-history" onClick={() => isShowProfileOptions(false)}>
-                                View volunteering <br /> history
+                            {isVolunteer && (
+                                <>
+                                    <Link to="/volunteering-history" className="view-volunteering-history" onClick={() => isShowProfileOptions(false)}>
+                                        View volunteering <br /> history
+                                    </Link>
+                                    <hr />
+                                </>
+                            )}
+                            <Link to="/manage-profile" className="manage-profile" onClick={() => isShowProfileOptions(false)}>
+                                Manage profile
                             </Link>
                             <hr />
+                            <div className="log-out" onClick={handleLogout}>Log out</div>
                         </>
                     )}
-                    <Link to="/manage-profile" className="manage-profile" onClick={() => isShowProfileOptions(false)}>
-                        Manage profile
-                    </Link>
-                    <hr />
-                    <div className="log-out" onClick={handleLogout}>Log out</div>
                 </div>
             )}
         </div>
