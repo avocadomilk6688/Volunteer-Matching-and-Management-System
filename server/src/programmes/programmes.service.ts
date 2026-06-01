@@ -413,30 +413,42 @@ export class ProgrammesService {
     };
   }
 
+  // --- FIXED: CRUCIAL RE-ASSIGNMENT LOGIC ENFORCED HERE ---
+  // Overriding .merge relational assignment behavior guarantees empty relationship arrays remove old linkages completely.
   async update(id: string, updateDto: UpdateProgrammeDto) {
     const programme = await this.findOne(id);
     const skillIds = this.parseIds(updateDto.skillIds);
     const interestIds = this.parseIds(updateDto.interestIds);
 
-    const updatedProgramme = this.programmeRepo.merge(programme, {
-      ...updateDto,
-      schedule: {
-        ...programme.schedule,
-        start_time: updateDto.start_time
-          ? new Date(updateDto.start_time)
-          : programme.schedule.start_time,
-        end_time: updateDto.end_time
-          ? new Date(updateDto.end_time)
-          : programme.schedule.end_time,
-        location: updateDto.location ?? programme.schedule.location,
-        mode: updateDto.mode ?? programme.schedule.mode,
-      },
-      related_skills: skillIds.map((sId: string) => ({ id: sId }) as Skill),
-      related_interests: interestIds.map(
-        (iId: string) => ({ id: iId }) as Interest,
-      ),
+    // 1. Merge core primitive properties over top of the schema model securely
+    this.programmeRepo.merge(programme, {
+      title: updateDto.title,
+      description: updateDto.description,
     });
-    return await this.programmeRepo.save(updatedProgramme);
+
+    // 2. Handle nested Schedule table modifications manually
+    programme.schedule = {
+      ...programme.schedule,
+      start_time: updateDto.start_time
+        ? new Date(updateDto.start_time)
+        : programme.schedule.start_time,
+      end_time: updateDto.end_time
+        ? new Date(updateDto.end_time)
+        : programme.schedule.end_time,
+      location: updateDto.location ?? programme.schedule.location,
+      mode: updateDto.mode ?? programme.schedule.mode,
+    };
+
+    // 3. Direct explicit array re-assignment instructs TypeORM to drop removed records natively
+    programme.related_skills = skillIds.map(
+      (sId: string) => ({ id: sId }) as Skill,
+    );
+    programme.related_interests = interestIds.map(
+      (iId: string) => ({ id: iId }) as Interest,
+    );
+
+    // 4. Fire repository save context to update tables safely
+    return await this.programmeRepo.save(programme);
   }
 
   async remove(id: string) {
