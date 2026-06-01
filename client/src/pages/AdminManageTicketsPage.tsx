@@ -65,6 +65,28 @@ export function AdminManageTicketsPage() {
         setActiveChatTicket(ticket);
     };
 
+    // --- FIXED: Added status transition mutation request context ---
+    const handleResolveTicket = async (id: string) => {
+        if (!window.confirm("Are you sure you want to mark this support ticket as resolved?")) {
+            return;
+        }
+
+        try {
+            const token = localStorage.getItem('token');
+            // Hits the interaction entity route to change the row status entry safely
+            await axios.patch(`${API_BASE_URL}/interactions/support-ticket/${id}`,
+                { status: 'resolved' },
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+
+            alert("Ticket has been marked as resolved.");
+            fetchTickets(); // Pull down fresh pipeline queues immediately
+        } catch (error) {
+            console.error("Error updating support ticket status payload:", error);
+            alert("Failed to modify ticket verification state on server.");
+        }
+    };
+
     const headers = ['Description', 'User', 'Role', 'Submission Time', 'Action'];
 
     return (
@@ -122,12 +144,21 @@ export function AdminManageTicketsPage() {
                                             <td className="admin-cell-ticket-role">{renderedRole}</td>
                                             <td className="admin-cell-ticket-time">{formattedTime}</td>
                                             <td className="admin-cell-action">
-                                                <button
-                                                    className="admin-ticket-chat-btn"
-                                                    onClick={() => handleOpenSupportChat(row)}
-                                                >
-                                                    Chat
-                                                </button>
+                                                <div style={{ display: 'flex', gap: '8px' }}>
+                                                    <button
+                                                        className="admin-ticket-chat-btn"
+                                                        onClick={() => handleOpenSupportChat(row)}
+                                                    >
+                                                        Chat
+                                                    </button>
+                                                    {/* --- ADDED: Close button element styling matches action matrix cleanly --- */}
+                                                    <button
+                                                        className="admin-ticket-close-btn"
+                                                        onClick={() => handleResolveTicket(row.id)}
+                                                    >
+                                                        Close
+                                                    </button>
+                                                </div>
                                             </td>
                                         </tr>
                                     );

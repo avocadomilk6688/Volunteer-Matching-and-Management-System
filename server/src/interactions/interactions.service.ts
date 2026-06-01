@@ -350,8 +350,25 @@ export class InteractionsService {
   async findAllTickets(): Promise<SupportTicket[]> {
     return await this.ticketRepo.find({
       relations: ['user'], // Eagerly joins relational user parameters (id, username, role) to populate tables
-      order: { submissionTime: 'DESC' }, // Pushes the most recent submissions to the top of the dashboard feed
+      order: { id: 'DESC' }, // Pushes the most recent submissions to the top of the dashboard feed using alphanumeric ID sorting
     });
+  }
+
+  // --- FIXED: ADDED THE EXPLICIT LIFECYCLE MUTATION PIPELINE FOR THE CLOSE ACTIONS BUTTON ---
+  async updateSupportTicket(
+    id: string,
+    dto: { status: string },
+  ): Promise<SupportTicket> {
+    const existingTicket = await this.ticketRepo.findOne({ where: { id } });
+    if (!existingTicket) {
+      throw new NotFoundException(
+        `Support ticket with identifier code ID "${id}" does not exist inside the active table dataset.`,
+      );
+    }
+
+    // Merges incoming state updates seamlessly onto the target support tuple row parameters
+    const updatedTicket = this.ticketRepo.merge(existingTicket, dto);
+    return await this.ticketRepo.save(updatedTicket);
   }
 
   async findAll(): Promise<Message[]> {

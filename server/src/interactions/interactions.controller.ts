@@ -105,6 +105,16 @@ export class InteractionsController {
     return await this.interactionsService.findAllTickets();
   }
 
+  // ─── FIXED: ADDED THE MISSING SUPPORT TICKET PATCH METHOD ROUTE HANDLER ───
+  // Resolves the 404 error when making modifications to a specific support ticket's lifecycle payload
+  @Patch('support-ticket/:id')
+  async updateSupportTicket(
+    @Param('id') id: string,
+    @Body() updateDto: { status: string },
+  ) {
+    return await this.interactionsService.updateSupportTicket(id, updateDto);
+  }
+
   @Get()
   findAll() {
     return this.interactionsService.findAll();
