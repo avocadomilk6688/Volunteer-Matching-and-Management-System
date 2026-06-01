@@ -1,9 +1,9 @@
-import './header.css';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../context/auth/useAuth';
 import { Link, useNavigate } from 'react-router';
 import { MdNotifications } from 'react-icons/md';
-import { useState, useEffect } from 'react';
 import axios from 'axios';
+import './header.css';
 
 const API_BASE_URL = "http://localhost:3000";
 
@@ -34,12 +34,17 @@ export function Header() {
     const [showNotifications, setShowNotifications] = useState(false);
     const [notifications, setNotifications] = useState<Notification[]>([]);
 
+    // --- FIXED: Tracker state to store the client-side read benchmark timestamp ---
+    const [lastViewedNotifTime, setLastViewedNotifTime] = useState<number>(() => {
+        const stored = localStorage.getItem('last_viewed_notifications_time');
+        return stored ? parseInt(stored, 10) : 0;
+    });
+
     // 1. Fetch real notifications from backend
     useEffect(() => {
         if (isAuthenticated && user?.id) {
             const fetchNotifications = async () => {
                 try {
-                    // This assumes your backend has a GET /notifications/user/:id endpoint
                     const res = await axios.get(`${API_BASE_URL}/interactions/user/${user.id}`);
                     setNotifications(res.data);
                 } catch (err) {
@@ -49,7 +54,7 @@ export function Header() {
 
             fetchNotifications();
 
-            // Optional: Refresh notifications every 60 seconds
+            // Refresh notifications every 60 seconds
             const interval = setInterval(fetchNotifications, 60000);
             return () => clearInterval(interval);
         }
@@ -62,9 +67,17 @@ export function Header() {
         navigate('/');
     };
 
+    // --- FIXED: When opening notifications, immediately set the last viewed baseline timestamp ---
     const toggleNotifications = () => {
-        setShowNotifications(!showNotifications);
+        const nextState = !showNotifications;
+        setShowNotifications(nextState);
         if (showProfileOptions) isShowProfileOptions(false);
+
+        if (nextState) {
+            const currentTimestamp = Date.now();
+            localStorage.setItem('last_viewed_notifications_time', currentTimestamp.toString());
+            setLastViewedNotifTime(currentTimestamp);
+        }
     };
 
     const toggleProfile = () => {
@@ -111,6 +124,12 @@ export function Header() {
         return '/volunteer-home';
     };
 
+    // --- FIXED: Evaluates dynamically if any fetched record is newer than our view benchmark ---
+    const hasUnreadNotifications = notifications.some(notif => {
+        const notifTime = new Date(notif.createdAt).getTime();
+        return notifTime > lastViewedNotifTime;
+    });
+
     return (
         <div className="header-container">
             <Link to={getLogoLink()} className="header-logo">
@@ -139,7 +158,8 @@ export function Header() {
 
                             <button className="notif-icon" onClick={toggleNotifications}>
                                 <MdNotifications size={24} color="white" />
-                                {notifications.length > 0 && <span className="notif-badge"></span>}
+                                {/* --- FIXED Badge rule evaluates our unread check state instead of raw list length --- */}
+                                {hasUnreadNotifications && <span className="notif-badge"></span>}
                             </button>
                         </div>
                     </div>
