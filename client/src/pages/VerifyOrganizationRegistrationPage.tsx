@@ -5,16 +5,15 @@ import { GenericTable } from './Table';
 import axios from 'axios';
 import './verify_organization_registration_page.css';
 
-// --- Interface matches your exact TypeORM database entity properties precisely ---
 interface OrgRegistration {
     id: string;
-    organizationName: string;      // Matches entity property mapping
-    supporting_documents: string[]; // Matches TypeORM simple-array structure
-    authorizedPersonName: string;  // Matches entity property mapping
-    submission_time: string;       // datetime string format
+    organizationName: string;
+    supporting_documents: string[];
+    authorizedPersonName: string;
+    submission_time: string;
     status: string;
     description: string;
-    address?: string | null;       // Entity address field hook
+    address?: string | null;
 }
 
 const API_BASE_URL = "http://localhost:3000";
@@ -23,7 +22,6 @@ export function VerifyOrganizationRegistrationPage() {
     const navigate = useNavigate();
     const location = useLocation();
 
-    // Data tracking states
     const [registrations, setRegistrations] = useState<OrgRegistration[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
 
@@ -32,7 +30,6 @@ export function VerifyOrganizationRegistrationPage() {
             setLoading(true);
             const token = localStorage.getItem('token');
 
-            // Fetch live pending registrations from your endpoint pipeline
             const response = await axios.get<OrgRegistration[]>(`${API_BASE_URL}/organizations/registration/pending`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
@@ -49,7 +46,6 @@ export function VerifyOrganizationRegistrationPage() {
         fetchRegistrations();
     }, []);
 
-    // ─── FIXED: DYNAMIC ISOLATED RECOVERY PIPELINE CONTEXT ───
     const handleAction = async (id: string, actionType: 'approve' | 'reject', orgName: string) => {
         const actionConfirmText = actionType === 'approve' ? 'approve registration for' : 'reject registration for';
         if (!window.confirm(`Are you sure you want to ${actionConfirmText} "${orgName}"?`)) {
@@ -59,16 +55,12 @@ export function VerifyOrganizationRegistrationPage() {
         try {
             const token = localStorage.getItem('token');
 
-            // 1. Fetch the absolute source of truth individual item record directly from the backend.
-            // This gets us the original database string, completely bypassing the array sanitization logic.
             const sourceOfTruthResponse = await axios.get(`${API_BASE_URL}/organizations/registration/${id}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
 
-            // Fallback recovery if parsing anomalies surface
             const rawAuthorizedPerson = sourceOfTruthResponse.data?.authorizedPersonName || '';
 
-            // 2. Safely forward the original intact string payload to the PATCH router layer
             await axios.patch(`${API_BASE_URL}/organizations/registration/${id}`,
                 {
                     status: actionType === 'approve' ? 'approved' : 'rejected',
@@ -78,14 +70,13 @@ export function VerifyOrganizationRegistrationPage() {
             );
 
             alert(`Organization has been successfully ${actionType}d.`);
-            fetchRegistrations(); // Instantly pull updated table datasets
+            fetchRegistrations();
         } catch (error) {
             console.error("Verification modification error:", error);
             alert("Failed to modify verification state on server.");
         }
     };
 
-    // --- ADDED: 'Address' into the headers array ---
     const headers = ['Organization', 'Submitted Documents', 'Authorized Person', 'Address', 'Description', 'Submission Time', 'Action'];
 
     return (
@@ -93,7 +84,6 @@ export function VerifyOrganizationRegistrationPage() {
             <Header />
             <div className="admin-dashboard-container">
 
-                {/* Left Navigation Sidebar */}
                 <aside className="admin-sidebar">
                     <nav>
                         <ul>
@@ -116,7 +106,6 @@ export function VerifyOrganizationRegistrationPage() {
                     </nav>
                 </aside>
 
-                {/* Right content execution view track */}
                 <main className="admin-main-content">
                     <h1 className="admin-main-title">Verify Organization Registration</h1>
 
@@ -126,17 +115,10 @@ export function VerifyOrganizationRegistrationPage() {
                         <GenericTable headers={headers}>
                             {registrations.length > 0 ? (
                                 registrations.map((row) => {
-                                    // Helper block to present datetime strings cleanly inside your layout rows
                                     const formattedTime = row.submission_time
                                         ? new Date(row.submission_time).toLocaleString()
                                         : 'N/A';
 
-                                    // Safely isolates structural file items inside the multi-document wrapper array
-                                    const primaryDocumentPath = Array.isArray(row.supporting_documents) && row.supporting_documents.length > 0
-                                        ? row.supporting_documents[0]
-                                        : '';
-
-                                    // ─── FIXED: PARSE OUT THE SYSTEM PIPELINES TO DISPLAY A CLEAN NAME ───
                                     const cleanNameDisplay = row.authorizedPersonName?.includes('|')
                                         ? row.authorizedPersonName.split('|')[0]
                                         : row.authorizedPersonName;
@@ -144,23 +126,30 @@ export function VerifyOrganizationRegistrationPage() {
                                     return (
                                         <tr key={row.id}>
                                             <td className="admin-cell-org-name">{row.organizationName}</td>
+
+                                            {/* ─── FIXED: DYNAMIC MULTI-DOCUMENT DOWNLOAD RENDERING SYSTEM ─── */}
                                             <td>
-                                                {primaryDocumentPath ? (
-                                                    <a
-                                                        href={`${API_BASE_URL}${primaryDocumentPath}`}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="admin-document-link"
-                                                    >
-                                                        document.pdf
-                                                    </a>
+                                                {Array.isArray(row.supporting_documents) && row.supporting_documents.length > 0 ? (
+                                                    <div className="admin-document-links-container" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                                        {row.supporting_documents.map((docPath, index) => (
+                                                            <a
+                                                                key={`${row.id}-doc-${index}`}
+                                                                href={`${API_BASE_URL}${docPath.trim()}`}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                className="admin-document-link"
+                                                                style={{ display: 'inline-block', fontSize: '13px' }}
+                                                            >
+                                                                doc_{index + 1}.pdf
+                                                            </a>
+                                                        ))}
+                                                    </div>
                                                 ) : (
                                                     <span style={{ color: '#999', fontSize: '13px' }}>No docs uploaded</span>
                                                 )}
                                             </td>
-                                            {/* Render sanitized name variant to keeping the UI completely pristine */}
+
                                             <td>{cleanNameDisplay}</td>
-                                            {/* --- ADDED: Address Cell layout rendering column --- */}
                                             <td className="admin-cell-address">{row.address || 'N/A'}</td>
                                             <td className="admin-cell-description">{row.description}</td>
                                             <td className="admin-cell-time">{formattedTime}</td>
@@ -168,7 +157,6 @@ export function VerifyOrganizationRegistrationPage() {
                                                 <div className="admin-verify-btn-group">
                                                     <button
                                                         className="admin-approve-btn"
-                                                        // ─── FIXED: REMOVED COMPONENT STATE TRACKING VALUE REVERSION ───
                                                         onClick={() => handleAction(row.id, 'approve', row.organizationName)}
                                                     >
                                                         Approve
@@ -186,7 +174,6 @@ export function VerifyOrganizationRegistrationPage() {
                                 })
                             ) : (
                                 <tr>
-                                    {/* --- FIXED: Bumped colSpan to 7 to safely cover our new column configuration --- */}
                                     <td colSpan={7} className="admin-empty-table-fallback">
                                         No pending organization registration verifications in queue.
                                     </td>
