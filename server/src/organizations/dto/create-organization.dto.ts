@@ -5,11 +5,12 @@ import {
   IsOptional,
   IsUrl,
 } from 'class-validator';
+import { PartialType } from '@nestjs/mapped-types';
 
 export class CreateOrganizationRegistrationDto {
   @IsString()
   @IsOptional()
-  name?: string;
+  organizationName?: string;
 
   @IsString()
   @IsNotEmpty()
@@ -17,13 +18,18 @@ export class CreateOrganizationRegistrationDto {
 
   @IsArray()
   @IsString({ each: true })
-  @IsNotEmpty()
-  submitted_documents!: string[];
+  @IsOptional()
+  supporting_documents?: string[];
 
   @IsString()
   @IsNotEmpty()
-  authorized_person!: string;
+  authorizedPersonName!: string;
+
+  @IsString()
+  @IsOptional()
+  address?: string;
 }
+
 export class CreateOrganizationDto {
   @IsString()
   @IsOptional()
@@ -45,3 +51,14 @@ export class CreateOrganizationDto {
   @IsNotEmpty()
   userId!: string;
 }
+
+// ─── FIXED: STRICT TYPE VALIDATION HOOK FOR UPDATE STRINGS ───
+export class UpdateOrganizationRegistrationDto extends PartialType(
+  CreateOrganizationRegistrationDto,
+) {
+  @IsString()
+  @IsOptional()
+  status?: string;
+}
+
+export class UpdateOrganizationDto extends PartialType(CreateOrganizationDto) {}

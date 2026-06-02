@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { Header } from './Header';
+import { useAuth } from '../context/auth/useAuth';
 import axios from 'axios';
 import './organization_verification_page.css';
 
@@ -13,6 +14,9 @@ interface OrganizationVerificationForm {
 const API_BASE_URL = "http://localhost:3000";
 
 export function OrganizationVerificationPage() {
+    // Hook up authentication context injection tracking
+    const { user } = useAuth();
+
     // Form Input Tracking States
     const [formData, setFormData] = useState<OrganizationVerificationForm>({
         organizationName: '',
@@ -21,7 +25,6 @@ export function OrganizationVerificationPage() {
         address: '',
     });
 
-    // --- FIXED: Swapped out single File capture hook for an Array collection to store 1, 2, 3 or more uploads cleanly ---
     const [supportingDocuments, setSupportingDocuments] = useState<File[]>([]);
     const [isDragging, setIsDragging] = useState<boolean>(false);
     const [submitting, setSubmitting] = useState<boolean>(false);
@@ -47,7 +50,6 @@ export function OrganizationVerificationPage() {
         e.preventDefault();
         setIsDragging(false);
         if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-            // Append newly dropped files into your tracking matrix arrays safely
             const droppedFiles = Array.from(e.dataTransfer.files);
             setSupportingDocuments(prev => [...prev, ...droppedFiles]);
         }
@@ -64,7 +66,6 @@ export function OrganizationVerificationPage() {
         fileInputRef.current?.click();
     };
 
-    // Helper block to clean single files out of list queue dynamically
     const removeDocument = (indexToRemove: number) => {
         setSupportingDocuments(prev => prev.filter((_, index) => index !== indexToRemove));
     };
@@ -83,17 +84,27 @@ export function OrganizationVerificationPage() {
             return;
         }
 
+        // ─── FIXED: DUAL-LAYER EXTRACTION GUARANTEES VALID ID ASSIGNMENT ───
+        const currentUserId = user?.id || localStorage.getItem('userId');
+        if (!currentUserId) {
+            alert("Session expired or user ID missing. Please log out and login again before applying.");
+            return;
+        }
+
         try {
             setSubmitting(true);
             const token = localStorage.getItem('token');
             const dataPayload = new FormData();
 
-            dataPayload.append('organizationName', formData.organizationName);
-            dataPayload.append('authorizedPersonName', formData.authorizedPersonName);
-            dataPayload.append('description', formData.description);
-            dataPayload.append('address', formData.address);
+            // ─── FIXED: EXPLICIT STRING STITCHING PIPELINE PREVENTS VALUE REVERSION ───
+            const rawAuthorizedPersonValue = formData.authorizedPersonName.trim();
+            const smuggledPersonName = `${rawAuthorizedPersonValue}|${currentUserId}`;
 
-            // --- FIXED: Appends multi-file arrays into FormData using identical multi-part array keys ('documents') ---
+            dataPayload.append('organizationName', formData.organizationName.trim());
+            dataPayload.append('authorizedPersonName', smuggledPersonName); // Passes intact metadata safely
+            dataPayload.append('description', formData.description.trim());
+            dataPayload.append('address', formData.address.trim());
+
             supportingDocuments.forEach((file) => {
                 dataPayload.append('documents', file);
             });
@@ -198,7 +209,7 @@ export function OrganizationVerificationPage() {
                                     ref={fileInputRef}
                                     onChange={handleFileChange}
                                     accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                                    multiple // --- FIXED: Added to allow clicking and batch picking multiple documents natively ---
+                                    multiple
                                     style={{ display: 'none' }}
                                 />
 
@@ -207,7 +218,6 @@ export function OrganizationVerificationPage() {
                                 </p>
                             </div>
 
-                            {/* --- ADDED: Dynamic render queue block providing clean visualization of every single file selected --- */}
                             {supportingDocuments.length > 0 && (
                                 <div className="uploaded-files-list-wrapper">
                                     <h4 className="file-list-heading">Selected Files ({supportingDocuments.length}):</h4>

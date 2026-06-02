@@ -17,9 +17,9 @@ import { OrganizationsService } from './organizations.service';
 import {
   CreateOrganizationDto,
   CreateOrganizationRegistrationDto,
+  UpdateOrganizationRegistrationDto,
 } from './dto/create-organization.dto';
 
-// --- Interfaces for Type Safety ---
 interface UpdateOrgPayload {
   username?: string;
   email?: string;
@@ -30,11 +30,6 @@ interface UpdateOrgPayload {
   profile_picture_url?: string;
 }
 
-interface UpdateRegistrationPayload extends Partial<CreateOrganizationRegistrationDto> {
-  address?: string;
-}
-
-// --- FIXED: Explicit type signature for the organization verification payload ---
 interface VerifyOrganizationBody {
   organizationName: string;
   authorizedPersonName: string;
@@ -65,7 +60,6 @@ const documentStorageConfig = diskStorage({
 export class OrganizationsController {
   constructor(private readonly organizationsService: OrganizationsService) {}
 
-  // --- FIXED: Replaced body: any with VerifyOrganizationBody to kill the 'any' assignment warning ---
   @Post('verify')
   @UseInterceptors(
     FilesInterceptor('documents', 10, { storage: documentStorageConfig }),
@@ -101,7 +95,6 @@ export class OrganizationsController {
     return await this.organizationsService.createRegistration(createRegDto);
   }
 
-  // --- NEW: Endpoint to fetch pending registrations ---
   @Get('registration/pending')
   async findAllPendingRegistrations() {
     return await this.organizationsService.findAllPendingRegistrations();
@@ -112,10 +105,16 @@ export class OrganizationsController {
     return await this.organizationsService.findAllRegistrations();
   }
 
+  @Get('registration/:id')
+  async findOneRegistration(@Param('id') id: string) {
+    return await this.organizationsService.findOneRegistration(id);
+  }
+
   @Patch('registration/:id')
   async updateRegistration(
     @Param('id') id: string,
-    @Body() updateDto: UpdateRegistrationPayload,
+    // ─── FIXED: REPLACED ANY WITH STRICT TRANSITIONAL DTO CLASS ENFORCEMENT ───
+    @Body() updateDto: UpdateOrganizationRegistrationDto,
   ) {
     return await this.organizationsService.updateRegistration(id, updateDto);
   }
@@ -156,19 +155,17 @@ export class OrganizationsController {
     return await this.organizationsService.findOne(id);
   }
 
-  // --- FIXED: Explicitly casting 'body' object properties safely to satisfy strict ESLint rules ---
   @Patch(':id')
   @UseInterceptors(
     FileInterceptor('profile_picture', { storage: storageConfig }),
   )
   async update(
     @Param('id') id: string,
-    @Body() body: Record<string, unknown>, // Changes raw body parsing type to an unknown record type object
+    @Body() body: Record<string, unknown>,
     @UploadedFile() file?: Express.Multer.File,
   ) {
     const updateData: UpdateOrgPayload = {};
 
-    // Safely verify and map incoming body variables down to your update payload block
     if (typeof body.username === 'string') updateData.username = body.username;
     if (typeof body.email === 'string') updateData.email = body.email;
     if (typeof body.password === 'string') updateData.password = body.password;

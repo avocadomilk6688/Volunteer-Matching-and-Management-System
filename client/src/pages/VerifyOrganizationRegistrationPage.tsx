@@ -49,6 +49,7 @@ export function VerifyOrganizationRegistrationPage() {
         fetchRegistrations();
     }, []);
 
+    // ─── FIXED: DYNAMIC ISOLATED RECOVERY PIPELINE CONTEXT ───
     const handleAction = async (id: string, actionType: 'approve' | 'reject', orgName: string) => {
         const actionConfirmText = actionType === 'approve' ? 'approve registration for' : 'reject registration for';
         if (!window.confirm(`Are you sure you want to ${actionConfirmText} "${orgName}"?`)) {
@@ -57,10 +58,25 @@ export function VerifyOrganizationRegistrationPage() {
 
         try {
             const token = localStorage.getItem('token');
+
+            // 1. Fetch the absolute source of truth individual item record directly from the backend.
+            // This gets us the original database string, completely bypassing the array sanitization logic.
+            const sourceOfTruthResponse = await axios.get(`${API_BASE_URL}/organizations/registration/${id}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+
+            // Fallback recovery if parsing anomalies surface
+            const rawAuthorizedPerson = sourceOfTruthResponse.data?.authorizedPersonName || '';
+
+            // 2. Safely forward the original intact string payload to the PATCH router layer
             await axios.patch(`${API_BASE_URL}/organizations/registration/${id}`,
-                { status: actionType === 'approve' ? 'approved' : 'rejected' },
+                {
+                    status: actionType === 'approve' ? 'approved' : 'rejected',
+                    authorizedPersonName: rawAuthorizedPerson
+                },
                 { headers: { Authorization: `Bearer ${token}` } }
             );
+
             alert(`Organization has been successfully ${actionType}d.`);
             fetchRegistrations(); // Instantly pull updated table datasets
         } catch (error) {
@@ -120,6 +136,11 @@ export function VerifyOrganizationRegistrationPage() {
                                         ? row.supporting_documents[0]
                                         : '';
 
+                                    // ─── FIXED: PARSE OUT THE SYSTEM PIPELINES TO DISPLAY A CLEAN NAME ───
+                                    const cleanNameDisplay = row.authorizedPersonName?.includes('|')
+                                        ? row.authorizedPersonName.split('|')[0]
+                                        : row.authorizedPersonName;
+
                                     return (
                                         <tr key={row.id}>
                                             <td className="admin-cell-org-name">{row.organizationName}</td>
@@ -137,7 +158,8 @@ export function VerifyOrganizationRegistrationPage() {
                                                     <span style={{ color: '#999', fontSize: '13px' }}>No docs uploaded</span>
                                                 )}
                                             </td>
-                                            <td>{row.authorizedPersonName}</td>
+                                            {/* Render sanitized name variant to keeping the UI completely pristine */}
+                                            <td>{cleanNameDisplay}</td>
                                             {/* --- ADDED: Address Cell layout rendering column --- */}
                                             <td className="admin-cell-address">{row.address || 'N/A'}</td>
                                             <td className="admin-cell-description">{row.description}</td>
@@ -146,6 +168,7 @@ export function VerifyOrganizationRegistrationPage() {
                                                 <div className="admin-verify-btn-group">
                                                     <button
                                                         className="admin-approve-btn"
+                                                        // ─── FIXED: REMOVED COMPONENT STATE TRACKING VALUE REVERSION ───
                                                         onClick={() => handleAction(row.id, 'approve', row.organizationName)}
                                                     >
                                                         Approve

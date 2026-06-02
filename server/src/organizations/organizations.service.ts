@@ -6,6 +6,7 @@ import { OrganizationRegistration } from './entities/organization-registration.e
 import {
   CreateOrganizationDto,
   CreateOrganizationRegistrationDto,
+  UpdateOrganizationRegistrationDto,
 } from './dto/create-organization.dto';
 import { generateCustomId } from '../common/utils/id_generator.util';
 import { User } from '../users/entities/user.entity';
@@ -25,7 +26,7 @@ interface CreateVerificationRegistrationDto {
   authorizedPersonName: string;
   description: string;
   address: string;
-  supporting_documents: string[]; // Typed as array to perfectly match our simple-array schema
+  supporting_documents: string[];
 }
 
 @Injectable()
@@ -40,16 +41,13 @@ export class OrganizationsService {
 
   // --- Registration Record Methods ---
 
-  /**
-   * Handles multi-file verification form submissions natively and securely
-   */
   async createVerificationRegistration(dto: CreateVerificationRegistrationDto) {
     const id = await generateCustomId(this.regRepo, 'REG');
 
     const newReg = this.regRepo.create({
       id,
       organizationName: dto.organizationName,
-      authorizedPersonName: dto.authorizedPersonName,
+      authorizedPersonName: String(dto.authorizedPersonName).trim(),
       description: dto.description,
       address: dto.address,
       supporting_documents: dto.supporting_documents,
@@ -62,39 +60,134 @@ export class OrganizationsService {
 
   async createRegistration(dto: CreateOrganizationRegistrationDto) {
     const id = await generateCustomId(this.regRepo, 'REG');
+
     const newReg = this.regRepo.create({
       id,
-      ...dto,
+      organizationName: dto.organizationName,
+      description: dto.description,
+      address: dto.address,
+      authorizedPersonName: String(dto.authorizedPersonName).trim(),
+      supporting_documents: dto.supporting_documents || [],
       submission_time: new Date(),
       status: 'pending',
-    } as any);
+    });
+
     return await this.regRepo.save(newReg);
   }
 
-  // --- FIXED: Added method to fetch pending registrations ---
   async findAllPendingRegistrations() {
-    return await this.regRepo.find({
+    const records = await this.regRepo.find({
       where: { status: 'pending' },
       order: { submission_time: 'DESC' },
+    });
+
+    return records.map((rec) => {
+      if (rec.authorizedPersonName?.includes('|')) {
+        rec.authorizedPersonName = rec.authorizedPersonName.split('|')[0];
+      }
+      return rec;
     });
   }
 
   async findAllRegistrations() {
-    return await this.regRepo.find();
+    const records = await this.regRepo.find();
+    return records.map((rec) => {
+      if (rec.authorizedPersonName?.includes('|')) {
+        rec.authorizedPersonName = rec.authorizedPersonName.split('|')[0];
+      }
+      return rec;
+    });
   }
 
   async findOneRegistration(id: string) {
     const reg = await this.regRepo.findOne({ where: { id } });
     if (!reg) throw new NotFoundException(`Registration ${id} not found`);
+
     return reg;
   }
 
+  // ─── REWRITTEN FOR HIGH CONCURRENCY ISOLATED DISK COMMITS ───
   async updateRegistration(
     id: string,
-    updateDto: Partial<CreateOrganizationRegistrationDto>,
+    updateDto: UpdateOrganizationRegistrationDto,
   ) {
-    await this.regRepo.update(id, updateDto as any);
-    return await this.findOneRegistration(id);
+    console.log(
+      `[APPROVAL PROCESS START] Updating registration record row ID: ${id}`,
+      updateDto,
+    );
+
+    const registration = await this.regRepo.findOne({ where: { id } });
+    if (!registration)
+      throw new NotFoundException(`Registration ${id} not found`);
+
+    // ─── CRITICAL FIX: PREVENT OVERWRITING THE HIDDEN PIPE VALUE ───
+    // Isolate status modifications exclusively to keep clean incoming names from erasing metadata tracking parameters
+    await this.regRepo.update(id, { status: updateDto.status });
+
+    const updatedReg = await this.regRepo.findOne({ where: { id } });
+    if (!updatedReg)
+      throw new NotFoundException(`Updated registration ${id} not found`);
+
+    console.log(
+      `[APPROVAL CHECK] Fresh DB String Target state reads: "${updatedReg.authorizedPersonName}"`,
+    );
+
+    if (
+      updateDto.status === 'approved' &&
+      updatedReg.authorizedPersonName?.includes('|')
+    ) {
+      const [, targetUserId] = updatedReg.authorizedPersonName.split('|');
+      console.log(
+        `[APPROVAL MATCH FOUND] Parsing target user key identifier: "${targetUserId}"`,
+      );
+
+      if (targetUserId) {
+        const existingOrg = await this.orgRepo.findOne({
+          where: { user: { id: targetUserId } },
+        });
+
+        if (!existingOrg) {
+          const orgId = await generateCustomId(this.orgRepo, 'O');
+
+          // Hand TypeORM complete, lightweight entity mapping stubs to resolve internal foreign keys
+          const newOrgProfile = this.orgRepo.create({
+            id: orgId,
+            description: updatedReg.description || 'No description provided',
+            profile_picture_url: '/images/default_profile_pic.png',
+            contact_number: 'N/A',
+            rating: 0,
+            registrationRecord: {
+              id: updatedReg.id,
+            } as OrganizationRegistration,
+            user: { id: targetUserId } as User,
+          });
+
+          const savedProfile = await this.orgRepo.save(newOrgProfile);
+          console.log(
+            `[SEED PROFILE SUCCESS ✅] Generated custom row in Organization profile context! ID: ${savedProfile.id}`,
+          );
+        } else {
+          console.log(
+            `[SEED SKIPPED ⚠️] Profile row configuration already exists for user link ID: ${targetUserId}`,
+          );
+        }
+      } else {
+        console.error(
+          `[SEED ERROR ❌] String token extraction split array index failure. targetUserId was blank.`,
+        );
+      }
+    } else {
+      console.log(
+        `[SEED SKIPPED ⚠️] Core criteria bypassed. Status: "${updateDto.status}", String contains pipe: ${updatedReg.authorizedPersonName?.includes('|')}`,
+      );
+    }
+
+    if (updatedReg.authorizedPersonName?.includes('|')) {
+      updatedReg.authorizedPersonName =
+        updatedReg.authorizedPersonName.split('|')[0];
+    }
+
+    return updatedReg;
   }
 
   async removeRegistration(id: string) {
@@ -108,7 +201,9 @@ export class OrganizationsService {
     const id = await generateCustomId(this.orgRepo, 'ORG');
     const newOrg = this.orgRepo.create({
       id,
-      ...dto,
+      description: dto.description,
+      profile_picture_url: dto.profile_picture_url,
+      contact_number: dto.contact_number,
       registrationRecord: {
         id: dto.registrationRecordId,
       } as OrganizationRegistration,
@@ -132,9 +227,6 @@ export class OrganizationsService {
     return org;
   }
 
-  /**
-   * Updates Organization, Linked User, and Linked Registration Record
-   */
   async update(id: string, updateDto: UpdateOrgPayload) {
     const org = await this.orgRepo.findOne({
       where: { id },
@@ -143,7 +235,6 @@ export class OrganizationsService {
 
     if (!org) throw new NotFoundException('Organization not found');
 
-    // 1. Handle User Table Updates via the Transaction Manager
     const userData: Partial<User> = {};
     if (updateDto.username) userData.username = updateDto.username;
     if (updateDto.email) userData.email = updateDto.email;
@@ -153,14 +244,12 @@ export class OrganizationsService {
       await this.orgRepo.manager.update(User, org.user.id, userData);
     }
 
-    // 2. Handle Registration Table Updates
     if (updateDto.address && org.registrationRecord) {
       await this.regRepo.update(org.registrationRecord.id, {
         address: updateDto.address,
       });
     }
 
-    // 3. Handle Organization Table Updates
     const orgUpdateData: Partial<Organization> = {};
     if (updateDto.description)
       orgUpdateData.description = updateDto.description;
