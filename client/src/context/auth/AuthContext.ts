@@ -1,10 +1,20 @@
 import { createContext } from "react";
 
+// ─── ADDED: PENDING RATING TRIGGER OBJECT TYPE CONTRACT ───
+export interface PendingRatingTrigger {
+  programmeId: string;
+  organizationName: string;
+  organizationLogo: string;
+}
+
 export interface User {
   id: string;
   email: string;
   role: "admin" | "volunteer" | "organization";
   username?: string | null;
+
+  // ─── FIXED: ALLOWS AUTOMATED POPUPS TO BE ACCESSED NATIVELY BY THE FRONTEND COMPILER ───
+  pendingRating?: PendingRatingTrigger | null;
 
   // These allow the nested data from TypeORM relations to exist in React
   volunteer?: {

@@ -58,15 +58,24 @@ export class CreateRatingDto {
   @IsNumber()
   @Min(1)
   @Max(5)
-  value!: number;
+  @IsNotEmpty()
+  rating!: number; // Changed from 'value' to 'rating' to match Service/Controller usage
 
   @IsString()
   @IsNotEmpty()
-  raterId!: string;
+  senderId!: string; // Using 'senderId' instead of 'raterId' to match Service
 
   @IsString()
   @IsNotEmpty()
-  rateeId!: string;
+  targetVolunteerId!: string; // Using 'targetVolunteerId' instead of 'rateeId'
+
+  @IsString()
+  @IsNotEmpty()
+  programmeId!: string;
+
+  @IsString()
+  @IsOptional()
+  senderRole?: string;
 }
 
 export class CreateSupportTicketDto {

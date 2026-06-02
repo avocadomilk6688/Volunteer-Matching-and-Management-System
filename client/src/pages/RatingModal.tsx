@@ -1,64 +1,129 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AiOutlineClose, AiFillStar, AiOutlineStar, AiOutlineSearch } from 'react-icons/ai';
-import { useAuth } from '../context/auth/useAuth'; // Adjust path if needed
+import { useAuth } from '../context/auth/useAuth';
 import axios from 'axios';
 import './rating_modal.css';
+
+interface VolunteerRecord {
+    id: string;
+    username: string;
+    profile_picture_url?: string;
+    customRating?: number; // Keeps track of manual rating overrides per volunteer row
+}
 
 interface RatingModalProps {
     isOpen: boolean;
     onClose: () => void;
     programmeId: string;
-    organizationName?: string; // For volunteer view
-    organizationLogo?: string; // For volunteer view
+    organizationName?: string;
+    organizationLogo?: string;
 }
 
 const API_BASE_URL = "http://localhost:3000";
 
-export function RatingModal({ isOpen, onClose, programmeId, organizationName = "EcoGuardians Malaysia", organizationLogo }: RatingModalProps) {
+export function RatingModal({
+    isOpen,
+    onClose,
+    programmeId,
+    organizationName = "EcoGuardians Malaysia",
+    organizationLogo
+}: RatingModalProps) {
     const { user } = useAuth();
 
-    // Core states
-    const [rating, setRating] = useState<number>(4); // Default to 4 stars as shown in images
-    const [searchQuery, setSearchQuery] = useState<string>("");
+    // Core application states
+    const [rating, setRating] = useState<number>(4); // Default global batch rating score
+    const [volunteers, setVolunteers] = useState<VolunteerRecord[]>([]);
+    const [searchQuery, setSearchQuery] = useState<string>(``);
+    const [loadingVolunteers, setLoadingVolunteers] = useState<boolean>(false);
     const [submitting, setSubmitting] = useState<boolean>(false);
+
+    const role = user?.role || 'volunteer';
+
+    // Fetch program volunteers automatically if logged in as an organization
+    useEffect(() => {
+        if (isOpen && role === 'organization') {
+            const fetchProgrammeVolunteers = async () => {
+                try {
+                    setLoadingVolunteers(true);
+                    const token = localStorage.getItem('token');
+
+                    const response = await axios.get<VolunteerRecord[]>(
+                        `${API_BASE_URL}/programmes/${programmeId}/volunteers`,
+                        { headers: { Authorization: `Bearer ${token}` } }
+                    );
+                    setVolunteers(response.data);
+                } catch (error) {
+                    console.error("Failed to fetch programme volunteers list:", error);
+                } finally {
+                    setLoadingVolunteers(false);
+                }
+            };
+            fetchProgrammeVolunteers();
+        }
+    }, [isOpen, programmeId, role]);
 
     if (!isOpen) return null;
 
-    const role = user?.role || 'volunteer'; // Fallback check
-
+    // Handles changing the global or volunteer-wide fallback star score
     const handleStarClick = (starValue: number) => {
         setRating(starValue);
+    };
+
+    // Safely handles independent row overrides for specific volunteers
+    const handleIndividualStarClick = (volunteerId: string, starValue: number) => {
+        setVolunteers(prev => prev.map(vol =>
+            vol.id === volunteerId ? { ...vol, customRating: starValue } : vol
+        ));
     };
 
     const handleSubmit = async () => {
         try {
             setSubmitting(true);
+            const token = localStorage.getItem('token');
+            const config = { headers: { Authorization: `Bearer ${token}` } };
 
-            const payload = {
-                programmeId,
-                rating,
-                senderRole: role,
-                senderId: user?.id,
-                // If it's an organization batch rating, search query can be sent or handled accordingly
-                batchSearch: role === 'organization' ? searchQuery : undefined
-            };
+            if (role === 'volunteer') {
+                // Individual submission path for volunteer reviewing the organization
+                const payload = {
+                    programmeId,
+                    rating,
+                    senderRole: 'volunteer',
+                    senderId: user?.id
+                };
+                await axios.post(`${API_BASE_URL}/interactions/rating`, payload, config);
+            } else {
+                // Batch/Manual mixed collection payload path for organizations reviewing volunteers
+                const ratingsPayload = volunteers.map(vol => ({
+                    programmeId,
+                    rating: vol.customRating !== undefined ? vol.customRating : rating, // Fallback to global batch star if untouched
+                    senderRole: 'organization',
+                    senderId: user?.id,
+                    targetVolunteerId: vol.id
+                }));
 
-            await axios.post(`${API_BASE_URL}/interactions/rating`, payload);
-            alert("Rating submitted successfully!");
+                await axios.post(`${API_BASE_URL}/interactions/rating/batch`, { ratings: ratingsPayload }, config);
+            }
+
+            alert("Ratings submitted successfully!");
             onClose();
         } catch (error: unknown) {
-            console.error("Failed to submit rating:", error);
-            alert("Failed to submit rating entry.");
+            console.error("Failed to save transaction records:", error);
+            alert("Failed to save rating records down to database registry.");
         } finally {
             setSubmitting(false);
         }
     };
 
+    // Real-time client-side listing filtration matrix string comparison
+    const filteredVolunteers = volunteers.filter(vol =>
+        vol.username.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+
     return (
         <div className="modal-portal-overlay">
             <div className="rating-modal-container">
 
-                {/* Unified Orange Header */}
+                {/* Unified Orange Header Component */}
                 <header className="rating-modal-header">
                     <h2>{role === 'organization' ? 'Rate the Volunteers!' : 'Rate the Organization!'}</h2>
                     <button className="modal-close-icon-btn" onClick={onClose}>
@@ -66,13 +131,13 @@ export function RatingModal({ isOpen, onClose, programmeId, organizationName = "
                     </button>
                 </header>
 
-                {/* Conditional Modal Body Wrapper */}
+                {/* Main Interactive App Canvas */}
                 <div className="rating-modal-body">
                     {role === 'organization' ? (
-                        /* --- IMAGE 1: ORGANIZATION VIEW --- */
+                        /* ─── CASE A: ORGANIZATION INTERFACE VIEW ─── */
                         <div className="org-rating-layout">
                             <div className="batch-rating-row">
-                                <span className="batch-label-text">Batch Rating:</span>
+                                <span className="batch-label-text">Batch Rating All:</span>
                                 <div className="stars-interactive-row small-stars">
                                     {[1, 2, 3, 4, 5].map((star) => (
                                         <span key={star} onClick={() => handleStarClick(star)} className="star-wrapper">
@@ -94,17 +159,44 @@ export function RatingModal({ isOpen, onClose, programmeId, organizationName = "
                                 </div>
                             </div>
 
-                            <div className="no-result-placeholder">
-                                <p>No result</p>
-                            </div>
+                            {/* Dynamically Populated Volunteer Rows */}
+                            {loadingVolunteers ? (
+                                <div className="no-result-placeholder"><p>Loading program attendants...</p></div>
+                            ) : filteredVolunteers.length > 0 ? (
+                                <div className="volunteers-scroll-container" style={{ maxHeight: '220px', overflowY: 'auto', margin: '15px 0', border: '1px solid #eee', borderRadius: '6px' }}>
+                                    {filteredVolunteers.map((vol) => {
+                                        // Use custom row selection score if available; fallback to global state value
+                                        const currentVolScore = vol.customRating !== undefined ? vol.customRating : rating;
+                                        return (
+                                            <div key={vol.id} className="volunteer-manual-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', borderBottom: '1px solid #f5f5f5' }}>
+                                                <span className="vol-item-name-text" style={{ fontSize: '14px', fontWeight: 500, color: '#333' }}>{vol.username}</span>
+                                                <div className="stars-interactive-row individual-stars">
+                                                    {[1, 2, 3, 4, 5].map((star) => (
+                                                        <span key={star} onClick={() => handleIndividualStarClick(vol.id, star)} className="star-wrapper" style={{ cursor: 'pointer', fontSize: '18px', marginLeft: '3px' }}>
+                                                            {star <= currentVolScore ? <AiFillStar className="star-filled" style={{ color: '#ff7f00' }} /> : <AiOutlineStar className="star-empty" style={{ color: '#ccc' }} />}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            ) : (
+                                <div className="no-result-placeholder">
+                                    <p>No results found</p>
+                                </div>
+                            )}
                         </div>
                     ) : (
-                        /* --- IMAGE 2: VOLUNTEER VIEW --- */
+                        /* ─── CASE B: VOLUNTEER INTERFACE VIEW ─── */
                         <div className="volunteer-rating-layout">
                             <div className="target-profile-header">
                                 <div
                                     className="profile-circle-placeholder"
-                                    style={{ backgroundImage: organizationLogo ? `url(${organizationLogo})` : 'none' }}
+                                    style={{
+                                        backgroundImage: organizationLogo ? `url(${API_BASE_URL}${organizationLogo})` : 'none',
+                                        backgroundColor: '#f0f0f0'
+                                    }}
                                 />
                                 <span className="target-profile-name">{organizationName}</span>
                             </div>
@@ -119,7 +211,7 @@ export function RatingModal({ isOpen, onClose, programmeId, organizationName = "
                         </div>
                     )}
 
-                    {/* Unified Bottom Submit Button */}
+                    {/* Action Execution Footer Section */}
                     <div className="modal-submit-row">
                         <button
                             className="modal-orange-submit-btn"

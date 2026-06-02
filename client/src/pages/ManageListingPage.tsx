@@ -7,6 +7,7 @@ import { useAuth } from '../context/auth/useAuth';
 import { AiOutlineMessage } from 'react-icons/ai';
 import { ChatWindow } from './ChatWindow';
 import { socket } from '../services/socket'; // Import socket instance directly
+import { RatingModal } from './RatingModal';
 
 // --- Explicit TypeScript Interfaces ---
 interface TagItem { id: string; name: string; }
@@ -155,6 +156,9 @@ export function ManageListingPage() {
 
     // --- STATE FOR UNREAD MESSAGE NOTIFICATION BADGE ---
     const [hasUnread, setHasUnread] = useState(false);
+
+    // ─── ADDED: AUTOMATIC DIALOG OPEN ON LOGIN RATING payload INTERCEPT ───
+    const [isRatingOpen, setIsRatingOpen] = useState<boolean>(!!user?.pendingRating);
 
     const [rowData, setRowData] = useState({
         title: '',
@@ -447,6 +451,15 @@ export function ManageListingPage() {
                     onClose={() => setIsChatOpen(false)}
                     senderId={user?.id || ""}
                     receiverId=""
+                />
+            )}
+
+            {/* ─── ADDED: BATCH RATING POPUP INTERCEPTOR OVERLAY CORES ─── */}
+            {user?.pendingRating && (
+                <RatingModal
+                    isOpen={isRatingOpen}
+                    onClose={() => setIsRatingOpen(false)}
+                    programmeId={user.pendingRating.programmeId}
                 />
             )}
         </div>

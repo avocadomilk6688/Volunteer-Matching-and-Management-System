@@ -14,6 +14,27 @@ import { CreateUserDto } from '../users/dto/create-user.dto';
 import { LoginDto } from './dto/login.dto';
 import { MailService } from '../mail/mail.service';
 
+interface RawRatingRow {
+  id: string;
+}
+
+interface RawOrganizationRow {
+  name: string;
+  profile_picture_url: string;
+}
+
+// Explicit structures representing database table cross-joins
+interface RawVolunteerAppRow {
+  programmeId: string;
+  title: string;
+  organizationId: string | null;
+}
+
+interface RawOrganizationProgRow {
+  programmeId: string;
+  title: string;
+}
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -67,13 +88,12 @@ export class AuthService {
   async login(loginDto: LoginDto) {
     const { email, password, role } = loginDto;
 
-    // Eagerly joins 'organization_registration' columns securely matching your Entity structures
     const user = await this.userRepository.findOne({
       where: { email },
       relations: [
         'volunteer',
         'organization',
-        'organization.registrationRecord', // Eager multi-level join
+        'organization.registrationRecord',
         'admin',
       ],
     });
@@ -88,10 +108,89 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials.');
     }
 
-    // ─── FIXED: DATA STRUCTURE NORMALIZATION ───
-    // If an organization profile exists, explicitly attach and overwrite its 'id' property
-    // to mirror the core 'user.id' ("O002"). This forces the untouched ManageListingPage filter
-    // ("item.organization?.id === user?.id") to always find a perfect string match!
+    let pendingRatingTrigger: {
+      programmeId: string;
+      organizationName: string;
+      organizationLogo: string;
+    } | null = null;
+
+    try {
+      if (user.role === 'volunteer') {
+        // 1. VOLUNTEER TRACK: Find applications they completed that haven't been rated yet
+        const completedApps: RawVolunteerAppRow[] =
+          await this.userRepository.manager.query(
+            `SELECT a.programmeId, p.title, p.organizationId 
+           FROM application a
+           JOIN programme p ON a.programmeId = p.id
+           WHERE a.volunteerId = ? AND a.status = 'completed'`,
+            [user.id],
+          );
+
+        for (const app of completedApps) {
+          const ratingExists: RawRatingRow[] =
+            await this.userRepository.manager.query(
+              `SELECT id FROM interaction_rating WHERE programmeId = ? AND senderId = ? LIMIT 1`,
+              [app.programmeId, user.id],
+            );
+
+          if (!ratingExists || ratingExists.length === 0) {
+            let orgName = 'EcoGuardians Malaysia';
+            let orgLogo = '';
+
+            if (app.organizationId) {
+              const orgData: RawOrganizationRow[] =
+                await this.userRepository.manager.query(
+                  `SELECT name, profile_picture_url FROM organization WHERE id = ? LIMIT 1`,
+                  [app.organizationId],
+                );
+
+              if (orgData && orgData.length > 0) {
+                orgName = orgData[0].name || orgName;
+                orgLogo = orgData[0].profile_picture_url || orgLogo;
+              }
+            }
+
+            pendingRatingTrigger = {
+              programmeId: app.programmeId,
+              organizationName: orgName,
+              organizationLogo: orgLogo,
+            };
+            break;
+          }
+        }
+      } else if (user.role === 'organization') {
+        // 2. ORGANIZATION TRACK: Find distinct programmes they own that contain completed
+        // applications, but lack a submitted organizational review record
+        const completedOrgProgs: RawOrganizationProgRow[] =
+          await this.userRepository.manager.query(
+            `SELECT DISTINCT a.programmeId, p.title
+           FROM application a
+           JOIN programme p ON a.programmeId = p.id
+           WHERE p.organizationId = ? AND a.status = 'completed'`,
+            [user.id],
+          );
+
+        for (const prog of completedOrgProgs) {
+          const ratingExists: RawRatingRow[] =
+            await this.userRepository.manager.query(
+              `SELECT id FROM interaction_rating WHERE programmeId = ? AND senderId = ? LIMIT 1`,
+              [prog.programmeId, user.id],
+            );
+
+          if (!ratingExists || ratingExists.length === 0) {
+            pendingRatingTrigger = {
+              programmeId: prog.programmeId,
+              organizationName: prog.title,
+              organizationLogo: '',
+            };
+            break;
+          }
+        }
+      }
+    } catch (err) {
+      console.error('[COMPLETED APPLICATION SCANNING ERROR]:', err);
+    }
+
     const organizationPayload = user.organization
       ? {
           ...user.organization,
@@ -101,12 +200,13 @@ export class AuthService {
 
     return {
       access_token: 'session_active_token',
-      id: user.id, // "O002"
+      id: user.id,
       email: user.email,
       role: user.role,
       username: user.username,
       volunteer: user.volunteer,
       organization: organizationPayload,
+      pendingRating: pendingRatingTrigger,
     };
   }
 

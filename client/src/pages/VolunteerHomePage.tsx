@@ -10,6 +10,7 @@ import axios from 'axios';
 import { useAuth } from '../context/auth/useAuth';
 import { ChatWindow } from './ChatWindow';
 import { socket } from '../services/socket';
+import { RatingModal } from './RatingModal';
 
 // --- Constants ---
 const API_BASE_URL = "http://localhost:3000";
@@ -143,6 +144,9 @@ export function VolunteerHomePage() {
     const [isChatOpen, setIsChatOpen] = useState(false);
     const [hasUnread, setHasUnread] = useState(false);
 
+    // ─── ADDED: LOCALIZED STATE AUTO-TRIGGERS OPEN IF BACKEND DISPATCHES PENDING RATING TRIGGER ───
+    const [isRatingOpen, setIsRatingOpen] = useState<boolean>(!!user?.pendingRating);
+
     // --- Type-safe session storage helper ---
     const getStored = <T,>(key: string, defaultValue: T): T => {
         const saved = sessionStorage.getItem(key);
@@ -260,7 +264,6 @@ export function VolunteerHomePage() {
 
     // --- FIXED: AUTO-REFRESH ON DROPDOWN SELECTION STATUS CHANGE ---
     useEffect(() => {
-        // Prevent premature fetching during initial page load sequences
         if (allSkills.length > 0 || allInterests.length > 0) {
             handleSearch(1);
         }
@@ -476,6 +479,17 @@ export function VolunteerHomePage() {
                     onClose={() => setIsChatOpen(false)}
                     senderId={user?.id || ""}
                     receiverId=""
+                />
+            )}
+
+            {/* ─── ADDED: AUTOMATED VOTE INTERCEPTOR INJECTION COMPONENT ─── */}
+            {user?.pendingRating && (
+                <RatingModal
+                    isOpen={isRatingOpen}
+                    onClose={() => setIsRatingOpen(false)}
+                    programmeId={user.pendingRating.programmeId}
+                    organizationName={user.pendingRating.organizationName}
+                    organizationLogo={user.pendingRating.organizationLogo}
                 />
             )}
         </div>

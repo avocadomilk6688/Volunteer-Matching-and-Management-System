@@ -88,6 +88,11 @@ export class InteractionsController {
     return this.interactionsService.createRating(createRatingDto);
   }
 
+  @Post('rating/batch')
+  createBatchRatings(@Body() payload: { ratings: any[] }) {
+    return this.interactionsService.createBatchRatings(payload);
+  }
+
   @Post('notification')
   createNotification(@Body() createNotificationDto: CreateNotificationDto) {
     return this.interactionsService.createNotification(createNotificationDto);

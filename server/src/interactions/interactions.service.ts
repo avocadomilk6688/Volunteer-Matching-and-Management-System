@@ -15,6 +15,8 @@ import { SupportTicket } from './entities/support_ticket.entity';
 import { Application } from '../applications/entities/application.entity';
 import { User } from '../users/entities/user.entity';
 import { Programme } from '../programmes/entities/programme.entity';
+import { Volunteer } from '../volunteers/entities/volunteer.entity';
+import { Organization } from '../organizations/entities/organization.entity';
 
 // DTOs
 import {
@@ -37,6 +39,15 @@ export interface RecentContact {
   role: string;
   programmeId: string | null;
   programmeName: string | null;
+}
+
+// ─── TYPE CONTRACTS FOR RAW SQL MEAN QUERY OUTPUTS ───
+interface RawProgrammeLookupRow {
+  organizationId: string | null;
+}
+
+interface RawAggregateScoreRow {
+  meanScore: string | null;
 }
 
 @Injectable()
@@ -62,6 +73,12 @@ export class InteractionsService {
 
     @InjectRepository(Application)
     private readonly applicationRepo: Repository<Application>,
+
+    @InjectRepository(Volunteer)
+    private readonly volunteerRepo: Repository<Volunteer>,
+
+    @InjectRepository(Organization)
+    private readonly organizationRepo: Repository<Organization>,
   ) {}
 
   // --- Q&A Logic ---
@@ -71,17 +88,16 @@ export class InteractionsService {
     });
   }
 
-  async createQA(dto: CreateQuestionAnswerDto): Promise<string> {
+  async createQA(createQaDto: CreateQuestionAnswerDto): Promise<string> {
     const id = await generateCustomId(this.qaRepo, 'QA');
-    const newQA = this.qaRepo.create({ id, ...dto });
+    const newQA = this.qaRepo.create({ id, ...createQaDto });
     await this.qaRepo.save(newQA);
     return `QA ${id} added`;
   }
 
-  // --- FIXED: ADDED THE EXPLICIT UPDATE ENTRY LOGIC TO PREVENT FRONTEND 404 CRASHES ---
   async updateQA(
     id: string,
-    dto: Partial<CreateQuestionAnswerDto>,
+    updateQaDto: Partial<CreateQuestionAnswerDto>,
   ): Promise<QuestionAnswer> {
     const existingQA = await this.qaRepo.findOne({ where: { id } });
     if (!existingQA) {
@@ -90,12 +106,10 @@ export class InteractionsService {
       );
     }
 
-    // Merge modified properties safely over top of existing row layout parameters
-    const updatedQA = this.qaRepo.merge(existingQA, dto);
+    const updatedQA = this.qaRepo.merge(existingQA, updateQaDto);
     return await this.qaRepo.save(updatedQA);
   }
 
-  // --- FIXED: ADDED THE EXPLICIT DELETION ENTRY LOGIC TO PREVENT FRONTEND 404 CRASHES ---
   async removeQA(id: string): Promise<{ deleted: boolean; message: string }> {
     const existingQA = await this.qaRepo.findOne({ where: { id } });
     if (!existingQA) {
@@ -113,17 +127,17 @@ export class InteractionsService {
 
   // --- Messaging Logic ---
   async createMessage(
-    dto: CreateMessageDto & { programmeId?: string },
+    createMessageDto: CreateMessageDto & { programmeId?: string },
   ): Promise<Message> {
     const id = await generateCustomId(this.messageRepo, 'M');
 
     const newMessage = this.messageRepo.create({
       id,
-      content: dto.content,
-      sender: { id: dto.senderId } as User,
-      receiver: { id: dto.receiverId } as User,
-      programme: dto.programmeId
-        ? ({ id: dto.programmeId } as Programme)
+      content: createMessageDto.content,
+      sender: { id: createMessageDto.senderId } as User,
+      receiver: { id: createMessageDto.receiverId } as User,
+      programme: createMessageDto.programmeId
+        ? ({ id: createMessageDto.programmeId } as Programme)
         : undefined,
     });
 
@@ -241,27 +255,159 @@ export class InteractionsService {
     return { participantUserIds, messages };
   }
 
-  // --- General Interactions & Relational Notification Logic ---
-  async createRating(dto: CreateRatingDto): Promise<string> {
+  // ─── TYPE-SAFE RATING CHANNELS COMPATIBLE WITH RELATIONAL OBJECT ASSIGNMENTS ───
+
+  /**
+   * Processes a single incoming rating record and recalculates global scores.
+   * Maps properties safely onto 'rater' and 'ratee' User object linkages.
+   */
+  async createRating(
+    createRatingDto: CreateRatingDto & {
+      programmeId: string;
+      rating: number;
+      senderRole?: string;
+      senderId?: string;
+      targetVolunteerId?: string;
+    },
+  ): Promise<string> {
     const id = await generateCustomId(this.ratingRepo, 'R');
-    const newRating = this.ratingRepo.create({ id, ...dto });
+
+    // TypeORM Structural Mapping: Assign entities as structural identifiers
+    const newRating = this.ratingRepo.create({
+      id,
+      value: createRatingDto.rating,
+      rater: createRatingDto.senderId
+        ? ({ id: createRatingDto.senderId } as User)
+        : undefined,
+      ratee: createRatingDto.targetVolunteerId
+        ? ({ id: createRatingDto.targetVolunteerId } as User)
+        : undefined,
+    });
     await this.ratingRepo.save(newRating);
+
+    await this.recalculateTargetMean(
+      createRatingDto.programmeId,
+      createRatingDto.senderRole || '',
+      createRatingDto.targetVolunteerId || null,
+    );
+
     return `Rating ${id} submitted successfully`;
   }
 
   /**
-   * Safe Notification dispatch handler tailored to your specific User relational entity setup.
-   * Cleans string artifacts and saves entities sequentially to fully eliminate key assignment race conditions.
+   * Processes a structured array of ratings sent from organizational batch panels.
    */
+  async createBatchRatings(payload: {
+    ratings: Array<
+      CreateRatingDto & {
+        programmeId: string;
+        rating: number;
+        senderRole: string;
+        senderId: string;
+        targetVolunteerId: string;
+      }
+    >;
+  }): Promise<string> {
+    if (!payload.ratings || payload.ratings.length === 0) {
+      throw new BadRequestException(
+        'Cannot execute empty batch updates matrix.',
+      );
+    }
+
+    for (const rateItem of payload.ratings) {
+      const id = await generateCustomId(this.ratingRepo, 'R');
+
+      // TypeORM Structural Mapping: Assign entities as structural identifiers per row item
+      const newRating = this.ratingRepo.create({
+        id,
+        value: rateItem.rating,
+        rater: { id: rateItem.senderId } as User,
+        ratee: { id: rateItem.targetVolunteerId } as User,
+      });
+      await this.ratingRepo.save(newRating);
+
+      await this.recalculateTargetMean(
+        rateItem.programmeId,
+        rateItem.senderRole,
+        rateItem.targetVolunteerId,
+      );
+    }
+
+    return `Batch total of ${payload.ratings.length} reviews compiled successfully`;
+  }
+
+  /**
+   * Internal algorithm to aggregate historical scores and update the profile table fields.
+   */
+  private async recalculateTargetMean(
+    programmeId: string,
+    senderRole: string,
+    targetVolunteerId: string | null,
+  ): Promise<void> {
+    try {
+      if (senderRole === 'volunteer') {
+        const progLookup: RawProgrammeLookupRow[] =
+          await this.ratingRepo.manager.query(
+            `SELECT organizationId FROM programme WHERE id = ? LIMIT 1`,
+            [programmeId],
+          );
+
+        if (progLookup.length === 0) return;
+        const targetOrgId = progLookup[0].organizationId;
+        if (!targetOrgId) return;
+
+        const stats: RawAggregateScoreRow[] =
+          await this.ratingRepo.manager.query(
+            `SELECT AVG(value) as meanScore 
+             FROM rating r
+             JOIN programme p ON r.programmeId = p.id
+             WHERE p.organizationId = ?`,
+            [targetOrgId],
+          );
+
+        const calculatedMean = stats[0]?.meanScore
+          ? parseFloat(stats[0].meanScore)
+          : 4.0;
+        await this.organizationRepo.update(targetOrgId, {
+          rating: calculatedMean,
+        });
+      } else if (senderRole === 'organization' && targetVolunteerId) {
+        const stats: RawAggregateScoreRow[] =
+          await this.ratingRepo.manager.query(
+            `SELECT AVG(value) as meanScore 
+             FROM rating 
+             WHERE rateeId = ?`,
+            [targetVolunteerId],
+          );
+
+        const calculatedMean = stats[0]?.meanScore
+          ? parseFloat(stats[0].meanScore)
+          : 4.0;
+        await this.volunteerRepo.update(targetVolunteerId, {
+          rating: calculatedMean,
+        });
+      }
+    } catch (err) {
+      console.error('[CRITICAL MEAN AGGREGATION CALCULATION FAILED]:', err);
+    }
+  }
+
+  // --- General Interactions & Relational Notification Logic ---
   async createNotification(
-    dto: CreateNotificationDto & { type?: string; receiverId?: string },
-  ): Promise<any> {
-    let cleanedContent = dto.content;
+    createNotificationDto: CreateNotificationDto & {
+      type?: string;
+      receiverId?: string;
+    },
+  ): Promise<string | { success: boolean; message: string }> {
+    let cleanedContent = createNotificationDto.content;
     if (cleanedContent && cleanedContent.startsWith('NNaN')) {
       cleanedContent = cleanedContent.replace(/^NNaN/, '');
     }
 
-    if (dto.type === 'programme_report' || !dto.receiverId) {
+    if (
+      createNotificationDto.type === 'programme_report' ||
+      !createNotificationDto.receiverId
+    ) {
       const administrators = await this.userRepo.find({
         where: { role: 'admin' },
       });
@@ -292,11 +438,11 @@ export class InteractionsService {
     const singleCustomId = await generateCustomId(this.notificationRepo, 'NOT');
 
     const targetUser = await this.userRepo.findOne({
-      where: { id: dto.receiverId },
+      where: { id: createNotificationDto.receiverId },
     });
     if (!targetUser) {
       throw new NotFoundException(
-        `Notification target user with ID ${dto.receiverId} not found`,
+        `Notification target user with ID ${createNotificationDto.receiverId} not found`,
       );
     }
 
@@ -311,53 +457,49 @@ export class InteractionsService {
     return `Notification ${singleCustomId} created`;
   }
 
-  // ─── REWRITTEN SUPPORT TICKET PIPELINE ───
-  async createSupportTicket(dto: CreateSupportTicketDto): Promise<string> {
-    if (!dto.userId) {
+  // --- Support Ticket Pipeline ---
+  async createSupportTicket(
+    createTicketDto: CreateSupportTicketDto,
+  ): Promise<string> {
+    if (!createTicketDto.userId) {
       throw new BadRequestException(
         'Cannot log a support ticket without an active user ID context.',
       );
     }
 
-    // 1. Generate incremental alphanumeric custom identity code ('T001', 'T002', etc.)
     const id = await generateCustomId(this.ticketRepo, 'T');
 
-    // 2. Query the full User entity from the database using the tracked userId mapping
     const userEntity = await this.userRepo.findOne({
-      where: { id: dto.userId },
+      where: { id: createTicketDto.userId },
     });
 
     if (!userEntity) {
       throw new NotFoundException(
-        `Relational linkage failed: User record with ID "${dto.userId}" not found in the primary registry.`,
+        `Relational linkage failed: User record with ID "${createTicketDto.userId}" not found in the primary registry.`,
       );
     }
 
-    // 3. Assemble the record payload mapping fields explicitly to their entity parameters
     const newTicket = this.ticketRepo.create({
       id,
-      content: dto.content,
-      status: dto.status || 'open',
-      user: userEntity, // Explicitly binds the database entity relationship context cleanly
+      content: createTicketDto.content,
+      status: createTicketDto.status || 'open',
+      user: userEntity,
     });
 
-    // 4. Save the completed ticket tuple into your MySQL schema
     await this.ticketRepo.save(newTicket);
     return `Ticket ${id} submitted`;
   }
 
-  // ─── ADDED: EXPLICIT QUEUES LOADING PIPELINE FOR ADMIN VIEW ───
   async findAllTickets(): Promise<SupportTicket[]> {
     return await this.ticketRepo.find({
-      relations: ['user'], // Eagerly joins relational user parameters (id, username, role) to populate tables
-      order: { id: 'DESC' }, // Pushes the most recent submissions to the top of the dashboard feed using alphanumeric ID sorting
+      relations: ['user'],
+      order: { id: 'DESC' },
     });
   }
 
-  // --- FIXED: ADDED THE EXPLICIT LIFECYCLE MUTATION PIPELINE FOR THE CLOSE ACTIONS BUTTON ---
   async updateSupportTicket(
     id: string,
-    dto: { status: string },
+    updateTicketDto: { status: string },
   ): Promise<SupportTicket> {
     const existingTicket = await this.ticketRepo.findOne({ where: { id } });
     if (!existingTicket) {
@@ -366,8 +508,10 @@ export class InteractionsService {
       );
     }
 
-    // Merges incoming state updates seamlessly onto the target support tuple row parameters
-    const updatedTicket = this.ticketRepo.merge(existingTicket, dto);
+    const updatedTicket = this.ticketRepo.merge(
+      existingTicket,
+      updateTicketDto,
+    );
     return await this.ticketRepo.save(updatedTicket);
   }
 
