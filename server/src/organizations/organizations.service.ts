@@ -99,10 +99,27 @@ export class OrganizationsService {
     });
   }
 
+  // ─── FIXED: DUAL-PATH FALLBACK LOOKS UP USER REF KEYS NATIVELY ───
   async findOneRegistration(id: string) {
-    const reg = await this.regRepo.findOne({ where: { id } });
-    if (!reg) throw new NotFoundException(`Registration ${id} not found`);
+    // 1. Attempt standard primary key search matching direct registration row IDs (REGxxx)
+    let reg = await this.regRepo.findOne({ where: { id } });
 
+    // 2. If missing, scan data tables to capture user relation suffix tags (Oxxx)
+    if (!reg) {
+      const allRecords = await this.regRepo.find();
+      reg =
+        allRecords.find((rec) =>
+          rec.authorizedPersonName?.includes(`|${id}`),
+        ) || null;
+    }
+
+    if (!reg) {
+      throw new NotFoundException(
+        `Registration record referencing key "${id}" not found`,
+      );
+    }
+
+    // Return object instance preserving trailing pipes so frontends can process verification checks
     return reg;
   }
 

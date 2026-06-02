@@ -8,7 +8,7 @@ import './login_page.css';
 const API_BASE_URL = "http://localhost:3000";
 
 interface ProfileRelation {
-    id: string; // E.g., O002
+    id: string;
     profile_picture_url?: string;
     registrationRecord?: {
         id: string;
@@ -18,12 +18,19 @@ interface ProfileRelation {
 
 interface LoginResponseData {
     access_token: string;
-    id: string; // Core tracking ID (O002)
+    id: string;
     username: string;
     role: 'admin' | 'volunteer' | 'organization';
     volunteer?: ProfileRelation;
     organization?: ProfileRelation;
     message?: string;
+}
+
+interface RemoteRegistrationRecord {
+    id: string;
+    organizationName: string;
+    authorizedPersonName: string;
+    status: string;
 }
 
 export function LoginPage() {
@@ -52,11 +59,9 @@ export function LoginPage() {
                 throw new Error(data.message || 'Login failed');
             }
 
-            // ─── CRITICAL MISSING LINK FIXED ───
             localStorage.setItem('token', data.access_token);
             localStorage.setItem('userId', data.id);
 
-            // ─── DATA STRUCTURE NORMALIZATION MATRIX ───
             const unifiedAuthUserContext = {
                 ...data,
                 id: data.id,
@@ -67,38 +72,50 @@ export function LoginPage() {
                 } : undefined
             };
 
-            // Propagate normalized data representation to Context
             login(data.access_token, unifiedAuthUserContext);
 
-            // ─── NAV INTERCEPTOR LOGIC MATRIX ───
             if (role === 'volunteer') {
                 navigate('/volunteer-home');
             } else if (role === 'admin') {
                 navigate('/manage-user-account');
             } else if (role === 'organization') {
 
-                // ─── FIXED: PERSISTENT VERIFICATION SUBMISSION INTERCEPTOR ───
-                // If they signed up but haven't submitted the document verification form,
-                // user.organization will either be completely missing, null, or an empty object.
-                const isFormUnsubmitted = !data.organization || Object.keys(data.organization).length === 0;
-
-                if (isFormUnsubmitted) {
-                    console.log("REDIRECT: Unsubmitted organization detected. Directing to form canvas.");
-                    navigate('/organization-verification');
-                } else {
-                    // If the form exists, evaluate the administrative review workflow status safely
-                    const rawStatus = data.organization?.registrationRecord?.status || 'pending';
-                    const registrationStatus = rawStatus.trim().toLowerCase();
-
-                    console.log("DEBUG: Normalized registration status evaluation:", registrationStatus);
-
-                    if (registrationStatus === 'approved') {
+                if (data.organization && Object.keys(data.organization).length > 0) {
+                    const rawStatus = data.organization?.registrationRecord?.status || 'approved';
+                    if (rawStatus.trim().toLowerCase() === 'approved') {
                         navigate('/manage-listing');
-                    } else if (registrationStatus === 'pending') {
-                        navigate('/pending-approval');
                     } else {
-                        // Safety fallback
-                        navigate('/manage-listing');
+                        navigate('/pending-approval');
+                    }
+                } else {
+                    // ─── FIXED: FETCH THE RAW INDIVIDUAL TARGET ROW DIRECTLY ───
+                    try {
+                        const singleRegResponse = await fetch(`${API_BASE_URL}/organizations/registration/${data.id}`, {
+                            headers: { Authorization: `Bearer ${data.access_token}` }
+                        });
+
+                        if (singleRegResponse.ok) {
+                            const registrationRecord = (await singleRegResponse.json()) as RemoteRegistrationRecord;
+                            const currentStatus = registrationRecord.status?.trim().toLowerCase();
+
+                            console.log("DEBUG: Isolated pending row verification check status state:", currentStatus);
+
+                            if (currentStatus === 'pending') {
+                                console.log("REDIRECT: Active unapproved record matched. Moving to pending route.");
+                                navigate('/pending-approval');
+                            } else if (currentStatus === 'approved') {
+                                navigate('/manage-listing');
+                            } else {
+                                navigate('/organization-verification');
+                            }
+                        } else {
+                            // If the individual row returns a 404 or fails, it means they never submitted a form
+                            console.log("REDIRECT: Registration instance lookup failed. Prompting form layout entry.");
+                            navigate('/organization-verification');
+                        }
+                    } catch (checkError) {
+                        console.error("Failed to query localized tracking indices:", checkError);
+                        navigate('/organization-verification');
                     }
                 }
             } else {
@@ -177,7 +194,6 @@ export function LoginPage() {
                     </form>
 
                     <Link className="forgot-password" to="/forgot-password">Forgot password</Link>
-
                     <p className="sign-up">Don't have an account? <Link to="/sign-up">Sign Up</Link></p>
                 </div>
             </div>
