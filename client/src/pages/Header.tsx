@@ -34,19 +34,21 @@ export function Header() {
     const [showNotifications, setShowNotifications] = useState(false);
     const [notifications, setNotifications] = useState<Notification[]>([]);
 
-    // --- Tracker state to store the client-side read benchmark timestamp ---
+    // ─── LAZY STATE INITIALIZATION WITH CONDITIONAL ID EVALUATOR ───
     const [lastViewedNotifTime, setLastViewedNotifTime] = useState<number>(() => {
-        const stored = localStorage.getItem('last_viewed_notifications_time');
-        return stored ? parseInt(stored, 10) : 0;
+        const userId = rawUser?.id || localStorage.getItem('userId');
+        if (userId) {
+            const stored = localStorage.getItem(`last_viewed_notifications_time_${userId}`);
+            return stored ? parseInt(stored, 10) : 0;
+        }
+        return 0;
     });
 
-    // ─── MOVE DECLARATIONS UP TO SATISFY BLOCK SCOPE DEPENDENCIES ───
     const role = user?.role;
     const isVolunteer = role === 'volunteer';
     const isOrganization = role === 'organization';
     const isAdmin = role === 'admin';
 
-    // ─── FIXED: BULLETPROOF SYSTEM CHECK FOR UNVERIFIED ORGANIZATIONS ───
     const isUnverifiedOrg = isOrganization && (
         !user?.organization ||
         Object.keys(user.organization).length === 0
@@ -81,22 +83,42 @@ export function Header() {
         }
     }, [isAuthenticated, user?.id, isUnverifiedOrg]);
 
+    // ─── FIXED: LOGOUT RE-INJECTION BACKUP PIPELINE ───
     const handleLogout = () => {
-        logout();
+        if (user?.id) {
+            // 1. Snatch the current read timestamp right before useAuth wipes localStorage
+            const userSpecificKey = `last_viewed_notifications_time_${user.id}`;
+            const currentSavedTime = localStorage.getItem(userSpecificKey);
+
+            // 2. Fire the central context logout handler
+            logout();
+
+            // 3. Re-inject the timestamp back into storage so it survives the cleanup scrub
+            if (currentSavedTime) {
+                localStorage.setItem(userSpecificKey, currentSavedTime);
+            }
+        } else {
+            logout();
+        }
+
+        // Wipe component memory to prevent stale rendering passes
+        setNotifications([]);
+        setLastViewedNotifTime(0);
         isShowProfileOptions(false);
         setShowNotifications(false);
         navigate('/');
     };
 
     const toggleNotifications = () => {
-        if (isUnverifiedOrg) return;
+        if (isUnverifiedOrg || !user?.id) return;
         const nextState = !showNotifications;
         setShowNotifications(nextState);
         if (showProfileOptions) isShowProfileOptions(false);
 
         if (nextState) {
             const currentTimestamp = Date.now();
-            localStorage.setItem('last_viewed_notifications_time', currentTimestamp.toString());
+            const userSpecificKey = `last_viewed_notifications_time_${user.id}`;
+            localStorage.setItem(userSpecificKey, currentTimestamp.toString());
             setLastViewedNotifTime(currentTimestamp);
         }
     };
