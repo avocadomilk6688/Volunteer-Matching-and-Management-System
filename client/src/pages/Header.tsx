@@ -151,9 +151,13 @@ export function Header() {
     const getProfilePic = () => {
         const defaultPic = '/images/default_profile_pic.png';
         if (!user || isAdmin || isUnverifiedOrg) return defaultPic;
+
         const picUrl = isVolunteer ? user.volunteer?.profile_picture_url : user.organization?.profile_picture_url;
         if (!picUrl) return defaultPic;
         if (picUrl.startsWith('http') || picUrl.startsWith('blob:')) return picUrl;
+
+        if (picUrl.startsWith('/images/')) return picUrl;
+
         return `${API_BASE_URL}${picUrl.startsWith('/') ? '' : '/'}${picUrl}`;
     };
 
