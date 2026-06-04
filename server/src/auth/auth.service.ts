@@ -85,8 +85,10 @@ export class AuthService {
         volunteerProfile.rating = 0.0;
         volunteerProfile.points = 0;
         volunteerProfile.user = savedUser;
-        // Optional nullable fields (gender, location, etc.) are left unassigned
-        // so the database automatically saves them as NULL without type conflicts.
+
+        // ─── SET RELATIVE CLIENT PUBLIC ASSET LINK AS DEFAULT ───
+        volunteerProfile.profile_picture_url =
+          '/images/default_profile_pic.png';
 
         await this.volunteerRepository.save(volunteerProfile);
       } else if (role === 'organization') {

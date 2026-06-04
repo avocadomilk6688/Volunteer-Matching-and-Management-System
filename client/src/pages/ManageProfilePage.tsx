@@ -178,6 +178,11 @@ export function ManageProfilePage() {
     const getFullImageUrl = (url: string | null | undefined) => {
         if (!url) return `https://ui-avatars.com/api/?name=${username}&background=random`;
         if (url.startsWith('blob:') || url.startsWith('http')) return url;
+
+        // If the path points to frontend public assets folder, serve it directly
+        if (url.startsWith('/images/')) return url;
+
+        // Fallback for user-uploaded files that actually live on the backend storage
         return `${API_BASE_URL}${url}`;
     };
 
