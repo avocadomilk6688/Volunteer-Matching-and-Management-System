@@ -10,6 +10,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { User } from '../users/entities/user.entity';
+import { Volunteer } from '../volunteers/entities/volunteer.entity';
+import { Organization } from '../organizations/entities/organization.entity';
 import { CreateUserDto } from '../users/dto/create-user.dto';
 import { LoginDto } from './dto/login.dto';
 import { MailService } from '../mail/mail.service';
@@ -23,7 +25,6 @@ interface RawOrganizationRow {
   profile_picture_url: string;
 }
 
-// Explicit structures representing database table cross-joins
 interface RawVolunteerAppRow {
   programmeId: string;
   title: string;
@@ -40,6 +41,13 @@ export class AuthService {
   constructor(
     @InjectRepository(User)
     private userRepository: Repository<User>,
+
+    @InjectRepository(Volunteer)
+    private volunteerRepository: Repository<Volunteer>,
+
+    @InjectRepository(Organization)
+    private organizationRepository: Repository<Organization>,
+
     private readonly mailService: MailService,
   ) {}
 
@@ -64,10 +72,33 @@ export class AuthService {
       email,
       password: hashedPassword,
       role: role as 'admin' | 'volunteer' | 'organization',
+      username: email.split('@')[0],
     });
 
     try {
-      return await this.userRepository.save(user);
+      const savedUser = await this.userRepository.save(user);
+
+      // ─── STRICT TYPE-SAFE INSTANTIATION (OMITTING NULL ASSIGNMENTS) ───
+      if (role === 'volunteer') {
+        const volunteerProfile = new Volunteer();
+        volunteerProfile.id = newId;
+        volunteerProfile.rating = 0.0;
+        volunteerProfile.points = 0;
+        volunteerProfile.user = savedUser;
+        // Optional nullable fields (gender, location, etc.) are left unassigned
+        // so the database automatically saves them as NULL without type conflicts.
+
+        await this.volunteerRepository.save(volunteerProfile);
+      } else if (role === 'organization') {
+        const organizationProfile = new Organization();
+        organizationProfile.id = newId;
+        organizationProfile.rating = 0.0;
+        organizationProfile.user = savedUser;
+
+        await this.organizationRepository.save(organizationProfile);
+      }
+
+      return savedUser;
     } catch (error: unknown) {
       if (
         error &&
@@ -116,13 +147,12 @@ export class AuthService {
 
     try {
       if (user.role === 'volunteer') {
-        // 1. VOLUNTEER TRACK: Find applications they completed that haven't been rated yet
         const completedApps: RawVolunteerAppRow[] =
           await this.userRepository.manager.query(
             `SELECT a.programmeId, p.title, p.organizationId 
-           FROM application a
-           JOIN programme p ON a.programmeId = p.id
-           WHERE a.volunteerId = ? AND a.status = 'completed'`,
+            FROM application a
+            JOIN programme p ON a.programmeId = p.id
+            WHERE a.volunteerId = ? AND a.status = 'completed'`,
             [user.id],
           );
 
@@ -159,14 +189,12 @@ export class AuthService {
           }
         }
       } else if (user.role === 'organization') {
-        // 2. ORGANIZATION TRACK: Find distinct programmes they own that contain completed
-        // applications, but lack a submitted organizational review record
         const completedOrgProgs: RawOrganizationProgRow[] =
           await this.userRepository.manager.query(
             `SELECT DISTINCT a.programmeId, p.title
-           FROM application a
-           JOIN programme p ON a.programmeId = p.id
-           WHERE p.organizationId = ? AND a.status = 'completed'`,
+            FROM application a
+            JOIN programme p ON a.programmeId = p.id
+            WHERE p.organizationId = ? AND a.status = 'completed'`,
             [user.id],
           );
 
@@ -210,9 +238,6 @@ export class AuthService {
     };
   }
 
-  /**
-   * Generates a password reset link and saves the token to the database.
-   */
   async forgotPassword(email: string): Promise<{ message: string }> {
     const user = await this.userRepository.findOne({ where: { email } });
     if (!user) {
@@ -231,9 +256,6 @@ export class AuthService {
     return { message: 'Reset link dispatched successfully.' };
   }
 
-  /**
-   * Verifies incoming token validity and commits the new encrypted password string to the MySQL database instance.
-   */
   async resetPassword(
     token: string,
     newPassword: string,

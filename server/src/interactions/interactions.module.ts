@@ -12,6 +12,8 @@ import { Rating } from './entities/rating.entity';
 import { SupportTicket } from './entities/support_ticket.entity';
 import { Application } from '../applications/entities/application.entity';
 import { User } from '../users/entities/user.entity'; // --- ADDED IMPORT ---
+import { Volunteer } from '../volunteers/entities/volunteer.entity';
+import { Organization } from '../organizations/entities/organization.entity';
 
 @Module({
   imports: [
@@ -23,6 +25,8 @@ import { User } from '../users/entities/user.entity'; // --- ADDED IMPORT ---
       SupportTicket,
       Application,
       User,
+      Volunteer,
+      Organization,
     ]),
   ],
   controllers: [InteractionsController],
