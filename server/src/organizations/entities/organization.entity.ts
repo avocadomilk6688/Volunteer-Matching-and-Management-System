@@ -19,7 +19,6 @@ export class Organization {
   @Column({ type: 'varchar', length: 255 })
   contact_number!: string;
 
-  // ─── FIXED: EXPLICIT JOIN COLUMN NAME PREVENTS ORM MAP FAILURES ───
   @OneToOne(() => OrganizationRegistration)
   @JoinColumn({ name: 'registrationRecordId' }) // Maps property directly to the underlying foreign key column
   registrationRecord!: OrganizationRegistration;

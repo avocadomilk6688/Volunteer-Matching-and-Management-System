@@ -18,7 +18,7 @@ interface TagItem { id: string; name: string; }
 interface SkillEntity { id: string; skill_name: string; }
 interface InterestEntity { id: string; interest_name: string; }
 interface UserEntity { id: string; username: string; email: string; }
-interface RegistrationRecord { id: string; address: string | null; }
+interface RegistrationRecord { id: string; address: string | null; organizationName: string | null; } // 👈 Added organizationName field here
 
 interface OrganizationProfileResponse {
     id: string;
@@ -84,7 +84,9 @@ export function ManageProfilePage() {
                 if (isOrg) {
                     const res = await axios.get<OrganizationProfileResponse>(`${API_BASE_URL}/organizations/${user.id}`);
                     const d = res.data;
-                    setUsername(d.user?.username || '');
+
+                    // ─── POPULATES THE REQUISITE NAME FIELD DIRECTLY FROM THE REGBOX RELATION ───
+                    setUsername(d.registrationRecord?.organizationName || d.user?.username || '');
                     setEmail(d.user?.email || '');
                     setContact(d.contact_number || '');
                     setProfilePicUrl(d.profile_picture_url || '');

@@ -235,55 +235,68 @@ export class OrganizationsService {
     });
   }
 
+  // ─── FIXED: DUAL-PATH FALLBACK HANDLES RAW ORG PRIMARY KEYS AND USER ID RELATIONSHIPS ───
   async findOne(id: string) {
-    const org = await this.orgRepo.findOne({
-      where: { id },
+    // 1. Attempt fallback relation search using user context ID relation directly (e.g. O006)
+    let org = await this.orgRepo.findOne({
+      where: { user: { id } },
       relations: ['registrationRecord', 'user'],
     });
-    if (!org) throw new NotFoundException(`Organization ${id} not found`);
+
+    // 2. If missing, look up directly matching raw target primary profile IDs (e.g. O004)
+    if (!org) {
+      org = await this.orgRepo.findOne({
+        where: { id },
+        relations: ['registrationRecord', 'user'],
+      });
+    }
+
+    if (!org)
+      throw new NotFoundException(
+        `Organization profile linked to user/profile ID "${id}" not found`,
+      );
     return org;
   }
 
   async update(id: string, updateDto: UpdateOrgPayload) {
-    const org = await this.orgRepo.findOne({
-      where: { id },
-      relations: ['registrationRecord', 'user'],
-    });
-
-    if (!org) throw new NotFoundException('Organization not found');
+    // Look up profile dynamically using the fallback engine to guarantee compatibility during updates
+    const org = await this.findOne(id);
 
     const userData: Partial<User> = {};
-    if (updateDto.username) userData.username = updateDto.username;
-    if (updateDto.email) userData.email = updateDto.email;
-    if (updateDto.password) userData.password = updateDto.password;
+    if (updateDto.username !== undefined)
+      userData.username = updateDto.username;
+    if (updateDto.email !== undefined) userData.email = updateDto.email;
+    if (updateDto.password !== undefined)
+      userData.password = updateDto.password;
 
     if (Object.keys(userData).length > 0 && org.user) {
       await this.orgRepo.manager.update(User, org.user.id, userData);
     }
 
-    if (updateDto.address && org.registrationRecord) {
+    if (updateDto.address !== undefined && org.registrationRecord) {
       await this.regRepo.update(org.registrationRecord.id, {
         address: updateDto.address,
       });
     }
 
     const orgUpdateData: Partial<Organization> = {};
-    if (updateDto.description)
+    if (updateDto.description !== undefined)
       orgUpdateData.description = updateDto.description;
-    if (updateDto.contact_number)
+    if (updateDto.contact_number !== undefined)
       orgUpdateData.contact_number = updateDto.contact_number;
-    if (updateDto.profile_picture_url)
+    if (updateDto.profile_picture_url !== undefined)
       orgUpdateData.profile_picture_url = updateDto.profile_picture_url;
 
     if (Object.keys(orgUpdateData).length > 0) {
-      await this.orgRepo.update(id, orgUpdateData);
+      await this.orgRepo.update(org.id, orgUpdateData);
     }
 
-    return this.findOne(id);
+    return this.findOne(org.id);
   }
 
   async remove(id: string) {
-    const result = await this.orgRepo.delete(id);
+    const org = await this.findOne(id);
+    const result = await this.orgRepo.delete(org.id);
     return { deleted: (result.affected ?? 0) > 0 };
   }
 }
