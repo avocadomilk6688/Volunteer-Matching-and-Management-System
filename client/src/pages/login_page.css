@@ -33,7 +33,8 @@ form {
     align-items: center;
 }
 
-.email-input input, .password-input input {
+.email-input input,
+.password-input input {
     margin-top: 12px;
     margin-bottom: 30px;
     padding: 4px 10px;
@@ -46,8 +47,8 @@ form {
 .role-selection {
     display: flex;
     flex-direction: row;
-    align-items: center; 
-    gap: 8px; 
+    align-items: center;
+    gap: 8px;
     margin-bottom: 20px;
     width: 100%;
 }
@@ -74,4 +75,8 @@ form {
 
 .sign-up a {
     color: #FF8C42;
+}
+
+.role-selection input[type="radio"] {
+    accent-color: #FF8C42;
 }
