@@ -44,6 +44,25 @@ interface TagSelectionProps {
     type: 'skill' | 'interest';
 }
 
+// --- STRICT LOCAL TYPE EXTENSIONS INSTEAD OF ANY ---
+interface SecureOrganizationShape {
+    id: string;
+    description?: string | null;
+    rating?: number;
+    profile_picture_url?: string | null;
+}
+
+interface SecureUserEntity {
+    id: string;
+    role: string;
+    username?: string | null;
+    email?: string;
+    pendingRating?: {
+        programmeId: string;
+    } | null;
+    organization?: SecureOrganizationShape | null;
+}
+
 // --- Draggable Chat Button Sub-Component (UPDATED WITH UNREAD STATE) ---
 const DraggableChatButton = ({ onClick, hasUnread }: { onClick: () => void; hasUnread: boolean }) => {
     const [position, setPosition] = useState({
@@ -134,7 +153,11 @@ const DraggableChatButton = ({ onClick, hasUnread }: { onClick: () => void; hasU
 export function ManageListingPage() {
     const navigate = useNavigate();
     const location = useLocation();
-    const { user } = useAuth();
+
+    // Cast the untyped auth reference safely to our strict schema context wrapper
+    const { user: rawUser } = useAuth();
+    const user = rawUser as SecureUserEntity | undefined;
+
     const fileInputRef = useRef<HTMLInputElement>(null);
     const API_BASE_URL = "http://localhost:3000";
 
@@ -157,7 +180,7 @@ export function ManageListingPage() {
     // --- STATE FOR UNREAD MESSAGE NOTIFICATION BADGE ---
     const [hasUnread, setHasUnread] = useState(false);
 
-    // ─── ADDED: AUTOMATIC DIALOG OPEN ON LOGIN RATING payload INTERCEPT ───
+    // ─── AUTOMATIC DIALOG OPEN ON LOGIN RATING payload INTERCEPT ───
     const [isRatingOpen, setIsRatingOpen] = useState<boolean>(!!user?.pendingRating);
 
     const [rowData, setRowData] = useState({
@@ -167,6 +190,7 @@ export function ManageListingPage() {
         location: '',
         start_time: '',
         end_time: '',
+        imageUrl: '',
     });
 
     const headers = ['Title', 'Description', 'Cover Image', 'Skills', 'Interests', 'Mode', 'Location', 'Schedule', 'Action'];
@@ -186,7 +210,6 @@ export function ManageListingPage() {
 
         const handleIncomingNotification = (data: { type: string, from: string }) => {
             console.log("DEBUG: Background notification received on manage listing page:", data);
-            // Only flip indicator dot on if the actual chat view wrapper layout is closed
             if (!isChatOpen) {
                 setHasUnread(true);
             }
@@ -213,7 +236,10 @@ export function ManageListingPage() {
             const skillData = await skillRes.json() as SkillEntity[];
             const intData = await intRes.json() as InterestEntity[];
 
-            const filtered = (progData.items || []).filter((item: Programme) => item.organization?.id === user?.id);
+            const filtered = (progData.items || []).filter((item: Programme) => {
+                const itemOrgId = item.organization?.id;
+                return itemOrgId === user?.organization?.id || itemOrgId === user?.id;
+            });
             setListings(filtered);
 
             setAllSkills(skillData.map(s => ({ id: s.id, name: s.skill_name })));
@@ -246,7 +272,7 @@ export function ManageListingPage() {
         setMySkills([]);
         setMyInterests([]);
         setSelectedImage(null);
-        setRowData({ title: '', description: '', mode: 'Physical', location: '', start_time: '', end_time: '' });
+        setRowData({ title: '', description: '', mode: 'Physical', location: '', start_time: '', end_time: '', imageUrl: '' });
     };
 
     const handleSave = async () => {
@@ -255,6 +281,8 @@ export function ManageListingPage() {
             return alert("Required fields missing.");
         }
 
+        const trueOrganizationId = user?.organization?.id || user?.id || '';
+
         const formData = new FormData();
         formData.append('title', rowData.title);
         formData.append('description', rowData.description);
@@ -262,10 +290,18 @@ export function ManageListingPage() {
         formData.append('location', rowData.location);
         formData.append('start_time', rowData.start_time);
         formData.append('end_time', rowData.end_time);
-        formData.append('organizationId', user?.id || '');
+        formData.append('organizationId', trueOrganizationId);
         formData.append('skillIds', JSON.stringify(mySkills.map(s => s.id)));
         formData.append('interestIds', JSON.stringify(myInterests.map(i => i.id)));
-        if (selectedImage) formData.append('file', selectedImage);
+
+        // ─── OPTIMIZED DISPATCH EXCLUSION LOGIC ───
+        if (selectedImage) {
+            // Priority 1: A fresh file object binary payload exists, upload it directly
+            formData.append('file', selectedImage);
+        } else if (editingId && rowData.imageUrl) {
+            // Priority 2: No fresh file selected; safely pass the old URL fallback so it isn't blanked
+            formData.append('imageUrl', rowData.imageUrl);
+        }
 
         try {
             const url = editingId ? `${API_BASE_URL}/programmes/${editingId}` : `${API_BASE_URL}/programmes`;
@@ -299,6 +335,7 @@ export function ManageListingPage() {
             location: item.schedule.location,
             start_time: new Date(item.schedule.start_time).toISOString().slice(0, 16),
             end_time: new Date(item.schedule.end_time).toISOString().slice(0, 16),
+            imageUrl: item.imageUrl || '',
         });
         setMySkills(item.related_skills.map(s => ({ id: s.id, name: s.skill_name })));
         setMyInterests(item.related_interests.map(i => ({ id: i.id, name: i.interest_name })));
@@ -383,7 +420,18 @@ export function ManageListingPage() {
                                         <td>
                                             <div className="upload-cell">
                                                 <input type="file" ref={fileInputRef} hidden onChange={handleFileUpload} accept="image/*" />
-                                                <button className="mini-upload-btn" onClick={() => fileInputRef.current?.click()}>Change</button>
+                                                <button className="mini-upload-btn" onClick={() => fileInputRef.current?.click()}>
+                                                    Change
+                                                </button>
+                                                {selectedImage ? (
+                                                    <span style={{ fontSize: '10px', color: '#4CAF50', display: 'block', marginTop: '4px', fontWeight: 'bold' }}>
+                                                        New: {selectedImage.name}
+                                                    </span>
+                                                ) : rowData.imageUrl ? (
+                                                    <span style={{ fontSize: '10px', color: '#666', display: 'block', marginTop: '4px' }}>
+                                                        Current: {rowData.imageUrl.split('/').pop()}
+                                                    </span>
+                                                ) : null}
                                             </div>
                                         </td>
                                         <td className="tags-td"><TagSelection toggleTag={toggleTag} myTags={mySkills} allTags={allSkills} type="skill" isOpen={showSkillBox} setIsOpen={setShowSkillBox} /></td>
@@ -440,7 +488,7 @@ export function ManageListingPage() {
             <DraggableChatButton
                 onClick={() => {
                     setIsChatOpen(!isChatOpen);
-                    setHasUnread(false); // Clear red dot indicator instantly when chat window launches
+                    setHasUnread(false);
                 }}
                 hasUnread={hasUnread}
             />
@@ -454,7 +502,7 @@ export function ManageListingPage() {
                 />
             )}
 
-            {/* ─── ADDED: BATCH RATING POPUP INTERCEPTOR OVERLAY CORES ─── */}
+            {/* BATCH RATING POPUP INTERCEPTOR OVERLAY CORES */}
             {user?.pendingRating && (
                 <RatingModal
                     isOpen={isRatingOpen}

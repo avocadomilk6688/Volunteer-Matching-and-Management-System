@@ -23,6 +23,7 @@ export interface User {
     points?: number;
   };
   organization?: {
+    id: string,
     profile_picture_url?: string;
     description?: string;
     rating?: number;

@@ -169,7 +169,7 @@ export class ProgrammesService {
   }
 
   /**
-   * ─── FIXED: FULL RELATION ADAPTATION CHANNEL ───
+   * FULL RELATION ADAPTATION CHANNEL
    * Upgraded to QueryBuilder to match standard relational models eagerly.
    * This guarantees skills and interests load flawlessly for your listings table.
    */
@@ -413,9 +413,15 @@ export class ProgrammesService {
     };
   }
 
-  // --- FIXED: CRUCIAL RE-ASSIGNMENT LOGIC ENFORCED HERE ---
-  // Overriding .merge relational assignment behavior guarantees empty relationship arrays remove old linkages completely.
-  async update(id: string, updateDto: UpdateProgrammeDto) {
+  /**
+   * CRUCIAL RE-ASSIGNMENT LOGIC ENFORCED HERE
+   * Extended to support incoming files or existing text url pathways seamlessly.
+   */
+  async update(
+    id: string,
+    updateDto: UpdateProgrammeDto,
+    uploadedFileUrl?: string,
+  ) {
     const programme = await this.findOne(id);
     const skillIds = this.parseIds(updateDto.skillIds);
     const interestIds = this.parseIds(updateDto.interestIds);
@@ -425,6 +431,15 @@ export class ProgrammesService {
       title: updateDto.title,
       description: updateDto.description,
     });
+
+    // ─── FIXED: DYNAMICALLY PRESERVE OR UPDATE COVER IMAGE PATH AT RUNTIME ───
+    if (uploadedFileUrl) {
+      // If controller intercepted a brand new file binary stream from Multer
+      programme.imageUrl = uploadedFileUrl;
+    } else if (updateDto.imageUrl) {
+      // Fallback to text string context path sent down by the fallback payload interface
+      programme.imageUrl = updateDto.imageUrl;
+    }
 
     // 2. Handle nested Schedule table modifications manually
     programme.schedule = {
