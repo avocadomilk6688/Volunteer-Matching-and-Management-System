@@ -258,8 +258,8 @@ export class InteractionsService {
   // ─── TYPE-SAFE RATING CHANNELS COMPATIBLE WITH RELATIONAL OBJECT ASSIGNMENTS ───
 
   /**
-   * Processes a single incoming rating record and recalculates global scores.
-   * Maps properties safely onto 'rater' and 'ratee' User object linkages.
+   * Processes a single incoming rating record, auto-calculates timeline durations,
+   * updates application tracking states to 'Completed', and increments volunteer points.
    */
   async createRating(
     createRatingDto: CreateRatingDto & {
@@ -285,20 +285,47 @@ export class InteractionsService {
     });
     await this.ratingRepo.save(newRating);
 
-    // ─── FIXED: FLIP COMPLETION TRACKING STATE ON ATTENDANCE RECORDS ───
+    // ─── AUTOMATED RECONCILIATION, LIFECYCLE TRANSITION & POINTS BANKING ───
     if (
       createRatingDto.senderRole === 'volunteer' &&
       createRatingDto.senderId
     ) {
-      await this.applicationRepo.update(
-        {
-          volunteer: { id: createRatingDto.senderId },
-          programme: { id: createRatingDto.programmeId },
-        },
-        {
+      const appRecord = await this.applicationRepo
+        .createQueryBuilder('app')
+        .leftJoinAndSelect('app.programme', 'programme')
+        .leftJoinAndSelect('programme.schedule', 'schedule')
+        .where('app.volunteerId = :vId', { vId: createRatingDto.senderId })
+        .andWhere('app.programmeId = :pId', {
+          pId: createRatingDto.programmeId,
+        })
+        .getOne();
+
+      if (appRecord && appRecord.programme?.schedule) {
+        const start = new Date(
+          appRecord.programme.schedule.start_time,
+        ).getTime();
+        const end = new Date(appRecord.programme.schedule.end_time).getTime();
+
+        // Calculate total hours served rounded to the nearest integer block
+        const creditHours = Math.max(
+          0,
+          Math.round((end - start) / (1000 * 60 * 60)),
+        );
+
+        // Safely update total points pool balance inside the profile store
+        await this.volunteerRepo
+          .createQueryBuilder()
+          .update(Volunteer)
+          .set({ points: () => `points + ${creditHours}` })
+          .where('id = :id', { id: createRatingDto.senderId })
+          .execute();
+
+        // Commit permanent structural layout transitions back to the base table
+        await this.applicationRepo.update(appRecord.id, {
+          status: 'Completed',
           isRatedByVolunteer: true,
-        },
-      );
+        });
+      }
     }
 
     await this.recalculateTargetMean(

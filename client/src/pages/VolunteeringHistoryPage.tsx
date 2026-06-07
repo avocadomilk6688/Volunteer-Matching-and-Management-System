@@ -98,8 +98,47 @@ export function VolunteeringHistoryPage() {
         return statusLower === 'upcoming' || statusLower === 'completed';
     });
 
-    const formatStatus = (statusStr: string): string => {
-        return statusStr ? statusStr.toUpperCase() : 'UNKNOWN';
+    // ─── RUNTIME CALCULATIONS FOR DYNAMIC RENDERING FALLBACKS ───
+
+    /**
+     * Determines if the current date/time has passed the program's scheduled end time.
+     */
+    const isProgramTimePassed = (item: HistoryItem): boolean => {
+        const endTime = item.programme?.schedule?.end_time;
+        if (!endTime) return false;
+        return new Date() > new Date(endTime);
+    };
+
+    /**
+     * Overrides and calculates total accrued credit hours directly from timestamps
+     * if the database field returns empty/zero for a concluded timeline.
+     */
+    const getDisplayHours = (item: HistoryItem): number => {
+        if (item.hours && Number(item.hours) > 0) {
+            return Number(item.hours);
+        }
+
+        if (isProgramTimePassed(item) && item.programme?.schedule) {
+            const start = new Date(item.programme.schedule.start_time).getTime();
+            const end = new Date(item.programme.schedule.end_time).getTime();
+            if (!isNaN(start) && !isNaN(end)) {
+                return Math.max(0, Math.round((end - start) / (1000 * 60 * 60)));
+            }
+        }
+
+        return 0;
+    };
+
+    /**
+     * Forces status evaluation to 'COMPLETED' if the program timeline is over,
+     * overriding stale database layout flags.
+     */
+    const getDisplayStatus = (item: HistoryItem): string => {
+        if (!item.status) return 'UNKNOWN';
+        if (item.status.toLowerCase() === 'upcoming' && isProgramTimePassed(item)) {
+            return 'COMPLETED';
+        }
+        return item.status.toUpperCase();
     };
 
     // --- RECONFIGURED RANGE-BASED SCHEDULE PARSER ---
@@ -164,14 +203,20 @@ export function VolunteeringHistoryPage() {
         </div>
     );
 
+    // Calculate total hours contribution dynamically across all visible records
+    const dynamicTotalHours = filteredHistory.reduce((accumulator, currentRow) => {
+        return accumulator + getDisplayHours(currentRow);
+    }, 0);
+
     return (
         <div className="history-wrapper">
             <Header />
             <div className="history-content">
                 <h1 className="history-title">Volunteering History</h1>
 
+                {/* ─── DYNAMICALLY AGGREGATED RUNTIME SUMMATION STATS ─── */}
                 <div className="history-stats">
-                    <p>Total hours contributed: {data?.totalHours || 0}h</p>
+                    <p>Total hours contributed: {dynamicTotalHours}h</p>
                     <p>
                         Rating: <span className="star">★</span> {data?.rating ? data.rating.toFixed(1) : "0.0"}
                     </p>
@@ -179,23 +224,26 @@ export function VolunteeringHistoryPage() {
 
                 <GenericTable headers={headers}>
                     {filteredHistory.length > 0 ? (
-                        filteredHistory.map((row) => (
-                            <tr key={row.id}>
-                                <td>{row.programme?.title || 'General Activity'}</td>
-                                <td>{row.programme?.organization?.user?.username || 'Independent'}</td>
-                                <td>
-                                    <span className="pill schedule-pill">
-                                        {getScheduleInfo(row)}
-                                    </span>
-                                </td>
-                                <td>{row.hours ?? 0}h</td>
-                                <td>
-                                    <span className={`pill status-pill ${row.status ? row.status.toLowerCase() : 'unknown'}`}>
-                                        {formatStatus(row.status)}
-                                    </span>
-                                </td>
-                            </tr>
-                        ))
+                        filteredHistory.map((row) => {
+                            const calculatedStatus = getDisplayStatus(row);
+                            return (
+                                <tr key={row.id}>
+                                    <td>{row.programme?.title || 'General Activity'}</td>
+                                    <td>{row.programme?.organization?.user?.username || 'Independent'}</td>
+                                    <td>
+                                        <span className="pill schedule-pill">
+                                            {getScheduleInfo(row)}
+                                        </span>
+                                    </td>
+                                    <td>{getDisplayHours(row)}h</td>
+                                    <td>
+                                        <span className={`pill status-pill ${calculatedStatus.toLowerCase()}`}>
+                                            {calculatedStatus}
+                                        </span>
+                                    </td>
+                                </tr>
+                            );
+                        })
                     ) : (
                         <tr>
                             <td colSpan={5} className="empty-history">

@@ -146,20 +146,24 @@ export class AuthService {
       if (user.role === 'volunteer') {
         const currentTime = new Date();
 
-        // ─── AUTOMATED TIMELINE RECONCILIATION ENGINE ───
-        // Queries records that were approved, have passed their end date timeline, and remain unrated
-        const completedApps: RawVolunteerAppRow[] =
-          await this.userRepository.manager.query(
-            `SELECT a.programmeId, p.title, p.organizationId 
-             FROM application a
-             JOIN programme p ON a.programmeId = p.id
-             JOIN schedule s ON p.scheduleId = s.id
-             WHERE a.volunteerId = ? 
-               AND a.status = 'approved' 
-               AND s.end_time < ? 
-               AND a.isRatedByVolunteer = 0`,
-            [user.id, currentTime],
-          );
+        const completedApps: Array<
+          RawVolunteerAppRow & { completedHours: number }
+        > = await this.userRepository.manager.query(
+          `SELECT 
+        a.programmeId, 
+        p.title, 
+        p.organizationId,
+        'Completed' AS status, -- Dynamically transforms the status output for the frontend
+        TIMESTAMPDIFF(HOUR, s.start_time, s.end_time) AS completedHours -- Calculates duration in hours
+     FROM application a
+     JOIN programme p ON a.programmeId = p.id
+     JOIN schedule s ON p.scheduleId = s.id
+     WHERE a.volunteerId = ? 
+       AND LOWER(a.status) = 'upcoming' 
+       AND s.end_time < ? 
+       AND a.isRatedByVolunteer = 0`,
+          [user.id, currentTime],
+        );
 
         for (const app of completedApps) {
           const ratingExists: RawRatingRow[] =
