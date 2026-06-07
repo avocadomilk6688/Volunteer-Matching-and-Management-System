@@ -18,4 +18,7 @@ export class Application {
 
   @ManyToOne(() => Programme, (programme) => programme.applications)
   programme!: Programme;
+
+  @Column({ default: false })
+  isRatedByVolunteer!: boolean;
 }

@@ -31,11 +31,6 @@ interface RawVolunteerAppRow {
   organizationId: string | null;
 }
 
-interface RawOrganizationProgRow {
-  programmeId: string;
-  title: string;
-}
-
 @Injectable()
 export class AuthService {
   constructor(
@@ -149,13 +144,21 @@ export class AuthService {
 
     try {
       if (user.role === 'volunteer') {
+        const currentTime = new Date();
+
+        // ─── AUTOMATED TIMELINE RECONCILIATION ENGINE ───
+        // Queries records that were approved, have passed their end date timeline, and remain unrated
         const completedApps: RawVolunteerAppRow[] =
           await this.userRepository.manager.query(
             `SELECT a.programmeId, p.title, p.organizationId 
-            FROM application a
-            JOIN programme p ON a.programmeId = p.id
-            WHERE a.volunteerId = ? AND a.status = 'completed'`,
-            [user.id],
+             FROM application a
+             JOIN programme p ON a.programmeId = p.id
+             JOIN schedule s ON p.scheduleId = s.id
+             WHERE a.volunteerId = ? 
+               AND a.status = 'approved' 
+               AND s.end_time < ? 
+               AND a.isRatedByVolunteer = 0`,
+            [user.id, currentTime],
           );
 
         for (const app of completedApps) {
@@ -187,38 +190,12 @@ export class AuthService {
               organizationName: orgName,
               organizationLogo: orgLogo,
             };
-            break;
-          }
-        }
-      } else if (user.role === 'organization') {
-        const completedOrgProgs: RawOrganizationProgRow[] =
-          await this.userRepository.manager.query(
-            `SELECT DISTINCT a.programmeId, p.title
-            FROM application a
-            JOIN programme p ON a.programmeId = p.id
-            WHERE p.organizationId = ? AND a.status = 'completed'`,
-            [user.id],
-          );
-
-        for (const prog of completedOrgProgs) {
-          const ratingExists: RawRatingRow[] =
-            await this.userRepository.manager.query(
-              `SELECT id FROM interaction_rating WHERE programmeId = ? AND senderId = ? LIMIT 1`,
-              [prog.programmeId, user.id],
-            );
-
-          if (!ratingExists || ratingExists.length === 0) {
-            pendingRatingTrigger = {
-              programmeId: prog.programmeId,
-              organizationName: prog.title,
-              organizationLogo: '',
-            };
-            break;
+            break; // Stop loop once an applicable unrated record intercepts the thread
           }
         }
       }
     } catch (err) {
-      console.error('[COMPLETED APPLICATION SCANNING ERROR]:', err);
+      console.error('[TIMELINE APPLICATION EXTENSION SCANNING ERROR]:', err);
     }
 
     const organizationPayload = user.organization

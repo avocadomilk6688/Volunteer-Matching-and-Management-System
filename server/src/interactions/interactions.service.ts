@@ -41,7 +41,7 @@ export interface RecentContact {
   programmeName: string | null;
 }
 
-// ─── TYPE CONTRACTS FOR RAW SQL MEAN QUERY OUTPUTS ───
+// ─── TYPE CONTRACTS FOR RAW SQL MEAN MEAN QUERY OUTPUTS ───
 interface RawProgrammeLookupRow {
   organizationId: string | null;
 }
@@ -284,6 +284,22 @@ export class InteractionsService {
         : undefined,
     });
     await this.ratingRepo.save(newRating);
+
+    // ─── FIXED: FLIP COMPLETION TRACKING STATE ON ATTENDANCE RECORDS ───
+    if (
+      createRatingDto.senderRole === 'volunteer' &&
+      createRatingDto.senderId
+    ) {
+      await this.applicationRepo.update(
+        {
+          volunteer: { id: createRatingDto.senderId },
+          programme: { id: createRatingDto.programmeId },
+        },
+        {
+          isRatedByVolunteer: true,
+        },
+      );
+    }
 
     await this.recalculateTargetMean(
       createRatingDto.programmeId,
