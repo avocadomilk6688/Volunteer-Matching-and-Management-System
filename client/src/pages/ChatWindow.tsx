@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { socket } from '../services/socket';
 import './chat_window.css';
 import { MdClose } from 'react-icons/md';
-import { IoSendSharp } from 'react-icons/io5';
+import { IoSendSharp, IoMegaphoneSharp } from 'react-icons/io5';
 import axios from 'axios';
 
 // Backend Base URL
@@ -35,7 +35,7 @@ interface Contact {
 
 interface ChatWindowProps {
     onClose: () => void;
-    senderId: string;   // Logged-in User ID
+    senderId: string;   // Logged-in User ID passed from parent
     receiverId?: string; // The person you are talking to
     receiverName?: string;
     receiverImage?: string;
@@ -58,20 +58,24 @@ export function ChatWindow({
     const [messages, setMessages] = useState<Message[]>([]);
     const [contacts, setContacts] = useState<Contact[]>([]);
 
+    const [activeChat, setActiveChat] = useState({
+        id: initialReceiverId || "",
+        name: initialName || "",
+        image: initialImage || "",
+        programmeId: initialProgId || "",
+        programme: initialProg || "",
+        role: initialReceiverId === 'BATCH' ? 'programme_broadcast' : ''
+    });
+
+    // ─── CONTINUOUS TRACKING MATRIX DETECTS IF ACTIVE VIEW SHOULD BE A BROADCAST CHANNEL ───
+    const isBroadcastChannel = activeChat.id === 'BATCH' || activeChat.role === 'programme_broadcast';
+
     // ─── OPTIMIZED: INLINE LAZY STATE INITIALIZATION ───
     const [input, setInput] = useState<string>(() => {
         if (initialProgId && initialProgId.startsWith('T') && initialName) {
             return `Hi ${initialName}, I am reviewing your Support Ticket #${initialProgId}. Let's clarify your issue: `;
         }
         return "";
-    });
-
-    const [activeChat, setActiveChat] = useState({
-        id: initialReceiverId || "",
-        name: initialName || "",
-        image: initialImage || "",
-        programmeId: initialProgId || "",
-        programme: initialProg || ""
     });
 
     // --- RENDER-PHASE SYNC LOGIC ---
@@ -82,12 +86,19 @@ export function ChatWindow({
         console.log("DEBUG: SYNCING STATE BECAUSE PROPS CHANGED", { initialReceiverId, initialProgId });
         setPrevId(initialReceiverId);
         setPrevProgId(initialProgId);
+
+        // Synchronously clear the message window inside the render phase loop to bypass useEffect bottlenecks
+        if (initialReceiverId === 'BATCH') {
+            setMessages([]);
+        }
+
         setActiveChat({
             id: initialReceiverId || "",
             name: initialName || "",
             image: initialImage || "",
             programmeId: initialProgId || "",
-            programme: initialProg || ""
+            programme: initialProg || "",
+            role: initialReceiverId === 'BATCH' ? 'programme_broadcast' : ''
         });
 
         // Safe render-phase state synchronization block prevents loop warning anomalies
@@ -108,7 +119,7 @@ export function ChatWindow({
         scrollToBottom();
     }, [messages]);
 
-    // 1. Initial Load: Fetch Recent Contacts & Force Direct Avatar Lookups
+    // 1. Initial Load: Fetch Recent Contacts & Handle Real-Time Injector Columns
     useEffect(() => {
         const fetchContactsAndMissingDetails = async () => {
             if (!senderId) return;
@@ -151,12 +162,18 @@ export function ChatWindow({
                 if (!initialReceiverId && res.data.length > 0 && !activeChat.id) {
                     const latest = res.data[0];
                     console.log("DEBUG: AUTO-SELECTING LATEST CONTACT", latest);
+
+                    if (latest.partnerId === 'BATCH' || latest.role === 'programme_broadcast') {
+                        setMessages([]);
+                    }
+
                     setActiveChat({
                         id: latest.partnerId,
                         name: latest.username,
                         image: latest.profilePic || "",
                         programmeId: latest.programmeId || "",
-                        programme: latest.programmeName || "General Inquiry"
+                        programme: latest.programmeName || "General Inquiry",
+                        role: latest.role
                     });
                 }
             } catch (err) {
@@ -170,9 +187,13 @@ export function ChatWindow({
     useEffect(() => {
         if (!activeChat.id || !senderId) return;
 
+        // Return early immediately without executing any synchronous cascading rendering states
+        if (isBroadcastChannel) {
+            return;
+        }
+
         const loadConversation = async () => {
             // ─── TICKET STRIP HISTORY LOOKUP PARAMETER MATRIX ───
-            // If handling a support ticket context, look up records where programmeId is undefined (NULL).
             const historyProgParam = activeChat.programmeId?.startsWith('T')
                 ? undefined
                 : (activeChat.programmeId || undefined);
@@ -197,20 +218,17 @@ export function ChatWindow({
                 programmeId: activeChat.programmeId || undefined
             });
 
-            // ─── FIXED: DEDUPLICATE INCOMING REAL-TIME WEBSOCKET BROADCASTS ───
+            // ─── DEDUPLICATE INCOMING REAL-TIME WEBSOCKET BROADCASTS ───
             socket.on('receive_message', (newMessage: Message) => {
                 setMessages((prev) => {
-                    // Check 1: If the incoming message ID has already been assigned to state, ignore it
                     if (prev.find(m => m.id === newMessage.id)) return prev;
 
-                    // Check 2: Verify if an optimistic placeholder matching the content body is present
                     const hasOptimisticDuplicate = prev.some(m =>
                         m.id.startsWith('LOCAL_MOCK_') &&
                         m.content === newMessage.content &&
                         String(m.sender?.id || m.sender).toLowerCase() === String(newMessage.sender?.id || newMessage.sender).toLowerCase()
                     );
 
-                    // Swap out the temporary mock message container layout for the real, database-finalized row entry
                     if (hasOptimisticDuplicate) {
                         return prev.map(m =>
                             m.id.startsWith('LOCAL_MOCK_') && m.content === newMessage.content ? newMessage : m
@@ -227,34 +245,57 @@ export function ChatWindow({
         return () => {
             socket.off('receive_message');
         };
-    }, [activeChat.id, activeChat.programmeId, senderId]);
+    }, [activeChat.id, activeChat.programmeId, senderId, isBroadcastChannel]);
 
     // 3. Handle Send
-    const handleSend = () => {
+    const handleSend = async () => {
         if (!input.trim() || !activeChat.id) return;
 
-        const payload = {
-            content: input.trim(),
-            senderId: senderId,
-            receiverId: activeChat.id,
-            programmeId: activeChat.programmeId || undefined
-        };
-
-        console.log("DEBUG: SENDING MESSAGE PAYLOAD", payload);
-
-        // ─── OPTIMISTIC DISPLAY INJECTION ───
-        const mockMsgId = `LOCAL_MOCK_${Date.now()}`;
-        const optimisticMessage: Message = {
-            id: mockMsgId,
-            content: payload.content,
-            timestamp: new Date().toISOString(),
-            sender: { id: senderId },
-            receiver: { id: payload.receiverId }
-        };
-
-        setMessages(prev => [...prev, optimisticMessage]);
-        socket.emit('send_message', payload);
+        const typedContent = input.trim();
         setInput("");
+
+        if (isBroadcastChannel && activeChat.programmeId) {
+            try {
+                await axios.post(`${API_BASE_URL}/interactions/chat/batch`, {
+                    senderId,
+                    programmeId: activeChat.programmeId,
+                    content: typedContent
+                });
+
+                const confirmationNoticeMsg: Message = {
+                    id: `CONFIRM_BROADCAST_${Date.now()}`,
+                    content: `📢 [Broadcast Sent to All Participants]: ${typedContent}`,
+                    timestamp: new Date().toISOString(),
+                    sender: { id: senderId },
+                    receiver: { id: 'BATCH' }
+                };
+                setMessages(prev => [...prev, confirmationNoticeMsg]);
+            } catch (error) {
+                console.error("Batch delivery failed:", error);
+                alert("Failed to deliver broadcast announcement notice.");
+            }
+        } else {
+            const payload = {
+                content: typedContent,
+                senderId: senderId,
+                receiverId: activeChat.id,
+                programmeId: activeChat.programmeId || undefined
+            };
+
+            console.log("DEBUG: SENDING MESSAGE PAYLOAD", payload);
+
+            const mockMsgId = `LOCAL_MOCK_${Date.now()}`;
+            const optimisticMessage: Message = {
+                id: mockMsgId,
+                content: payload.content,
+                timestamp: new Date().toISOString(),
+                sender: { id: senderId },
+                receiver: { id: payload.receiverId }
+            };
+
+            setMessages(prev => [...prev, optimisticMessage]);
+            socket.emit('send_message', payload);
+        }
     };
 
     // --- Helpers ---
@@ -268,7 +309,6 @@ export function ChatWindow({
         return new Date(dateStr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
     };
 
-    // ─── FIXED: ROBUST MULTI-TYPE SENDER ALIGNMENT EVALUATOR ───
     const isSentByMe = (msg: Message) => {
         const rawSenderId = typeof msg.sender === 'string' ? msg.sender : msg.sender?.id;
         return String(rawSenderId).trim().toLowerCase() === String(senderId).trim().toLowerCase();
@@ -277,31 +317,50 @@ export function ChatWindow({
     return (
         <div className="chat-window-container">
             {/* Sidebar: Recent Contacts List */}
-            <div className="chat-sidebar">
+            <div className="chat-sidebar" style={{ width: '80px', borderRight: '1px solid #eee', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '10px 0', gap: '12px' }}>
                 {contacts.length === 0 ? (
                     <div className="sidebar-empty">No chats</div>
                 ) : (
-                    contacts.map((c) => (
-                        <div
-                            key={`${c.partnerId}_${c.programmeId}`}
-                            className={`sidebar-profile-item ${activeChat.id === c.partnerId && activeChat.programmeId === (c.programmeId || '') ? 'active' : ''}`}
-                            onClick={() => {
-                                console.log("DEBUG: SIDEBAR CONTACT CLICKED", c);
-                                setActiveChat({
-                                    id: c.partnerId,
-                                    name: c.username,
-                                    image: c.profilePic || "",
-                                    programmeId: c.programmeId || "",
-                                    programme: c.programmeName || "General Inquiry"
-                                });
-                            }}
-                        >
+                    contacts.map((c) => {
+                        const isRowBroadcast = c.partnerId === 'BATCH' || c.role === 'programme_broadcast';
+                        const isActive = activeChat.programmeId === c.programmeId && (isRowBroadcast ? isBroadcastChannel : activeChat.id === c.partnerId);
+
+                        return (
                             <div
-                                className="profile-circle"
-                                style={{ backgroundImage: `url(${getImgUrl(c.profilePic)})`, backgroundSize: 'cover' }}
-                            ></div>
-                        </div>
-                    ))
+                                key={`${c.partnerId}_${c.programmeId}`}
+                                className={`sidebar-profile-item ${isActive ? 'active' : ''}`}
+                                onClick={() => {
+                                    console.log("DEBUG: SIDEBAR CONTACT CLICKED", c);
+
+                                    // Safely clear message feeds inside the event context layer to block UI rendering errors
+                                    if (c.partnerId === 'BATCH' || c.role === 'programme_broadcast') {
+                                        setMessages([]);
+                                    }
+
+                                    setActiveChat({
+                                        id: c.partnerId,
+                                        name: c.username,
+                                        image: c.profilePic || "",
+                                        programmeId: c.programmeId || "",
+                                        programme: c.programmeName || "General Inquiry",
+                                        role: c.role
+                                    });
+                                }}
+                                style={{ position: 'relative', cursor: 'pointer' }}
+                            >
+                                {isRowBroadcast ? (
+                                    <div className="profile-circle broadcast-icon-avatar" style={{ backgroundColor: '#ff7f00', display: 'flex', justifyContent: 'center', alignItems: 'center', borderRadius: '50%', width: '48px', height: '48px', color: 'white' }}>
+                                        <IoMegaphoneSharp size={20} />
+                                    </div>
+                                ) : (
+                                    <div
+                                        className="profile-circle"
+                                        style={{ backgroundImage: `url(${getImgUrl(c.profilePic)})`, backgroundSize: 'cover', borderRadius: '50%', width: '48px', height: '48px', backgroundColor: '#eee' }}
+                                    ></div>
+                                )}
+                            </div>
+                        );
+                    })
                 )}
             </div>
 
@@ -310,34 +369,45 @@ export function ChatWindow({
                 {/* Header */}
                 <div className="chat-header">
                     <div className="header-left">
-                        <div
-                            className="header-profile-pic"
-                            style={{ backgroundImage: `url(${getImgUrl(activeChat.image)})`, backgroundSize: 'cover' }}
-                        ></div>
+                        {!isBroadcastChannel && (
+                            <div
+                                className="header-profile-pic"
+                                style={{ backgroundImage: `url(${getImgUrl(activeChat.image)})`, backgroundSize: 'cover' }}
+                            ></div>
+                        )}
                         <div className="header-info-stack">
-                            <span className="header-name">{activeChat.name || "Select a Chat"}</span>
+                            <span className="header-name" style={{ fontWeight: 'bold', fontSize: '16px' }}>{activeChat.name || "Select a Chat"}</span>
                             {activeChat.programme && (
                                 <span className="header-prog-name">{activeChat.programme}</span>
                             )}
                         </div>
                     </div>
-                    <button className="header-close-btn" onClick={onClose}>
+                    <button className="header-close-btn" onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
                         <MdClose size={24} />
                     </button>
                 </div>
 
                 {/* Messages Feed */}
-                <div className="chat-messages">
-                    {/* TICKET CONTEXT System Alert Banner Overlay */}
+                <div className="chat-messages" style={{ padding: '15px', flexGrow: 1, overflowY: 'auto' }}>
                     {activeChat.programmeId?.startsWith('T') && (
                         <div className="ticket-summary-alert-banner">
                             ⚠️ System Notice: You are chatting inside an active customer service help ticket room link context.
                         </div>
                     )}
 
+                    {isBroadcastChannel && (
+                        <div style={{ textAlign: 'center', margin: '20px 0' }}>
+                            <div style={{ color: '#ff7f00', marginBottom: '10px' }}><IoMegaphoneSharp size={32} /></div>
+                            <h4 style={{ margin: '0 0 5px 0', color: '#333' }}>Official Programme Broadcast Channel</h4>
+                            <p style={{ fontSize: '12px', color: '#666', maxWidth: '85%', margin: '0 auto' }}>
+                                Messages submitted to this feed are dynamically broadcasted down to ALL approved and completed volunteers in this programme as distinct, standalone private messages.
+                            </p>
+                        </div>
+                    )}
+
                     {!activeChat.id ? (
                         <div className="date-separator">Please select a contact to start chatting</div>
-                    ) : messages.length === 0 ? (
+                    ) : messages.length === 0 && !isBroadcastChannel ? (
                         <div className="date-separator">No messages yet. Say hello!</div>
                     ) : (
                         messages.map((msg) => {
@@ -346,16 +416,20 @@ export function ChatWindow({
                                 <div
                                     key={msg.id}
                                     className={`message-row ${currentMessageIsMine ? 'user' : 'partner'}`}
+                                    style={{ display: 'flex', justifyContent: currentMessageIsMine ? 'flex-end' : 'flex-start', margin: '8px 0' }}
                                 >
-                                    {!currentMessageIsMine && (
+                                    {!currentMessageIsMine && !isBroadcastChannel && (
                                         <div
                                             className="partner-profile-pic"
                                             style={{ backgroundImage: `url(${getImgUrl(activeChat.image)})`, backgroundSize: 'cover' }}
                                         ></div>
                                     )}
-                                    <div className={`message-bubble ${currentMessageIsMine ? 'orange' : 'gray'}`}>
-                                        <p>{msg.content}</p>
-                                        <span className="message-time">
+                                    <div
+                                        className={`message-bubble ${currentMessageIsMine ? 'orange' : 'gray'}`}
+                                        style={{ backgroundColor: currentMessageIsMine ? '#ff7f00' : '#f0f0f0', color: currentMessageIsMine ? 'white' : '#333', padding: '8px 12px', borderRadius: '8px', maxWidth: '70%' }}
+                                    >
+                                        <p style={{ margin: 0 }}>{msg.content}</p>
+                                        <span className="message-time" style={{ fontSize: '10px', opacity: 0.7, display: 'block', textAlign: 'right', marginTop: '4px' }}>
                                             {msg.timestamp ? formatTime(msg.timestamp) : ''}
                                         </span>
                                     </div>
@@ -367,22 +441,24 @@ export function ChatWindow({
                 </div>
 
                 {/* Input Field */}
-                <div className="chat-input-area">
+                <div className="chat-input-area" style={{ display: 'flex', padding: '10px', borderTop: '1px solid #eee' }}>
                     <input
                         type="text"
-                        placeholder="Type your message..."
+                        placeholder={isBroadcastChannel ? "Type broadcast announcement notice..." : "Type your message..."}
                         className="chat-input-field"
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && handleSend()}
                         disabled={!activeChat.id}
+                        style={{ flexGrow: 1, padding: '8px', borderRadius: '4px', border: isBroadcastChannel ? '1px solid #ff7f00' : '1px solid #ccc', marginRight: '8px', backgroundColor: isBroadcastChannel ? '#fffdfb' : '#fff' }}
                     />
                     <button
                         className="send-btn"
                         onClick={handleSend}
                         disabled={!input.trim() || !activeChat.id}
+                        style={{ backgroundColor: '#ff7f00', color: 'white', border: 'none', padding: '8px 12px', borderRadius: '4px', cursor: 'pointer' }}
                     >
-                        <IoSendSharp size={24} />
+                        <IoSendSharp size={18} />
                     </button>
                 </div>
             </div>

@@ -4,7 +4,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, IsNull } from 'typeorm';
+import { Repository, IsNull, In } from 'typeorm';
 
 // Entities
 import { Message } from './entities/message.entity';
@@ -49,8 +49,23 @@ interface RawAggregateScoreRow {
   meanScore: string | null;
 }
 
+interface RawActiveProgrammeRow {
+  id: string;
+  title: string;
+}
+
+interface MinimalChatGateway {
+  server: {
+    to: (roomName: string) => {
+      emit: (eventName: string, data: Message) => void;
+    };
+  };
+}
+
 @Injectable()
 export class InteractionsService {
+  public chatGateway: MinimalChatGateway | null = null;
+
   constructor(
     @InjectRepository(Message)
     private readonly messageRepo: Repository<Message>,
@@ -177,6 +192,36 @@ export class InteractionsService {
   }
 
   async getRecentContacts(userId: string): Promise<RecentContact[]> {
+    const contactsMap = new Map<string, RecentContact>();
+
+    const org = await this.organizationRepo.findOne({
+      where: { user: { id: userId } },
+    });
+    if (org) {
+      const activeProgrammes = await this.applicationRepo.manager.query<
+        RawActiveProgrammeRow[]
+      >(
+        `SELECT p.id, p.title 
+         FROM programme p 
+         WHERE p.organizationId = ?`,
+        [org.id],
+      );
+
+      for (const prog of activeProgrammes) {
+        const uniqueThreadKey = `BROADCAST_${prog.id}`;
+        contactsMap.set(uniqueThreadKey, {
+          partnerId: 'BATCH',
+          username: `📢 Broadcast: ${prog.title}`,
+          profilePic: null,
+          lastMessage: 'Click here to broadcast to all participants.',
+          timestamp: new Date(),
+          role: 'programme_broadcast',
+          programmeId: prog.id,
+          programmeName: prog.title,
+        });
+      }
+    }
+
     const messages = await this.messageRepo.find({
       where: [{ sender: { id: userId } }, { receiver: { id: userId } }],
       order: { timestamp: 'DESC' },
@@ -190,8 +235,6 @@ export class InteractionsService {
         'programme',
       ],
     });
-
-    const contactsMap = new Map<string, RecentContact>();
 
     for (const msg of messages) {
       const partner = msg.sender.id === userId ? msg.receiver : msg.sender;
@@ -230,8 +273,12 @@ export class InteractionsService {
     senderId: string,
     content: string,
   ) {
+    // ─── 🌟 FIXED: RESTRICTED INTERNAL METHOD MAPS UNIFORMLY TO UPCOMING STATUS RULES ───
     const applications = await this.applicationRepo.find({
-      where: { programme: { id: programmeId }, status: 'approved' },
+      where: {
+        programme: { id: programmeId },
+        status: In(['upcoming', 'Upcoming']),
+      },
       relations: ['volunteer', 'volunteer.user'],
     });
 
@@ -254,6 +301,73 @@ export class InteractionsService {
     return { participantUserIds, messages };
   }
 
+  // ─── 🌟 METHODS RUNTIME DISTRIBUTION LOOPS WITH SAFE TYPE VERIFICATION ───
+  /**
+   * Distributes a single broadcast text down to all upcoming/completed program attendants,
+   * saves records cleanly to history, and emits signals to each volunteer's socket.
+   */
+  async sendBatchMessage(dto: {
+    senderId: string;
+    programmeId: string;
+    content: string;
+  }) {
+    console.log('[BATCH BROADCAST TRIGGERED]:', dto);
+
+    // 1. Fetch participants registered under the target programme ID context with upcoming/completed states
+    const applications = await this.applicationRepo.find({
+      where: {
+        programme: { id: dto.programmeId },
+        status: In(['upcoming', 'completed', 'Upcoming', 'Completed']),
+      },
+      relations: ['volunteer', 'volunteer.user'],
+    });
+
+    console.log(
+      `[BATCH BROADCAST]: Found ${applications.length} target matching attendants.`,
+    );
+
+    if (applications.length === 0) {
+      return {
+        success: false,
+        processedCount: 0,
+        notice:
+          'No upcoming or completed volunteers found inside this programme thread.',
+      };
+    }
+
+    const formulationBody = `[Batch Message] ${dto.content}`;
+    const generatedSavedRows: Message[] = [];
+
+    // 2. Loop through all attendants to save unique entries in database tracking
+    for (const app of applications) {
+      const targetUserId = app.volunteer?.user?.id;
+      if (!targetUserId) continue;
+
+      const customId = await generateCustomId(this.messageRepo, 'M');
+
+      const msgRow = this.messageRepo.create({
+        id: customId,
+        content: formulationBody,
+        sender: { id: dto.senderId } as User,
+        receiver: { id: targetUserId } as User,
+        programme: { id: dto.programmeId } as Programme,
+        timestamp: new Date(),
+      });
+
+      const savedEntry = await this.messageRepo.save(msgRow);
+      generatedSavedRows.push(savedEntry);
+
+      // 3. Emit message data securely via dynamic socket layers
+      if (this.chatGateway) {
+        this.chatGateway.server
+          .to(`room_${targetUserId}`)
+          .emit('receive_message', savedEntry);
+      }
+    }
+
+    return { success: true, processedCount: generatedSavedRows.length };
+  }
+
   // --- Rating Logic ---
 
   /**
@@ -266,17 +380,15 @@ export class InteractionsService {
       rating: number;
       senderRole?: string;
       senderId?: string;
-      targetId?: string; // 🌟 Volunteer path target (Organization ID)
-      targetVolunteerId?: string; // 🌟 Admin/Fallback path target (Volunteer ID)
+      targetId?: string;
+      targetVolunteerId?: string;
     },
   ): Promise<string> {
     const id = await generateCustomId(this.ratingRepo, 'R');
 
-    // Determine target recipient ID mapping cleanly across payload interfaces
     const finalRateeId =
       createRatingDto.targetId || createRatingDto.targetVolunteerId;
 
-    // ─── FIXED: ASSIGN EXPLICIT TYPEORM RELATION POINTER OBJECTS ───
     const newRating = this.ratingRepo.create({
       id,
       value: createRatingDto.rating,
@@ -291,7 +403,6 @@ export class InteractionsService {
 
     await this.ratingRepo.save(newRating);
 
-    // ─── AUTOMATED RECONCILIATION, LIFECYCLE TRANSITION & POINTS BANKING ───
     if (
       createRatingDto.senderRole === 'volunteer' &&
       createRatingDto.senderId
@@ -312,13 +423,11 @@ export class InteractionsService {
         ).getTime();
         const end = new Date(appRecord.programme.schedule.end_time).getTime();
 
-        // Calculate total hours served rounded to the nearest integer block
         const creditHours = Math.max(
           0,
           Math.round((end - start) / (1000 * 60 * 60)),
         );
 
-        // Safely update total points pool balance inside the profile store
         await this.volunteerRepo
           .createQueryBuilder()
           .update(Volunteer)
@@ -326,7 +435,6 @@ export class InteractionsService {
           .where('id = :id', { id: createRatingDto.senderId })
           .execute();
 
-        // Commit permanent structural layout transitions back to the base table
         await this.applicationRepo.update(appRecord.id, {
           status: 'Completed',
           isRatedByVolunteer: true,
@@ -366,7 +474,6 @@ export class InteractionsService {
     for (const rateItem of payload.ratings) {
       const id = await generateCustomId(this.ratingRepo, 'R');
 
-      // ─── FIXED: LINK PROGRAMME AND RATEE TARGETS INSIDE BATCH LOOPS ───
       const newRating = this.ratingRepo.create({
         id,
         value: rateItem.rating,

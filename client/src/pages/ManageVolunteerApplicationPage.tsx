@@ -3,7 +3,7 @@ import './manage_volunteer_application.css';
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router';
 import { GenericTable } from './Table';
-import { AiFillStar, AiOutlineMessage } from 'react-icons/ai';
+import { AiFillStar } from 'react-icons/ai';
 import { BiFilterAlt } from 'react-icons/bi';
 import { useAuth } from '../context/auth/useAuth';
 import { ChatWindow } from './ChatWindow';
@@ -109,16 +109,6 @@ export function ManageVolunteerApplicationPage() {
         fetchData();
     }, [user?.id]);
 
-    // --- HANDLER CAPTURES COMPLETE THREAD DATA ---
-    const handleOpenChat = (vId: string, vName: string, pId: string, pTitle: string) => {
-        setSelectedVolunteer({
-            vId: vId,
-            vName: vName,
-            pId: pId,
-            pTitle: pTitle
-        });
-        setIsChatOpen(true);
-    };
 
     const filterOptions = useMemo(() => {
         const options = allProgrammes.map(prog => {
@@ -259,18 +249,7 @@ export function ManageVolunteerApplicationPage() {
                                     </td>
                                     <td className="col-action">
                                         <div className="action-buttons">
-                                            <button
-                                                className="chat-btn"
-                                                onClick={() => handleOpenChat(
-                                                    app.volunteer.user.id,
-                                                    app.volunteer.user.username,
-                                                    app.programme.id,
-                                                    app.programme.title
-                                                )}
-                                                style={{ backgroundColor: '#2196F3', color: 'white', padding: '5px 10px', borderRadius: '4px', border: 'none', display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer' }}
-                                            >
-                                                <AiOutlineMessage /> Chat
-                                            </button>
+
 
                                             <button className="approve-btn" onClick={() => handleUpdateStatus(app.id, 'approve')}>Approve</button>
                                             <button className="reject-btn" onClick={() => handleUpdateStatus(app.id, 'reject')}>Reject</button>

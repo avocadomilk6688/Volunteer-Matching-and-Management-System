@@ -83,6 +83,18 @@ export class InteractionsController {
     );
   }
 
+  // ─── 🌟 NEW ENDPOINT: ACCEPTS FRONTEND CHAT WINDOW BATCH payloads ───
+  /**
+   * Handles incoming broadcast messages requested by organizational chat feeds.
+   * Path: POST /interactions/chat/batch
+   */
+  @Post('chat/batch')
+  async sendBatchAnnouncement(
+    @Body() body: { senderId: string; programmeId: string; content: string },
+  ) {
+    return await this.interactionsService.sendBatchMessage(body);
+  }
+
   @Post('rating')
   createRating(@Body() createRatingDto: CreateRatingDto) {
     return this.interactionsService.createRating(createRatingDto);
