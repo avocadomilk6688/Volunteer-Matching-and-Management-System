@@ -21,8 +21,10 @@ interface RawRatingRow {
 }
 
 interface RawOrganizationRow {
-  name: string;
-  profile_picture_url: string;
+  name?: string;
+  username?: string;
+  profile_picture_url?: string;
+  profilePictureUrl?: string;
 }
 
 interface RawVolunteerAppRow {
@@ -145,31 +147,33 @@ export class AuthService {
     try {
       if (user.role === 'volunteer') {
         const currentTime = new Date();
+        const volunteerProfileId = user.volunteer?.id || user.id;
 
+        // ─── TARGET EXPLICIT RELATIONAL VOLUNTEER PROFILE ID STRING ───
         const completedApps: Array<
           RawVolunteerAppRow & { completedHours: number }
         > = await this.userRepository.manager.query(
           `SELECT 
-        a.programmeId, 
-        p.title, 
-        p.organizationId,
-        'Completed' AS status, -- Dynamically transforms the status output for the frontend
-        TIMESTAMPDIFF(HOUR, s.start_time, s.end_time) AS completedHours -- Calculates duration in hours
-     FROM application a
-     JOIN programme p ON a.programmeId = p.id
-     JOIN schedule s ON p.scheduleId = s.id
-     WHERE a.volunteerId = ? 
-       AND LOWER(a.status) = 'upcoming' 
-       AND s.end_time < ? 
-       AND a.isRatedByVolunteer = 0`,
-          [user.id, currentTime],
+            a.programmeId, 
+            p.title, 
+            p.organizationId,
+            'Completed' AS status, 
+            TIMESTAMPDIFF(HOUR, s.start_time, s.end_time) AS completedHours 
+           FROM application a
+           JOIN programme p ON a.programmeId = p.id
+           JOIN schedule s ON p.scheduleId = s.id
+           WHERE a.volunteerId = ? 
+             AND LOWER(a.status) = 'upcoming' 
+             AND s.end_time < ? 
+             AND a.isRatedByVolunteer = 0`,
+          [volunteerProfileId, currentTime],
         );
 
         for (const app of completedApps) {
           const ratingExists: RawRatingRow[] =
             await this.userRepository.manager.query(
-              `SELECT id FROM interaction_rating WHERE programmeId = ? AND senderId = ? LIMIT 1`,
-              [app.programmeId, user.id],
+              `SELECT id FROM rating WHERE programmeId = ? AND raterId = ? LIMIT 1`,
+              [app.programmeId, volunteerProfileId],
             );
 
           if (!ratingExists || ratingExists.length === 0) {
@@ -179,13 +183,26 @@ export class AuthService {
             if (app.organizationId) {
               const orgData: RawOrganizationRow[] =
                 await this.userRepository.manager.query(
-                  `SELECT name, profile_picture_url FROM organization WHERE id = ? LIMIT 1`,
+                  `SELECT u.username, o.profile_picture_url 
+                   FROM organization o
+                   JOIN user u ON o.id = u.id
+                   WHERE o.id = ? LIMIT 1`,
                   [app.organizationId],
                 );
 
               if (orgData && orgData.length > 0) {
-                orgName = orgData[0].name || orgName;
-                orgLogo = orgData[0].profile_picture_url || orgLogo;
+                const row = orgData[0];
+
+                // ─── STABILIZED INTERFACE VALUE EXTRACTION EXTRA DEEP FALLBACKS ───
+                orgName = row.username || row.name || orgName;
+                orgLogo =
+                  row.profile_picture_url || row.profilePictureUrl || orgLogo;
+
+                console.log('--- DB ORG PROFILE PIC LOOKUP RESULT ---', {
+                  rawRowMatched: row,
+                  resolvedName: orgName,
+                  resolvedLogo: orgLogo,
+                });
               }
             }
 
@@ -194,7 +211,7 @@ export class AuthService {
               organizationName: orgName,
               organizationLogo: orgLogo,
             };
-            break; // Stop loop once an applicable unrated record intercepts the thread
+            break;
           }
         }
       }

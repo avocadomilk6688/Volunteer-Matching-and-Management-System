@@ -41,7 +41,6 @@ export interface RecentContact {
   programmeName: string | null;
 }
 
-// ─── TYPE CONTRACTS FOR RAW SQL MEAN MEAN QUERY OUTPUTS ───
 interface RawProgrammeLookupRow {
   organizationId: string | null;
 }
@@ -255,7 +254,7 @@ export class InteractionsService {
     return { participantUserIds, messages };
   }
 
-  // ─── TYPE-SAFE RATING CHANNELS COMPATIBLE WITH RELATIONAL OBJECT ASSIGNMENTS ───
+  // --- Rating Logic ---
 
   /**
    * Processes a single incoming rating record, auto-calculates timeline durations,
@@ -267,22 +266,29 @@ export class InteractionsService {
       rating: number;
       senderRole?: string;
       senderId?: string;
-      targetVolunteerId?: string;
+      targetId?: string; // 🌟 Volunteer path target (Organization ID)
+      targetVolunteerId?: string; // 🌟 Admin/Fallback path target (Volunteer ID)
     },
   ): Promise<string> {
     const id = await generateCustomId(this.ratingRepo, 'R');
 
-    // TypeORM Structural Mapping: Assign entities as structural identifiers
+    // Determine target recipient ID mapping cleanly across payload interfaces
+    const finalRateeId =
+      createRatingDto.targetId || createRatingDto.targetVolunteerId;
+
+    // ─── FIXED: ASSIGN EXPLICIT TYPEORM RELATION POINTER OBJECTS ───
     const newRating = this.ratingRepo.create({
       id,
       value: createRatingDto.rating,
       rater: createRatingDto.senderId
         ? ({ id: createRatingDto.senderId } as User)
         : undefined,
-      ratee: createRatingDto.targetVolunteerId
-        ? ({ id: createRatingDto.targetVolunteerId } as User)
+      ratee: finalRateeId ? ({ id: finalRateeId } as User) : undefined,
+      programme: createRatingDto.programmeId
+        ? ({ id: createRatingDto.programmeId } as Programme)
         : undefined,
     });
+
     await this.ratingRepo.save(newRating);
 
     // ─── AUTOMATED RECONCILIATION, LIFECYCLE TRANSITION & POINTS BANKING ───
@@ -331,7 +337,7 @@ export class InteractionsService {
     await this.recalculateTargetMean(
       createRatingDto.programmeId,
       createRatingDto.senderRole || '',
-      createRatingDto.targetVolunteerId || null,
+      finalRateeId || null,
     );
 
     return `Rating ${id} submitted successfully`;
@@ -360,12 +366,13 @@ export class InteractionsService {
     for (const rateItem of payload.ratings) {
       const id = await generateCustomId(this.ratingRepo, 'R');
 
-      // TypeORM Structural Mapping: Assign entities as structural identifiers per row item
+      // ─── FIXED: LINK PROGRAMME AND RATEE TARGETS INSIDE BATCH LOOPS ───
       const newRating = this.ratingRepo.create({
         id,
         value: rateItem.rating,
         rater: { id: rateItem.senderId } as User,
         ratee: { id: rateItem.targetVolunteerId } as User,
+        programme: { id: rateItem.programmeId } as Programme,
       });
       await this.ratingRepo.save(newRating);
 

@@ -1,7 +1,8 @@
-import { Entity, Column, PrimaryColumn, ManyToOne } from 'typeorm';
+import { Entity, Column, PrimaryColumn, ManyToOne, JoinColumn } from 'typeorm';
 import { User } from '../../users/entities/user.entity';
+import { Programme } from '../../programmes/entities/programme.entity';
 
-@Entity()
+@Entity('rating')
 export class Rating {
   @PrimaryColumn({ type: 'varchar', length: 10 })
   id!: string;
@@ -14,4 +15,8 @@ export class Rating {
 
   @ManyToOne(() => User)
   ratee!: User;
+
+  @ManyToOne(() => Programme)
+  @JoinColumn({ name: 'programmeId' })
+  programme!: Programme;
 }
