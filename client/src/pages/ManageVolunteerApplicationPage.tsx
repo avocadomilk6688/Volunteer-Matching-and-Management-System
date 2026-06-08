@@ -6,7 +6,6 @@ import { GenericTable } from './Table';
 import { AiFillStar } from 'react-icons/ai';
 import { BiFilterAlt } from 'react-icons/bi';
 import { useAuth } from '../context/auth/useAuth';
-import { ChatWindow } from './ChatWindow';
 
 // --- Interfaces ---
 interface Skill { id: string; skill_name: string; }
@@ -15,7 +14,9 @@ interface Interest { id: string; interest_name: string; }
 interface ProgrammeEntity {
     id: string;
     title: string;
-    organization?: { id: string };
+    organization?: { id: string; rating: number };
+    related_skills?: Skill[]; // Eagerly loaded from your backend findAllAdmin/findOne models
+    related_interests?: Interest[];
 }
 
 interface VolunteerApplication {
@@ -56,17 +57,8 @@ export function ManageVolunteerApplicationPage() {
     const [selectedProgrammeId, setSelectedProgrammeId] = useState<string>('All');
     const [isFilterOpen, setIsFilterOpen] = useState(false);
 
-    // --- CHAT STATES FIXED ---
-    // Tracks both user context and specific programme context to prevent conversation leakages
-    const [isChatOpen, setIsChatOpen] = useState(false);
-    const [selectedVolunteer, setSelectedVolunteer] = useState<{
-        vId: string;
-        vName: string;
-        pId: string;
-        pTitle: string;
-    } | null>(null);
-
-    const headers = ['Volunteer', 'Current skills', 'Current interests', 'Resume', 'Programme applied', 'Action'];
+    // ─── 🌟 UPDATED HEADERS: ADDED 'RANK' AS THE FIRST COLUMN ON THE LEFT ───
+    const headers = ['Rank', 'Volunteer', 'Current skills', 'Current interests', 'Resume', 'Programme applied', 'Action'];
 
     const fetchData = async () => {
         if (!user?.id) return;
@@ -86,17 +78,67 @@ export function ManageVolunteerApplicationPage() {
             const appData = await appRes.json();
             const progData = await progRes.json() as BackendProgResponse;
 
-            if (Array.isArray(appData)) {
-                // Show only pending applications
-                const pendingApps = appData.filter((app: VolunteerApplication) => app.status === 'pending');
-                setApplications(pendingApps);
-            }
-
+            let orgProgrammes: ProgrammeEntity[] = [];
             if (progData && Array.isArray(progData.items)) {
-                const orgProgrammes = progData.items.filter(
+                orgProgrammes = progData.items.filter(
                     (p: ProgrammeEntity) => p.organization?.id === user.id
                 );
                 setAllProgrammes(orgProgrammes);
+            }
+
+            if (Array.isArray(appData)) {
+                const pendingApps = appData.filter((app: VolunteerApplication) => app.status === 'pending');
+
+                // ─── 🌟 HYBRID RECOMMENDATION ALGORITHM MATRIX FOR APPLICATION SORTING ───
+                const sortedPendingApps = pendingApps.sort((a, b) => {
+                    const progA = orgProgrammes.find(p => p.id === a.programme.id);
+                    const progB = orgProgrammes.find(p => p.id === b.programme.id);
+
+                    const calculateHybridRelevanceScore = (app: VolunteerApplication, prog?: ProgrammeEntity) => {
+                        if (!prog) return 0;
+
+                        let totalScore = 0;
+
+                        // 1. Organization Base Core Rating Element ((COALESCE(organization.rating, 0) * 5))
+                        const orgRatingWeight = (prog.organization?.rating || 0) * 5;
+                        totalScore += orgRatingWeight;
+
+                        // 2. Skill-Match Overlap Strategy Matrix (+10 points base weight per skill)
+                        if (prog.related_skills && Array.isArray(prog.related_skills)) {
+                            const targetSkillIds = prog.related_skills.map(s => s.id);
+
+                            app.volunteer.skills.forEach(skill => {
+                                if (targetSkillIds.includes(skill.id)) {
+                                    totalScore += 10;
+                                    totalScore += (app.volunteer.rating || 0) * 2;
+                                }
+                            });
+                        }
+
+                        // 3. Interest-Match Overlap Corridor Loop (+15 points base weight per interest)
+                        if (prog.related_interests && Array.isArray(prog.related_interests)) {
+                            const targetInterestIds = prog.related_interests.map(i => i.id);
+
+                            app.volunteer.interests.forEach(interest => {
+                                if (targetInterestIds.includes(interest.id)) {
+                                    totalScore += 15;
+                                }
+                            });
+                        }
+
+                        // 4. Volunteer Performance Quality Factor (Tie-breaker parameter)
+                        totalScore += (app.volunteer.rating || 0) * 5;
+
+                        return totalScore;
+                    };
+
+                    const scoreA = calculateHybridRelevanceScore(a, progA);
+                    const scoreB = calculateHybridRelevanceScore(b, progB);
+
+                    return scoreB - scoreA; // Descending order: Best matching suitability score lands first!
+                });
+
+                setApplications(sortedPendingApps);
             }
         } catch (error) {
             console.error("Error fetching data:", error);
@@ -108,7 +150,6 @@ export function ManageVolunteerApplicationPage() {
     useEffect(() => {
         fetchData();
     }, [user?.id]);
-
 
     const filterOptions = useMemo(() => {
         const options = allProgrammes.map(prog => {
@@ -210,11 +251,19 @@ export function ManageVolunteerApplicationPage() {
                         <div className="no-results">No pending applications found.</div>
                     ) : (
                         <GenericTable headers={headers}>
-                            {filteredApplications.map((app) => (
+                            {filteredApplications.map((app, index) => (
                                 <tr key={app.id}>
+                                    {/* ─── 🌟 ADDED: RANK COLUMN DISPLAY BLOCK ─── */}
+                                    <td className="col-rank" style={{ fontWeight: 'bold', color: '#ff7f00', fontSize: '15px', textAlign: 'center' }}>
+                                        #{index + 1}
+                                    </td>
+
+                                    {/* ─── 🌟 FIXED: REMOVED CLICK HANDLER AND UNDERLINE TEXT STYLES FROM VOLUNTEER CELL ─── */}
                                     <td className="col-volunteer">
                                         <div className="volunteer-info">
-                                            <span className="name">{app.volunteer.user.username}</span>
+                                            <span className="name" style={{ color: '#333', fontWeight: 'bold' }}>
+                                                {app.volunteer.user.username}
+                                            </span>
                                             <span className="rating">
                                                 <AiFillStar className="star-icon" />
                                                 {app.volunteer.rating?.toFixed(1) || '0.0'}
@@ -249,8 +298,6 @@ export function ManageVolunteerApplicationPage() {
                                     </td>
                                     <td className="col-action">
                                         <div className="action-buttons">
-
-
                                             <button className="approve-btn" onClick={() => handleUpdateStatus(app.id, 'approve')}>Approve</button>
                                             <button className="reject-btn" onClick={() => handleUpdateStatus(app.id, 'reject')}>Reject</button>
                                         </div>
@@ -261,22 +308,6 @@ export function ManageVolunteerApplicationPage() {
                     )}
                 </main>
             </div>
-
-            {/* --- CRITICAL UNIQUE COMPOSITE KEY APPLIED HERE --- */}
-            {isChatOpen && selectedVolunteer && (
-                <ChatWindow
-                    key={`${selectedVolunteer.vId}_${selectedVolunteer.pId}`}
-                    onClose={() => {
-                        setIsChatOpen(false);
-                        setSelectedVolunteer(null);
-                    }}
-                    senderId={user?.id || ""}
-                    receiverId={selectedVolunteer.vId}
-                    receiverName={selectedVolunteer.vName}
-                    programmeId={selectedVolunteer.pId}
-                    programmeName={selectedVolunteer.pTitle}
-                />
-            )}
         </div>
     );
 }
