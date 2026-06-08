@@ -7,8 +7,15 @@ import './rating_modal.css';
 interface VolunteerRecord {
     id: string;
     username: string;
+    name?: string;
     profile_picture_url?: string;
-    customRating?: number; // Keeps track of manual rating overrides per volunteer row
+    customRating?: number;
+    // ─── 🌟 FIXED: Added explicit definition to catch incoming nested user objects from the backend join ───
+    user?: {
+        id: string;
+        username: string;
+        email: string;
+    };
 }
 
 interface RatingModalProps {
@@ -17,10 +24,9 @@ interface RatingModalProps {
     programmeId: string;
     organizationName?: string;
     organizationLogo?: string;
-    organizationId?: string; // 🌟 STABILIZED: Relational tracking parameter mapped explicitly
+    organizationId?: string;
 }
 
-// ─── EXTRA INTERFACE ASSIGNMENT FOR STRUCTURAL USER CONTEXT EXTENSION ───
 interface AuthenticatedUserContext {
     id: string;
     role: 'admin' | 'volunteer' | 'organization';
@@ -41,14 +47,13 @@ export function RatingModal({
     programmeId,
     organizationName = "EcoGuardians Malaysia",
     organizationLogo,
-    organizationId = "O001" // 🌟 STABILIZED: Safety fallback maps smoothly during standalone testing
+    organizationId = "O001"
 }: RatingModalProps) {
-    // Cast the default hook context reference to our explicit type interface
     const { user: rawUser } = useAuth();
     const user = rawUser as AuthenticatedUserContext | undefined;
 
     // Core application states
-    const [rating, setRating] = useState<number>(4); // Default global batch rating score
+    const [rating, setRating] = useState<number>(4);
     const [volunteers, setVolunteers] = useState<VolunteerRecord[]>([]);
     const [searchQuery, setSearchQuery] = useState<string>(``);
     const [loadingVolunteers, setLoadingVolunteers] = useState<boolean>(false);
@@ -58,14 +63,16 @@ export function RatingModal({
 
     // Fetch program volunteers automatically if logged in as an organization
     useEffect(() => {
-        if (isOpen && role === 'organization') {
+        const hasValidId = programmeId && programmeId !== 'undefined' && programmeId !== 'null';
+
+        if (isOpen && role === 'organization' && hasValidId) {
             const fetchProgrammeVolunteers = async () => {
                 try {
                     setLoadingVolunteers(true);
                     const token = localStorage.getItem('token');
 
                     const response = await axios.get<VolunteerRecord[]>(
-                        `${API_BASE_URL}/programmes/${programmeId}/volunteers`,
+                        `${API_BASE_URL}/volunteers/programme/${programmeId}`,
                         { headers: { Authorization: `Bearer ${token}` } }
                     );
                     setVolunteers(response.data);
@@ -81,12 +88,10 @@ export function RatingModal({
 
     if (!isOpen) return null;
 
-    // Handles changing the global or volunteer-wide fallback star score
     const handleStarClick = (starValue: number) => {
         setRating(starValue);
     };
 
-    // Safely handles independent row overrides for specific volunteers
     const handleIndividualStarClick = (volunteerId: string, starValue: number) => {
         setVolunteers(prev => prev.map(vol =>
             vol.id === volunteerId ? { ...vol, customRating: starValue } : vol
@@ -100,22 +105,19 @@ export function RatingModal({
             const config = { headers: { Authorization: `Bearer ${token}` } };
 
             if (role === 'volunteer') {
-                // ─── FIXED: EXPLICITLY CAPTURE TARGET ID TO PREVENT NULL ENTRIES ───
                 const payload = {
                     programmeId,
                     rating,
                     senderRole: 'volunteer',
                     senderId: user?.id,
-                    targetId: organizationId // 🌟 Linked to populate your 'rateeId' column directly
+                    targetId: organizationId
                 };
                 await axios.post(`${API_BASE_URL}/interactions/rating`, payload, config);
 
-                // Type-safe session cleanup
                 if (user && 'pendingRating' in user) {
                     user.pendingRating = null;
                 }
             } else {
-                // Batch/Manual mixed collection payload path for organizations reviewing volunteers
                 const ratingsPayload = volunteers.map(vol => ({
                     programmeId,
                     rating: vol.customRating !== undefined ? vol.customRating : rating,
@@ -137,12 +139,12 @@ export function RatingModal({
         }
     };
 
-    // Real-time client-side listing filtration matrix string comparison
-    const filteredVolunteers = volunteers.filter(vol =>
-        vol.username.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    // ─── 🌟 FIXED: DRILL DOWN TO NESTED USER OBJECT FOR THE FILTERING ENGINE ───
+    const filteredVolunteers = volunteers.filter(vol => {
+        const targetName = vol.user?.username || vol.username || vol.name || '';
+        return targetName.toLowerCase().includes(searchQuery.toLowerCase());
+    });
 
-    // Dynamic image source parser override
     const resolveLogoUrl = (logoPath: string | undefined): string => {
         if (!logoPath) return 'none';
         if (logoPath.startsWith('http://') || logoPath.startsWith('https://')) {
@@ -198,9 +200,13 @@ export function RatingModal({
                                 <div className="volunteers-scroll-container" style={{ maxHeight: '220px', overflowY: 'auto', margin: '15px 0', border: '1px solid #eee', borderRadius: '6px' }}>
                                     {filteredVolunteers.map((vol) => {
                                         const currentVolScore = vol.customRating !== undefined ? vol.customRating : rating;
+
+                                        // ─── 🌟 FIXED: EXTRACT NESTED ACCOUNT USERNAMES SECURELY FROM THE OBJECT GRAPH ───
+                                        const displayName = vol.user?.username || vol.username || vol.name || "Unknown Attendant";
+
                                         return (
                                             <div key={vol.id} className="volunteer-manual-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', borderBottom: '1px solid #f5f5f5' }}>
-                                                <span className="vol-item-name-text" style={{ fontSize: '14px', fontWeight: 500, color: '#333' }}>{vol.username}</span>
+                                                <span className="vol-item-name-text" style={{ fontSize: '14px', fontWeight: 500, color: '#333' }}>{displayName}</span>
                                                 <div className="stars-interactive-row individual-stars">
                                                     {[1, 2, 3, 4, 5].map((star) => (
                                                         <span key={star} onClick={() => handleIndividualStarClick(vol.id, star)} className="star-wrapper" style={{ cursor: 'pointer', fontSize: '18px', marginLeft: '3px' }}>

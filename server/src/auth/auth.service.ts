@@ -145,11 +145,12 @@ export class AuthService {
     } | null = null;
 
     try {
+      const currentTime = new Date();
+
+      // ─── PATHWAY A: VOLUNTEER LOGIN FLOW SCANNER ───
       if (user.role === 'volunteer') {
-        const currentTime = new Date();
         const volunteerProfileId = user.volunteer?.id || user.id;
 
-        // ─── TARGET EXPLICIT RELATIONAL VOLUNTEER PROFILE ID STRING ───
         const completedApps: Array<
           RawVolunteerAppRow & { completedHours: number }
         > = await this.userRepository.manager.query(
@@ -192,8 +193,6 @@ export class AuthService {
 
               if (orgData && orgData.length > 0) {
                 const row = orgData[0];
-
-                // ─── STABILIZED INTERFACE VALUE EXTRACTION EXTRA DEEP FALLBACKS ───
                 orgName = row.username || row.name || orgName;
                 orgLogo =
                   row.profile_picture_url || row.profilePictureUrl || orgLogo;
@@ -212,6 +211,40 @@ export class AuthService {
               organizationLogo: orgLogo,
             };
             break;
+          }
+        }
+      }
+      // ─── PATHWAY B: ORGANIZATION LOGIN FLOW SCANNER ───
+      else if (user.role === 'organization') {
+        const orgProfileId = user.organization?.id || user.id;
+
+        // Fetch completed events managed by this specific organization ID
+        const endedProgrammes: Array<{ id: string; title: string }> =
+          await this.userRepository.manager.query(
+            `SELECT p.id, p.title 
+             FROM programme p
+             JOIN schedule s ON p.scheduleId = s.id
+             WHERE p.organizationId = ? 
+               AND s.end_time < ?`,
+            [orgProfileId, currentTime],
+          );
+
+        for (const prog of endedProgrammes) {
+          // Check if this organization has submitted any reviews for this event
+          const alreadyRated: RawRatingRow[] =
+            await this.userRepository.manager.query(
+              `SELECT id FROM rating WHERE programmeId = ? AND raterId = ? LIMIT 1`,
+              [prog.id, user.id],
+            );
+
+          // If no rating interaction has been logged by the organization yet, lock the trigger
+          if (!alreadyRated || alreadyRated.length === 0) {
+            pendingRatingTrigger = {
+              programmeId: prog.id,
+              organizationName: prog.title, // Maps the programme title into the name field for rendering
+              organizationLogo: '', // Organizations do not render an external profile icon
+            };
+            break; // Lock target and break the loop execution thread
           }
         }
       }

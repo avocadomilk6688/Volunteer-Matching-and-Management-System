@@ -55,7 +55,21 @@ export class VolunteersController {
     return await this.volunteersService.createInterest(name);
   }
 
-  // --- 2. DYNAMIC ROUTES ---
+  // --- 2. PROGRAMME SPECIFIC OVERRIDES ---
+
+  /**
+   * FETCH VOLUNTEERS BY PROGRAMME ID
+   * 🌟 Added explicitly to match frontend lookup payloads and power search matrix filtering.
+   * Placed above dynamic ':id' wildcard to prevent NestJS route collision issues.
+   */
+  @Get('programme/:programmeId')
+  async findVolunteersByProgramme(
+    @Param('programmeId') programmeId: string,
+  ): Promise<Volunteer[]> {
+    return await this.volunteersService.findVolunteersByProgramme(programmeId);
+  }
+
+  // --- 3. DYNAMIC ROUTES ---
 
   @Get(':id/history')
   async getHistory(@Param('id') id: string): Promise<any> {
