@@ -31,6 +31,7 @@ interface Contact {
     role: string;
     programmeId: string | null;
     programmeName: string | null;
+    hasUnread: boolean;
 }
 
 interface ChatWindowProps {
@@ -119,20 +120,6 @@ export function ChatWindow({
         scrollToBottom();
     }, [messages]);
 
-    useEffect(() => {
-        if (!senderId) return;
-
-        const markVisibleMessagesRead = async () => {
-            try {
-                await axios.patch(`${API_BASE_URL}/interactions/messages/read/${senderId}`);
-            } catch (err) {
-                console.error("Failed to mark visible chat messages as read", err);
-            }
-        };
-
-        markVisibleMessagesRead();
-    }, [senderId]);
-
     // 1. Initial Load: Fetch Recent Contacts & Handle Real-Time Injector Columns
     useEffect(() => {
         const fetchContactsAndMissingDetails = async () => {
@@ -190,6 +177,8 @@ export function ChatWindow({
                         role: latest.role
                     });
                 }
+
+                await axios.patch(`${API_BASE_URL}/interactions/messages/read/${senderId}`);
             } catch (err) {
                 console.error("Failed to load contacts", err);
             }

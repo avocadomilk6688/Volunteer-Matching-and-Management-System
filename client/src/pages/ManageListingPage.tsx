@@ -238,12 +238,7 @@ export function ManageListingPage() {
 
         const trueUserAccountId = user?.id || localStorage.getItem('userId');
         if (nextState && trueUserAccountId && trueUserAccountId !== 'undefined') {
-            try {
-                await axios.patch(`${API_BASE_URL}/interactions/messages/read/${trueUserAccountId}`);
-                setUnreadChatCount(0);
-            } catch (err) {
-                console.error("Error marking organization chat messages as read:", err);
-            }
+            setUnreadChatCount(0);
         }
     };
 

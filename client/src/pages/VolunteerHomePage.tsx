@@ -230,12 +230,7 @@ export function VolunteerHomePage() {
 
         const trueUserId = user?.id || localStorage.getItem('userId');
         if (nextState && trueUserId && trueUserId !== 'undefined') {
-            try {
-                await axios.patch(`${API_BASE_URL}/interactions/messages/read/${trueUserId}`);
-                setUnreadChatCount(0);
-            } catch (err) {
-                console.error("Error marking volunteer chat messages as read:", err);
-            }
+            setUnreadChatCount(0);
         }
     };
 

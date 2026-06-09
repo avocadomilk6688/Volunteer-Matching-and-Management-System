@@ -39,6 +39,7 @@ export interface RecentContact {
   role: string;
   programmeId: string | null;
   programmeName: string | null;
+  hasUnread: boolean;
 }
 
 interface RawProgrammeLookupRow {
@@ -219,6 +220,7 @@ export class InteractionsService {
           role: 'programme_broadcast',
           programmeId: prog.id,
           programmeName: prog.title,
+          hasUnread: false,
         });
       }
     }
@@ -261,11 +263,29 @@ export class InteractionsService {
           role: partner.role,
           programmeId: msg.programme?.id ?? null,
           programmeName: msg.programme?.title ?? 'General Inquiry',
+          hasUnread: msg.receiver.id === userId && !msg.isRead,
         });
       }
     }
 
-    return Array.from(contactsMap.values());
+    const contacts = Array.from(contactsMap.values());
+    const hasUnreadMessages = contacts.some(
+      (contact) => contact.hasUnread && contact.role !== 'programme_broadcast',
+    );
+
+    return contacts.sort((a, b) => {
+      const aBroadcast = a.role === 'programme_broadcast';
+      const bBroadcast = b.role === 'programme_broadcast';
+
+      if (hasUnreadMessages) {
+        if (a.hasUnread !== b.hasUnread) return a.hasUnread ? -1 : 1;
+        if (aBroadcast !== bBroadcast) return aBroadcast ? 1 : -1;
+      } else if (aBroadcast !== bBroadcast) {
+        return aBroadcast ? -1 : 1;
+      }
+
+      return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
+    });
   }
 
   // ─── 🌟 ADDED: CHAT MESSAGE UNREAD COUNTER FROM DETAILED REPO CORES ───
