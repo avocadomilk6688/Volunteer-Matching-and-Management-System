@@ -6,8 +6,9 @@ import { GenericTable } from './Table';
 import { useAuth } from '../context/auth/useAuth';
 import { AiOutlineMessage } from 'react-icons/ai';
 import { ChatWindow } from './ChatWindow';
-import { socket } from '../services/socket'; // Import socket instance directly
+import { socket } from '../services/socket';
 import { RatingModal } from './RatingModal';
+import axios from 'axios';
 
 // --- Explicit TypeScript Interfaces ---
 interface TagItem { id: string; name: string; }
@@ -44,7 +45,6 @@ interface TagSelectionProps {
     type: 'skill' | 'interest';
 }
 
-// --- STRICT LOCAL TYPE EXTENSIONS INSTEAD OF ANY ---
 interface SecureOrganizationShape {
     id: string;
     description?: string | null;
@@ -63,7 +63,7 @@ interface SecureUserEntity {
     organization?: SecureOrganizationShape | null;
 }
 
-// --- Draggable Chat Button Sub-Component (UPDATED WITH UNREAD STATE) ---
+// --- Draggable Chat Button Sub-Component ---
 const DraggableChatButton = ({ onClick, hasUnread }: { onClick: () => void; hasUnread: boolean }) => {
     const [position, setPosition] = useState({
         x: window.innerWidth - 120,
@@ -72,15 +72,6 @@ const DraggableChatButton = ({ onClick, hasUnread }: { onClick: () => void; hasU
     const [dragging, setDragging] = useState(false);
     const dragOffset = useRef({ x: 0, y: 0 });
     const startPos = useRef({ x: 0, y: 0 });
-
-    const handleMouseDown = (e: React.MouseEvent) => {
-        setDragging(true);
-        startPos.current = { x: e.clientX, y: e.clientY };
-        dragOffset.current = {
-            x: e.clientX - position.x,
-            y: e.clientY - position.y
-        };
-    };
 
     const handleMouseMove = useCallback((e: MouseEvent) => {
         if (!dragging) return;
@@ -103,6 +94,15 @@ const DraggableChatButton = ({ onClick, hasUnread }: { onClick: () => void; hasU
             onClick();
         }
     }, [onClick]);
+
+    const handleMouseDown = (e: React.MouseEvent) => {
+        setDragging(true);
+        startPos.current = { x: e.clientX, y: e.clientY };
+        dragOffset.current = {
+            x: e.clientX - position.x,
+            y: e.clientY - position.y
+        };
+    };
 
     useEffect(() => {
         if (dragging) {
@@ -129,7 +129,6 @@ const DraggableChatButton = ({ onClick, hasUnread }: { onClick: () => void; hasU
             }}
         >
             <AiOutlineMessage />
-            {/* --- RED INDICATOR DOT --- */}
             {hasUnread && (
                 <span
                     className="chat-notification-dot"
@@ -154,7 +153,6 @@ export function ManageListingPage() {
     const navigate = useNavigate();
     const location = useLocation();
 
-    // Cast the untyped auth reference safely to our strict schema context wrapper
     const { user: rawUser } = useAuth();
     const user = rawUser as SecureUserEntity | undefined;
 
@@ -177,20 +175,13 @@ export function ManageListingPage() {
     const [selectedImage, setSelectedImage] = useState<File | null>(null);
     const [isChatOpen, setIsChatOpen] = useState(false);
 
-    // --- STATE FOR UNREAD MESSAGE NOTIFICATION BADGE ---
-    const [hasUnread, setHasUnread] = useState(false);
+    // ─── 🌟 FIXED: TARGET TRUE USER ID (USRxxx) INSTEAD OF ORG PROFILE ID ───
+    const [unreadChatCount, setUnreadChatCount] = useState(0);
 
-    // ─── AUTOMATIC DIALOG OPEN ON LOGIN RATING payload INTERCEPT ───
     const [isRatingOpen, setIsRatingOpen] = useState<boolean>(!!user?.pendingRating);
 
     const [rowData, setRowData] = useState({
-        title: '',
-        description: '',
-        mode: 'Physical',
-        location: '',
-        start_time: '',
-        end_time: '',
-        imageUrl: '',
+        title: '', description: '', mode: 'Physical', location: '', start_time: '', end_time: '', imageUrl: '',
     });
 
     const headers = ['Title', 'Description', 'Cover Image', 'Skills', 'Interests', 'Mode', 'Location', 'Schedule', 'Action'];
@@ -199,28 +190,62 @@ export function ManageListingPage() {
         if (user?.id) fetchInitialData();
     }, [user?.id]);
 
-    // --- BACKGROUND NOTIFICATION LISTENER EFFECT ---
+    // ─── 🌟 FIXED: PULL BY ACTIVE USER ID ACCOUNT CONTEXT TO TRACE REAL MESSAGES ───
+    const fetchChatMessagesSync = useCallback(async () => {
+        const trueUserAccountId = user?.id || localStorage.getItem('userId');
+        if (!trueUserAccountId || trueUserAccountId === 'undefined') return;
+        try {
+            const res = await axios.get<{ count: number }>(`${API_BASE_URL}/interactions/messages/unread/${trueUserAccountId}`);
+            setUnreadChatCount(res.data.count || 0);
+        } catch (err) {
+            console.error("Error synchronizing chat array timestamps on org view:", err);
+        }
+    }, [user?.id]);
+
+    // WebSocket Handshake Listener Loop
     useEffect(() => {
-        if (!user?.id) return;
+        const trueUserAccountId = user?.id || localStorage.getItem('userId');
+        if (!trueUserAccountId || trueUserAccountId === 'undefined') return;
 
         if (!socket.connected) socket.connect();
 
-        // Connect client instance directly to personal private notify tracking room
-        socket.emit('join_private_room', { userId: user.id });
+        socket.emit('join_private_room', { userId: trueUserAccountId });
+        socket.emit('join_private_room', { userId: `room_${trueUserAccountId}` });
 
-        const handleIncomingNotification = (data: { type: string, from: string }) => {
-            console.log("DEBUG: Background notification received on manage listing page:", data);
-            if (!isChatOpen) {
-                setHasUnread(true);
-            }
+        fetchChatMessagesSync();
+
+        const handleRealTimeMessageArrival = () => {
+            console.log("🔴 REAL-TIME CHAT INTERCEPT: Message arrived, matching fresh lists...");
+            fetchChatMessagesSync();
         };
 
-        socket.on('new_notification', handleIncomingNotification);
+        socket.on('new_notification', handleRealTimeMessageArrival);
+        socket.on('receive_message', handleRealTimeMessageArrival);
 
         return () => {
-            socket.off('new_notification', handleIncomingNotification);
+            socket.off('new_notification', handleRealTimeMessageArrival);
+            socket.off('receive_message', handleRealTimeMessageArrival);
         };
-    }, [user?.id, isChatOpen]);
+    }, [user?.id, fetchChatMessagesSync]);
+
+    // Derived logic evaluating timestamp indices
+    const hasUnread = unreadChatCount > 0;
+
+    // ─── 🌟 FIXED: MAPPED EXPLICITLY TO THE ACCOUNT UNIQUE FIELD IDENTIFIER ───
+    const toggleChat = async () => {
+        const nextState = !isChatOpen;
+        setIsChatOpen(nextState);
+
+        const trueUserAccountId = user?.id || localStorage.getItem('userId');
+        if (nextState && trueUserAccountId && trueUserAccountId !== 'undefined') {
+            try {
+                await axios.patch(`${API_BASE_URL}/interactions/messages/read/${trueUserAccountId}`);
+                setUnreadChatCount(0);
+            } catch (err) {
+                console.error("Error marking organization chat messages as read:", err);
+            }
+        }
+    };
 
     const fetchInitialData = async () => {
         const token = localStorage.getItem('token');
@@ -294,12 +319,9 @@ export function ManageListingPage() {
         formData.append('skillIds', JSON.stringify(mySkills.map(s => s.id)));
         formData.append('interestIds', JSON.stringify(myInterests.map(i => i.id)));
 
-        // ─── OPTIMIZED DISPATCH EXCLUSION LOGIC ───
         if (selectedImage) {
-            // Priority 1: A fresh file object binary payload exists, upload it directly
             formData.append('file', selectedImage);
         } else if (editingId && rowData.imageUrl) {
-            // Priority 2: No fresh file selected; safely pass the old URL fallback so it isn't blanked
             formData.append('imageUrl', rowData.imageUrl);
         }
 
@@ -484,16 +506,14 @@ export function ManageListingPage() {
                 </main>
             </div>
 
-            {/* Draggable Chat Button linked with notification tracking */}
-            <DraggableChatButton
-                onClick={() => {
-                    setIsChatOpen(!isChatOpen);
-                    setHasUnread(false);
-                }}
-                hasUnread={hasUnread}
-            />
+            <div style={{ display: isChatOpen ? 'none' : 'block' }}>
+                <DraggableChatButton
+                    key={`m_listing_bubble_sync_${hasUnread}`}
+                    onClick={toggleChat}
+                    hasUnread={hasUnread}
+                />
+            </div>
 
-            {/* General Inbox Sidebar Chat Integration */}
             {isChatOpen && (
                 <ChatWindow
                     onClose={() => setIsChatOpen(false)}
@@ -502,7 +522,6 @@ export function ManageListingPage() {
                 />
             )}
 
-            {/* BATCH RATING POPUP INTERCEPTOR OVERLAY CORES */}
             {user?.pendingRating && (
                 <RatingModal
                     isOpen={isRatingOpen}
@@ -514,7 +533,6 @@ export function ManageListingPage() {
     );
 }
 
-// --- SUB-COMPONENT ---
 function TagSelection({ toggleTag, myTags, allTags, isOpen, setIsOpen, type }: TagSelectionProps) {
     return (
         <div className="tags-container">

@@ -34,15 +34,14 @@ export function Header() {
     const [showNotifications, setShowNotifications] = useState(false);
     const [notifications, setNotifications] = useState<Notification[]>([]);
 
-    // ─── LAZY STATE INITIALIZATION WITH CONDITIONAL ID EVALUATOR ───
-    const [lastViewedNotifTime, setLastViewedNotifTime] = useState<number>(() => {
-        const userId = rawUser?.id || localStorage.getItem('userId');
-        if (userId) {
-            const stored = localStorage.getItem(`last_viewed_notifications_time_${userId}`);
-            return stored ? parseInt(stored, 10) : 0;
-        }
-        return 0;
-    });
+    // ─── 🌟 DERIVED READ PASS: DERIVE TIME DIRECTLY IN THE RENDER PASS TO AVOID RENDERING ERRORS ───
+    const trueUserId = user?.id || localStorage.getItem('userId');
+    let lastViewedNotifTime = 0;
+
+    if (trueUserId && trueUserId !== 'undefined') {
+        const stored = localStorage.getItem(`last_viewed_notifications_time_${trueUserId}`);
+        lastViewedNotifTime = stored ? parseInt(stored, 10) : 0;
+    }
 
     const role = user?.role;
     const isVolunteer = role === 'volunteer';
@@ -54,7 +53,7 @@ export function Header() {
         Object.keys(user.organization).length === 0
     );
 
-    // Now safe to log after block scopes have resolved safely top-to-bottom
+    // Safe debug logging context
     console.log("CRITICAL HEADER DEBUG:", {
         rawUserRole: user?.role,
         typeOfRole: typeof user?.role,
@@ -83,43 +82,51 @@ export function Header() {
         }
     }, [isAuthenticated, user?.id, isUnverifiedOrg]);
 
-    // ─── FIXED: LOGOUT RE-INJECTION BACKUP PIPELINE ───
+    // ─── 🌟 FIXED: ARCHIVE & RESTORE ALL USERS' TIMESTAMP KEYS BEFORE THE WIPE UNSETPASS ───
     const handleLogout = () => {
-        if (user?.id) {
-            // 1. Snatch the current read timestamp right before useAuth wipes localStorage
-            const userSpecificKey = `last_viewed_notifications_time_${user.id}`;
-            const currentSavedTime = localStorage.getItem(userSpecificKey);
+        const timestampArchive: { [key: string]: string } = {};
 
-            // 2. Fire the central context logout handler
-            logout();
-
-            // 3. Re-inject the timestamp back into storage so it survives the cleanup scrub
-            if (currentSavedTime) {
-                localStorage.setItem(userSpecificKey, currentSavedTime);
+        // 1. Extract and preserve ALL active layout timestamp fields currently populated
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && (key.startsWith('last_viewed_chat_time_') || key.startsWith('last_viewed_notifications_time_'))) {
+                const value = localStorage.getItem(key);
+                if (value) {
+                    timestampArchive[key] = value;
+                }
             }
-        } else {
-            logout();
         }
 
-        // Wipe component memory to prevent stale rendering passes
+        // 2. Execute central logout context pipeline (runs standard clear passes)
+        logout();
+
+        // 3. Re-inject the entire key payload snapshot back so it survives cross-role swaps
+        Object.keys(timestampArchive).forEach((key) => {
+            localStorage.setItem(key, timestampArchive[key]);
+        });
+
+        // Wipe component states to prevent cross-account display bleed passing passes
         setNotifications([]);
-        setLastViewedNotifTime(0);
         isShowProfileOptions(false);
         setShowNotifications(false);
         navigate('/');
     };
 
     const toggleNotifications = () => {
-        if (isUnverifiedOrg || !user?.id) return;
+        const currentUserId = user?.id || localStorage.getItem('userId');
+        if (isUnverifiedOrg || !currentUserId || currentUserId === 'undefined') return;
+
         const nextState = !showNotifications;
         setShowNotifications(nextState);
         if (showProfileOptions) isShowProfileOptions(false);
 
         if (nextState) {
             const currentTimestamp = Date.now();
-            const userSpecificKey = `last_viewed_notifications_time_${user.id}`;
+            const userSpecificKey = `last_viewed_notifications_time_${currentUserId}`;
             localStorage.setItem(userSpecificKey, currentTimestamp.toString());
-            setLastViewedNotifTime(currentTimestamp);
+
+            // Reference update pushes evaluation without local state locks
+            setNotifications([...notifications]);
         }
     };
 

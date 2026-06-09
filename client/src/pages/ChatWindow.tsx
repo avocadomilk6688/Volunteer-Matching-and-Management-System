@@ -119,6 +119,20 @@ export function ChatWindow({
         scrollToBottom();
     }, [messages]);
 
+    useEffect(() => {
+        if (!senderId) return;
+
+        const markVisibleMessagesRead = async () => {
+            try {
+                await axios.patch(`${API_BASE_URL}/interactions/messages/read/${senderId}`);
+            } catch (err) {
+                console.error("Failed to mark visible chat messages as read", err);
+            }
+        };
+
+        markVisibleMessagesRead();
+    }, [senderId]);
+
     // 1. Initial Load: Fetch Recent Contacts & Handle Real-Time Injector Columns
     useEffect(() => {
         const fetchContactsAndMissingDetails = async () => {
@@ -192,6 +206,32 @@ export function ChatWindow({
             return;
         }
 
+        const handleReceiveMessage = (newMessage: Message) => {
+            const receiverId = typeof newMessage.receiver === 'string' ? newMessage.receiver : newMessage.receiver?.id;
+            if (String(receiverId).trim().toLowerCase() === String(senderId).trim().toLowerCase()) {
+                axios.patch(`${API_BASE_URL}/interactions/messages/read/${senderId}`)
+                    .catch((err) => console.error("Failed to mark incoming chat message as read", err));
+            }
+
+            setMessages((prev) => {
+                if (prev.find(m => m.id === newMessage.id)) return prev;
+
+                const hasOptimisticDuplicate = prev.some(m =>
+                    m.id.startsWith('LOCAL_MOCK_') &&
+                    m.content === newMessage.content &&
+                    String(m.sender?.id || m.sender).toLowerCase() === String(newMessage.sender?.id || newMessage.sender).toLowerCase()
+                );
+
+                if (hasOptimisticDuplicate) {
+                    return prev.map(m =>
+                        m.id.startsWith('LOCAL_MOCK_') && m.content === newMessage.content ? newMessage : m
+                    );
+                }
+
+                return [...prev, newMessage];
+            });
+        };
+
         const loadConversation = async () => {
             // ─── TICKET STRIP HISTORY LOOKUP PARAMETER MATRIX ───
             const historyProgParam = activeChat.programmeId?.startsWith('T')
@@ -219,31 +259,13 @@ export function ChatWindow({
             });
 
             // ─── DEDUPLICATE INCOMING REAL-TIME WEBSOCKET BROADCASTS ───
-            socket.on('receive_message', (newMessage: Message) => {
-                setMessages((prev) => {
-                    if (prev.find(m => m.id === newMessage.id)) return prev;
-
-                    const hasOptimisticDuplicate = prev.some(m =>
-                        m.id.startsWith('LOCAL_MOCK_') &&
-                        m.content === newMessage.content &&
-                        String(m.sender?.id || m.sender).toLowerCase() === String(newMessage.sender?.id || newMessage.sender).toLowerCase()
-                    );
-
-                    if (hasOptimisticDuplicate) {
-                        return prev.map(m =>
-                            m.id.startsWith('LOCAL_MOCK_') && m.content === newMessage.content ? newMessage : m
-                        );
-                    }
-
-                    return [...prev, newMessage];
-                });
-            });
+            socket.on('receive_message', handleReceiveMessage);
         };
 
         loadConversation();
 
         return () => {
-            socket.off('receive_message');
+            socket.off('receive_message', handleReceiveMessage);
         };
     }, [activeChat.id, activeChat.programmeId, senderId, isBroadcastChannel]);
 

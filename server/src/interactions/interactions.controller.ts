@@ -22,6 +22,7 @@ import {
 export class InteractionsController {
   constructor(private readonly interactionsService: InteractionsService) {}
 
+  // --- Q&A Logic ---
   @Get('qa')
   async findAllQA(): Promise<QuestionAnswer[]> {
     return await this.interactionsService.findAllQA();
@@ -32,7 +33,6 @@ export class InteractionsController {
     return this.interactionsService.createQA(createQuestionAnswerDto);
   }
 
-  // --- FIXED: ADDED THE INLINE PATCH METHOD ROUTE HANDLER ---
   @Patch('qa/:id')
   async updateQA(
     @Param('id') id: string,
@@ -41,10 +41,25 @@ export class InteractionsController {
     return await this.interactionsService.updateQA(id, updateDto);
   }
 
-  // --- FIXED: ADDED THE INLINE DELETE METHOD ROUTE HANDLER ---
   @Delete('qa/:id')
   async removeQA(@Param('id') id: string) {
     return await this.interactionsService.removeQA(id);
+  }
+
+  // --- Messaging Logic ---
+
+  // ─── 🌟 NEW ENDPOINT: CHAT MESSAGE UNREAD COUNT ───
+  // Replaces the broken /interactions/user/:userId logic for chat dots
+  @Get('messages/unread/:userId')
+  async getUnreadMessages(@Param('userId') userId: string) {
+    return await this.interactionsService.getUnreadMessagesCount(userId);
+  }
+
+  // ─── 🌟 NEW ENDPOINT: CHAT READ STATUS FLIP ───
+  // Clears the unread database state for a specific user
+  @Patch('messages/read/:userId')
+  async markMessagesRead(@Param('userId') userId: string) {
+    return await this.interactionsService.markMessagesAsRead(userId);
   }
 
   @Post('message')
@@ -54,10 +69,6 @@ export class InteractionsController {
     return this.interactionsService.createMessage(createMessageDto);
   }
 
-  /**
-   * Fetches conversation history.
-   * Path: GET /interactions/history/USR1/USR2?programmeId=PROG1
-   */
   @Get('history/:user1/:user2')
   async getHistory(
     @Param('user1') u1: string,
@@ -83,11 +94,6 @@ export class InteractionsController {
     );
   }
 
-  // ─── 🌟 NEW ENDPOINT: ACCEPTS FRONTEND CHAT WINDOW BATCH payloads ───
-  /**
-   * Handles incoming broadcast messages requested by organizational chat feeds.
-   * Path: POST /interactions/chat/batch
-   */
   @Post('chat/batch')
   async sendBatchAnnouncement(
     @Body() body: { senderId: string; programmeId: string; content: string },
@@ -95,6 +101,7 @@ export class InteractionsController {
     return await this.interactionsService.sendBatchMessage(body);
   }
 
+  // --- Rating & Notification Logic ---
   @Post('rating')
   createRating(@Body() createRatingDto: CreateRatingDto) {
     return this.interactionsService.createRating(createRatingDto);
@@ -115,15 +122,11 @@ export class InteractionsController {
     return this.interactionsService.createSupportTicket(createSupportTicketDto);
   }
 
-  // ─── FIXED: EXPLICIT ROUTE FOR FETCHING ALL SUPPORT TICKETS ───
-  // Handles incoming GET requests to /interactions/support-ticket for the Admin view.
   @Get('support-ticket')
   async findAllSupportTickets() {
     return await this.interactionsService.findAllTickets();
   }
 
-  // ─── FIXED: ADDED THE MISSING SUPPORT TICKET PATCH METHOD ROUTE HANDLER ───
-  // Resolves the 404 error when making modifications to a specific support ticket's lifecycle payload
   @Patch('support-ticket/:id')
   async updateSupportTicket(
     @Param('id') id: string,
@@ -137,6 +140,7 @@ export class InteractionsController {
     return this.interactionsService.findAll();
   }
 
+  // Used for standard bell notifications (do not modify this)
   @Get('user/:userId')
   async findByUser(@Param('userId') userId: string) {
     return await this.interactionsService.findAllByUserId(userId);

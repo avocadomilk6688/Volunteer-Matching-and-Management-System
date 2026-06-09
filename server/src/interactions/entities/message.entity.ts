@@ -25,6 +25,9 @@ export class Message {
   @ManyToOne(() => Programme, { nullable: true })
   programme!: Programme;
 
+  @Column({ type: 'boolean', default: false })
+  isRead!: boolean;
+
   @CreateDateColumn()
   timestamp!: Date;
 }

@@ -153,6 +153,7 @@ export class InteractionsService {
       programme: createMessageDto.programmeId
         ? ({ id: createMessageDto.programmeId } as Programme)
         : undefined,
+      isRead: false,
     });
 
     return await this.messageRepo.save(newMessage);
@@ -267,13 +268,44 @@ export class InteractionsService {
     return Array.from(contactsMap.values());
   }
 
+  // ─── 🌟 ADDED: CHAT MESSAGE UNREAD COUNTER FROM DETAILED REPO CORES ───
+  async getUnreadMessagesCount(userId: string): Promise<{ count: number }> {
+    const count = await this.messageRepo.count({
+      where: {
+        receiver: { id: userId },
+        isRead: false,
+      },
+    });
+    return { count };
+  }
+
+  // ─── 🌟 ADDED: FLIP UNREAD FIELD MATRICES FOR GIVEN TARGET USER ID ───
+  async markMessagesAsRead(
+    userId: string,
+  ): Promise<{ success: boolean; updatedCount: number }> {
+    const targetMessages = await this.messageRepo.find({
+      where: {
+        receiver: { id: userId },
+        isRead: false,
+      },
+    });
+
+    if (targetMessages.length > 0) {
+      targetMessages.forEach((msg) => {
+        msg.isRead = true;
+      });
+      await this.messageRepo.save(targetMessages);
+    }
+
+    return { success: true, updatedCount: targetMessages.length };
+  }
+
   // --- Broadcast Logic ---
   async broadcastToProgramme(
     programmeId: string,
     senderId: string,
     content: string,
   ) {
-    // ─── 🌟 FIXED: RESTRICTED INTERNAL METHOD MAPS UNIFORMLY TO UPCOMING STATUS RULES ───
     const applications = await this.applicationRepo.find({
       where: {
         programme: { id: programmeId },
@@ -301,7 +333,6 @@ export class InteractionsService {
     return { participantUserIds, messages };
   }
 
-  // ─── 🌟 METHODS RUNTIME DISTRIBUTION LOOPS WITH SAFE TYPE VERIFICATION ───
   /**
    * Distributes a single broadcast text down to all upcoming/completed program attendants,
    * saves records cleanly to history, and emits signals to each volunteer's socket.
@@ -313,7 +344,6 @@ export class InteractionsService {
   }) {
     console.log('[BATCH BROADCAST TRIGGERED]:', dto);
 
-    // 1. Fetch participants registered under the target programme ID context with upcoming/completed states
     const applications = await this.applicationRepo.find({
       where: {
         programme: { id: dto.programmeId },
@@ -338,7 +368,6 @@ export class InteractionsService {
     const formulationBody = `[Batch Message] ${dto.content}`;
     const generatedSavedRows: Message[] = [];
 
-    // 2. Loop through all attendants to save unique entries in database tracking
     for (const app of applications) {
       const targetUserId = app.volunteer?.user?.id;
       if (!targetUserId) continue;
@@ -357,7 +386,6 @@ export class InteractionsService {
       const savedEntry = await this.messageRepo.save(msgRow);
       generatedSavedRows.push(savedEntry);
 
-      // 3. Emit message data securely via dynamic socket layers
       if (this.chatGateway) {
         this.chatGateway.server
           .to(`room_${targetUserId}`)

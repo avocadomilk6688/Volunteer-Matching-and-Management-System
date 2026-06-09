@@ -45,6 +45,7 @@ const DateBox = forwardRef<HTMLDivElement, DateBoxProps>(({ value, onClick, plac
         <GoChevronDown className="select-arrow-icon" />
     </div>
 ));
+DateBox.displayName = 'DateBox';
 
 // --- Draggable Chat Button Sub-Component ---
 const DraggableChatButton = ({ onClick, hasUnread }: { onClick: () => void; hasUnread: boolean }) => {
@@ -142,10 +143,10 @@ export function VolunteerHomePage() {
     const [allSkills, setAllSkills] = useState<{ id: string, skill_name: string }[]>([]);
     const [allInterests, setAllInterests] = useState<{ id: string, interest_name: string }[]>([]);
     const [isChatOpen, setIsChatOpen] = useState(false);
-    const [hasUnread, setHasUnread] = useState(false);
-
-    // ─── ADDED: LOCALIZED STATE AUTO-TRIGGERS OPEN IF BACKEND DISPATCHES PENDING RATING TRIGGER ───
     const [isRatingOpen, setIsRatingOpen] = useState<boolean>(!!user?.pendingRating);
+
+    // ─── 🌟 SECURED VOLUNTEER NOTIFICATION & TIMELINE MATRIX ───
+    const [unreadChatCount, setUnreadChatCount] = useState(0);
 
     // --- Type-safe session storage helper ---
     const getStored = <T,>(key: string, defaultValue: T): T => {
@@ -183,29 +184,61 @@ export function VolunteerHomePage() {
     const [totalPages, setTotalPages] = useState(1);
     const itemsPerPage = 6;
 
-    // Background Notification Listener Effect
+    // Pull-based chat data sync handler
+    const fetchChatMessagesSync = useCallback(async () => {
+        const trueUserId = user?.id || localStorage.getItem('userId');
+        if (!trueUserId || trueUserId === 'undefined') return;
+        try {
+            const res = await axios.get<{ count: number }>(`${API_BASE_URL}/interactions/messages/unread/${trueUserId}`);
+            setUnreadChatCount(res.data.count || 0);
+        } catch (err) {
+            console.error("Error fetching message array contexts:", err);
+        }
+    }, [user?.id]);
+
+    // WebSocket Handshake Listener Loop
     useEffect(() => {
-        if (!user?.id) return;
+        const trueUserId = user?.id || localStorage.getItem('userId');
+        if (!trueUserId || trueUserId === 'undefined') return;
 
         if (!socket.connected) socket.connect();
 
-        socket.emit('join_private_room', { userId: user.id });
+        socket.emit('join_private_room', { userId: trueUserId });
+        socket.emit('join_private_room', { userId: `room_${trueUserId}` });
 
-        const handleIncomingNotification = (data: { type: string, from: string }) => {
-            console.log("DEBUG: Background notification received on home page:", data);
-            if (!isChatOpen) {
-                setHasUnread(true);
-            }
+        fetchChatMessagesSync();
+
+        const handleRealTimeMessageArrival = () => {
+            console.log("🔴 REAL-TIME CHAT INTERCEPT: Message arrived, matching fresh lists...");
+            fetchChatMessagesSync();
         };
 
-        socket.on('new_notification', handleIncomingNotification);
+        socket.on('new_notification', handleRealTimeMessageArrival);
+        socket.on('receive_message', handleRealTimeMessageArrival);
 
         return () => {
-            socket.off('new_notification', handleIncomingNotification);
+            socket.off('new_notification', handleRealTimeMessageArrival);
+            socket.off('receive_message', handleRealTimeMessageArrival);
         };
-    }, [user?.id, isChatOpen]);
+    }, [user?.id, fetchChatMessagesSync]);
 
-    // Save Filters To Session Storage
+    const hasUnread = unreadChatCount > 0;
+
+    const toggleChat = async () => {
+        const nextState = !isChatOpen;
+        setIsChatOpen(nextState);
+
+        const trueUserId = user?.id || localStorage.getItem('userId');
+        if (nextState && trueUserId && trueUserId !== 'undefined') {
+            try {
+                await axios.patch(`${API_BASE_URL}/interactions/messages/read/${trueUserId}`);
+                setUnreadChatCount(0);
+            } catch (err) {
+                console.error("Error marking volunteer chat messages as read:", err);
+            }
+        }
+    };
+
     const persistFilters = useCallback((page: number) => {
         sessionStorage.setItem('v_loc', JSON.stringify(selectedLocations));
         sessionStorage.setItem('v_skill', JSON.stringify(selectedSkills));
@@ -228,27 +261,14 @@ export function VolunteerHomePage() {
             const url = `${API_BASE_URL}/programmes/recommendations/${userIdParam}`;
 
             const params = isReset ? {
-                keyword: '',
-                location: '',
-                skill: '',
-                interest: '',
-                start: undefined,
-                end: undefined,
-                saved: 'all',
-                userId: user?.id,
-                page: 1,
-                limit: itemsPerPage
+                keyword: '', location: '', skill: '', interest: '',
+                start: undefined, end: undefined, saved: 'all', userId: user?.id,
+                page: 1, limit: itemsPerPage
             } : {
-                keyword: searchTerm,
-                location: selectedLocations.join(','),
-                skill: selectedSkills.join(','),
-                interest: selectedInterests.join(','),
-                start: startDate?.toISOString(),
-                end: endDate?.toISOString(),
-                saved: saveStatus,
-                userId: user?.id,
-                page: pageNumber,
-                limit: itemsPerPage
+                keyword: searchTerm, location: selectedLocations.join(','),
+                skill: selectedSkills.join(','), interest: selectedInterests.join(','),
+                start: startDate?.toISOString(), end: endDate?.toISOString(),
+                saved: saveStatus, userId: user?.id, page: pageNumber, limit: itemsPerPage
             };
 
             const response = await axios.get(url, { params });
@@ -262,7 +282,6 @@ export function VolunteerHomePage() {
         }
     };
 
-    // --- FIXED: AUTO-REFRESH ON DROPDOWN SELECTION STATUS CHANGE ---
     useEffect(() => {
         if (allSkills.length > 0 || allInterests.length > 0) {
             handleSearch(1);
@@ -466,13 +485,14 @@ export function VolunteerHomePage() {
                 </div>
             </div>
 
-            <DraggableChatButton
-                onClick={() => {
-                    setIsChatOpen(!isChatOpen);
-                    setHasUnread(false);
-                }}
-                hasUnread={hasUnread}
-            />
+            {/* Mutually Exclusive Layout Core */}
+            <div style={{ display: isChatOpen ? 'none' : 'block' }}>
+                <DraggableChatButton
+                    key={`v_home_bubble_sync_${hasUnread}`}
+                    onClick={toggleChat}
+                    hasUnread={hasUnread}
+                />
+            </div>
 
             {isChatOpen && (
                 <ChatWindow
@@ -482,7 +502,6 @@ export function VolunteerHomePage() {
                 />
             )}
 
-            {/* ─── ADDED: AUTOMATED VOTE INTERCEPTOR INJECTION COMPONENT ─── */}
             {user?.pendingRating && (
                 <RatingModal
                     isOpen={isRatingOpen}

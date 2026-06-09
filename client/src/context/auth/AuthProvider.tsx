@@ -20,7 +20,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const login = (token: string, userData: User) => {
         localStorage.setItem('token', token);
-        // CRITICAL: Saves the full object with volunteer/organization relations
+        localStorage.setItem('userId', userData.id); // Ensure we track userId separately for reliable key access
         localStorage.setItem('user', JSON.stringify(userData));
 
         setUser(userData);
@@ -28,7 +28,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     const logout = () => {
-        localStorage.clear(); // Wipe everything
+        // ─── 🌟 FIXED: SELECTIVE WIPE PROTECTS CHAT/NOTIFICATION STATES ───
+        // Instead of localStorage.clear(), we only remove auth-related keys.
+        // This keeps 'last_viewed_chat_time_*' and 'last_viewed_notifications_time_*' 
+        // keys safe for all users in the browser.
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        localStorage.removeItem('userId');
+
         setIsAuthenticated(false);
         setUser(null);
     };
