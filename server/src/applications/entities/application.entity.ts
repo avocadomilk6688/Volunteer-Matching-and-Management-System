@@ -16,7 +16,9 @@ export class Application {
   @ManyToOne(() => Volunteer, (volunteer) => volunteer.applications)
   volunteer!: Volunteer;
 
-  @ManyToOne(() => Programme, (programme) => programme.applications)
+  @ManyToOne(() => Programme, (programme) => programme.applications, {
+    onDelete: 'CASCADE',
+  })
   programme!: Programme;
 
   @Column({ default: false })

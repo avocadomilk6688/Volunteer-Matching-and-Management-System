@@ -16,7 +16,7 @@ export class Rating {
   @ManyToOne(() => User)
   ratee!: User;
 
-  @ManyToOne(() => Programme)
+  @ManyToOne(() => Programme, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'programmeId' })
   programme!: Programme;
 }

@@ -22,7 +22,7 @@ export class Message {
   @ManyToOne(() => User)
   receiver!: User;
 
-  @ManyToOne(() => Programme, { nullable: true })
+  @ManyToOne(() => Programme, { nullable: true, onDelete: 'CASCADE' })
   programme!: Programme;
 
   @Column({ type: 'boolean', default: false })
