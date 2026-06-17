@@ -80,8 +80,9 @@ export function LoginPage() {
                 navigate('/manage-user-account');
             } else if (role === 'organization') {
 
-                if (data.organization && Object.keys(data.organization).length > 0) {
-                    const rawStatus = data.organization?.registrationRecord?.status || 'approved';
+                const registrationRecord = data.organization?.registrationRecord;
+                if (registrationRecord) {
+                    const rawStatus = registrationRecord.status || 'approved';
                     if (rawStatus.trim().toLowerCase() === 'approved') {
                         navigate('/manage-listing');
                     } else {
@@ -95,8 +96,8 @@ export function LoginPage() {
                         });
 
                         if (singleRegResponse.ok) {
-                            const registrationRecord = (await singleRegResponse.json()) as RemoteRegistrationRecord;
-                            const currentStatus = registrationRecord.status?.trim().toLowerCase();
+                            const remoteRecord = (await singleRegResponse.json()) as RemoteRegistrationRecord;
+                            const currentStatus = remoteRecord.status?.trim().toLowerCase();
 
                             console.log("DEBUG: Isolated pending row verification check status state:", currentStatus);
 

@@ -93,6 +93,9 @@ export class AuthService {
         organizationProfile.id = newId;
         organizationProfile.rating = 0.0;
         organizationProfile.user = savedUser;
+        organizationProfile.contact_number = createUserDto.contact_number || '';
+        organizationProfile.profile_picture_url =
+          '/uploads/avatars/default-org.png';
 
         await this.organizationRepository.save(organizationProfile);
       }
