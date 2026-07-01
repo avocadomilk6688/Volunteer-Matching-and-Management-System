@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import { useNavigate } from 'react-router';
 import { Header } from './Header';
 import { useAuth } from '../context/auth/useAuth';
 import axios from 'axios';
@@ -14,8 +15,9 @@ interface OrganizationVerificationForm {
 const API_BASE_URL = "http://localhost:3000";
 
 export function OrganizationVerificationPage() {
+    const navigate = useNavigate();
     // Hook up authentication context injection tracking
-    const { user } = useAuth();
+    const { user, setUser } = useAuth();
 
     // Form Input Tracking States
     const [formData, setFormData] = useState<OrganizationVerificationForm>({
@@ -109,7 +111,7 @@ export function OrganizationVerificationPage() {
                 dataPayload.append('documents', file);
             });
 
-            await axios.post(`${API_BASE_URL}/organizations/verify`, dataPayload, {
+            const response = await axios.post(`${API_BASE_URL}/organizations/verify`, dataPayload, {
                 headers: {
                     'Content-Type': 'multipart/form-data',
                     Authorization: `Bearer ${token}`
@@ -118,9 +120,25 @@ export function OrganizationVerificationPage() {
 
             alert("Verification documents uploaded successfully! Your application is currently under administrative evaluation.");
 
+            // Update user auth context with the pending registration record
+            if (user) {
+                const updatedUser = {
+                    ...user,
+                    organization: {
+                        ...(user.organization || {}),
+                        id: user.id,
+                        registrationRecord: response.data
+                    }
+                };
+                setUser(updatedUser);
+                localStorage.setItem('user', JSON.stringify(updatedUser));
+            }
+
             // Clear inputs upon success pass
             setFormData({ organizationName: '', authorizedPersonName: '', description: '', address: '' });
             setSupportingDocuments([]);
+
+            navigate('/pending-approval');
         } catch (error: unknown) {
             console.error("Upload process crash error details:", error);
             alert("Failed to submit verification request. Please check system networks.");

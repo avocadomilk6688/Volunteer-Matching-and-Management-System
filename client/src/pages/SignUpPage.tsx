@@ -51,17 +51,33 @@ export function SignUpPage() {
                 throw new Error(data.message || "Registration failed");
             }
 
-            // ─── FIXED: STRUCTURAL TYPE CASTING REPLACES THE PROHIBITED 'ANY' KEYWORD ───
-            if (login) {
-                const userPayload: SignUpUserPayload = {
-                    id: String(data.id || data.user?.id || 'temp_registration_id'),
-                    email: data.email || email,
-                    role: (data.role || role) as 'admin' | 'volunteer' | 'organization',
-                    username: data.username || email.split('@')[0]
-                };
+            // ─── LOGIN PROGRAMMATICALLY TO GET REAL TOKEN AND CONTEXT ───
+            const loginResponse = await fetch('http://localhost:3000/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password, role }),
+            });
 
-                // Cast to unknown first then to the auth provider's expected schema type
-                login(data.access_token || 'session_active', userPayload as unknown as Parameters<typeof login>[1]);
+            if (!loginResponse.ok) {
+                throw new Error("Registration succeeded but initial login failed. Please login manually.");
+            }
+
+            const loginData = await loginResponse.json();
+            localStorage.setItem('token', loginData.access_token);
+            localStorage.setItem('userId', loginData.id);
+
+            const unifiedAuthUserContext = {
+                ...loginData,
+                id: loginData.id,
+                email: email,
+                organization: loginData.organization ? {
+                    ...loginData.organization,
+                    id: loginData.organization.id || loginData.id
+                } : undefined
+            };
+
+            if (login) {
+                login(loginData.access_token, unifiedAuthUserContext);
             }
 
             // Redirection rules for roles optimization

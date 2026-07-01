@@ -12,6 +12,7 @@ import { User } from '../users/entities/user.entity';
 import { Volunteer } from '../volunteers/entities/volunteer.entity';
 import { Organization } from '../organizations/entities/organization.entity';
 import { MailService } from '../mail/mail.service';
+import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 
 jest.mock('bcrypt');
@@ -65,6 +66,12 @@ describe('AuthService', () => {
         {
           provide: MailService,
           useValue: mockMailService,
+        },
+        {
+          provide: JwtService,
+          useValue: {
+            sign: jest.fn().mockReturnValue('mock_token'),
+          },
         },
       ],
     }).compile();
@@ -195,7 +202,7 @@ describe('AuthService', () => {
       const result = await service.login(loginDto);
 
       expect(result).toEqual({
-        access_token: 'session_active_token',
+        access_token: 'mock_token',
         id: 'V001',
         email: 'test@example.com',
         role: 'volunteer',

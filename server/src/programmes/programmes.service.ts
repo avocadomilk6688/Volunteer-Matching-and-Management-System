@@ -467,7 +467,18 @@ export class ProgrammesService {
   }
 
   async remove(id: string) {
+    const programme = await this.programmeRepo.findOne({
+      where: { id },
+      relations: ['schedule'],
+    });
+    if (!programme) {
+      return { deleted: false };
+    }
+    const scheduleId = programme.schedule?.id;
     const result = await this.programmeRepo.delete(id);
+    if (scheduleId) {
+      await this.scheduleRepo.delete(scheduleId);
+    }
     return { deleted: (result.affected ?? 0) > 0 };
   }
 }

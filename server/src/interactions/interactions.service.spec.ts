@@ -12,6 +12,7 @@ import { SupportTicket } from './entities/support_ticket.entity';
 import { Application } from '../applications/entities/application.entity';
 import { Volunteer } from '../volunteers/entities/volunteer.entity';
 import { Organization } from '../organizations/entities/organization.entity';
+import { VolunteersService } from '../volunteers/volunteers.service';
 import { generateCustomId } from '../common/utils/id_generator.util';
 
 jest.mock('../common/utils/id_generator.util');
@@ -76,6 +77,12 @@ describe('InteractionsService', () => {
         {
           provide: getRepositoryToken(Organization),
           useValue: mockRepository(),
+        },
+        {
+          provide: VolunteersService,
+          useValue: {
+            completeProgramme: jest.fn(),
+          },
         },
       ],
     }).compile();

@@ -17,6 +17,7 @@ import { User } from '../users/entities/user.entity';
 import { Programme } from '../programmes/entities/programme.entity';
 import { Volunteer } from '../volunteers/entities/volunteer.entity';
 import { Organization } from '../organizations/entities/organization.entity';
+import { VolunteersService } from '../volunteers/volunteers.service';
 
 // DTOs
 import {
@@ -94,6 +95,8 @@ export class InteractionsService {
 
     @InjectRepository(Organization)
     private readonly organizationRepo: Repository<Organization>,
+
+    private readonly volunteersService: VolunteersService,
   ) {}
 
   // --- Q&A Logic ---
@@ -487,6 +490,12 @@ export class InteractionsService {
           status: 'Completed',
           isRatedByVolunteer: true,
         });
+
+        try {
+          await this.volunteersService.completeProgramme(appRecord.id);
+        } catch (err) {
+          console.error('[LEADERBOARD POINT CALCULATION ERROR]:', err);
+        }
       }
     }
 
@@ -565,8 +574,9 @@ export class InteractionsService {
           await this.ratingRepo.manager.query(
             `SELECT AVG(value) as meanScore 
              FROM rating r
-             JOIN programme p ON r.programmeId = p.id
-             WHERE p.organizationId = ?`,
+             WHERE r.rateeId = (
+               SELECT userId FROM organization WHERE id = ? LIMIT 1
+             )`,
             [targetOrgId],
           );
 

@@ -9,7 +9,7 @@ export function PendingApprovalPage() {
 
     const handleLogout = () => {
         logout();
-        navigate('/');
+        window.location.href = '/';
     };
 
     return (

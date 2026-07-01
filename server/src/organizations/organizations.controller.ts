@@ -9,6 +9,7 @@ import {
   UseInterceptors,
   UploadedFile,
   UploadedFiles,
+  UseGuards,
 } from '@nestjs/common';
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
@@ -19,6 +20,9 @@ import {
   CreateOrganizationRegistrationDto,
   UpdateOrganizationRegistrationDto,
 } from './dto/create-organization.dto';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
 
 interface UpdateOrgPayload {
   username?: string;
@@ -57,10 +61,12 @@ const documentStorageConfig = diskStorage({
 });
 
 @Controller('organizations')
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class OrganizationsController {
   constructor(private readonly organizationsService: OrganizationsService) {}
 
   @Post('verify')
+  @Roles('admin', 'organization')
   @UseInterceptors(
     FilesInterceptor('documents', 10, { storage: documentStorageConfig }),
   )
@@ -89,6 +95,7 @@ export class OrganizationsController {
   // --- Registration Endpoints ---
 
   @Post('registration')
+  @Roles('admin', 'organization')
   async createRegistration(
     @Body() createRegDto: CreateOrganizationRegistrationDto,
   ) {
@@ -96,21 +103,25 @@ export class OrganizationsController {
   }
 
   @Get('registration/pending')
+  @Roles('admin')
   async findAllPendingRegistrations() {
     return await this.organizationsService.findAllPendingRegistrations();
   }
 
   @Get('registration')
+  @Roles('admin')
   async findAllRegistrations() {
     return await this.organizationsService.findAllRegistrations();
   }
 
   @Get('registration/:id')
+  @Roles('admin', 'organization')
   async findOneRegistration(@Param('id') id: string) {
     return await this.organizationsService.findOneRegistration(id);
   }
 
   @Patch('registration/:id')
+  @Roles('admin')
   async updateRegistration(
     @Param('id') id: string,
     // ─── FIXED: REPLACED ANY WITH STRICT TRANSITIONAL DTO CLASS ENFORCEMENT ───
@@ -120,6 +131,7 @@ export class OrganizationsController {
   }
 
   @Delete('registration/:id')
+  @Roles('admin')
   async removeRegistration(@Param('id') id: string) {
     return await this.organizationsService.removeRegistration(id);
   }
@@ -127,6 +139,7 @@ export class OrganizationsController {
   // --- Organization Profile Endpoints ---
 
   @Post()
+  @Roles('admin')
   @UseInterceptors(
     FileInterceptor('profile_picture', { storage: storageConfig }),
   )
@@ -146,16 +159,19 @@ export class OrganizationsController {
   }
 
   @Get()
+  @Roles('admin', 'volunteer', 'organization')
   async findAll() {
     return await this.organizationsService.findAll();
   }
 
   @Get(':id')
+  @Roles('admin', 'volunteer', 'organization')
   async findOne(@Param('id') id: string) {
     return await this.organizationsService.findOne(id);
   }
 
   @Patch(':id')
+  @Roles('admin', 'organization')
   @UseInterceptors(
     FileInterceptor('profile_picture', { storage: storageConfig }),
   )
@@ -185,6 +201,7 @@ export class OrganizationsController {
   }
 
   @Delete(':id')
+  @Roles('admin')
   async remove(@Param('id') id: string) {
     return await this.organizationsService.remove(id);
   }

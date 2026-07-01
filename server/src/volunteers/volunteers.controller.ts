@@ -9,6 +9,7 @@ import {
   UseInterceptors,
   UploadedFiles,
   Query,
+  UseGuards,
 } from '@nestjs/common';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
@@ -18,14 +19,19 @@ import { Volunteer } from './entities/volunteer.entity';
 import { VolunteerMonthlyPoint } from './entities/volunteer-monthly-point.entity';
 import { Skill } from './entities/skill.entity';
 import { Interest } from './entities/interest.entity';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
 
 @Controller('volunteers')
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class VolunteersController {
   constructor(private readonly volunteersService: VolunteersService) {}
 
   // --- 1. STATIC & RANKING ROUTES (Keep above dynamic :id) ---
 
   @Get('leaderboard')
+  @Roles('admin', 'volunteer', 'organization')
   async getMonthlyLeaderboard(
     @Query('month') month?: string,
     @Query('year') year?: string,
@@ -36,21 +42,25 @@ export class VolunteersController {
   }
 
   @Get('skills')
+  @Roles('admin', 'volunteer', 'organization')
   async findAllSkills(): Promise<Skill[]> {
     return await this.volunteersService.findAllSkills();
   }
 
   @Get('interests')
+  @Roles('admin', 'volunteer', 'organization')
   async findAllInterests(): Promise<Interest[]> {
     return await this.volunteersService.findAllInterests();
   }
 
   @Post('skills')
+  @Roles('admin')
   async createSkill(@Body('name') name: string): Promise<Skill> {
     return await this.volunteersService.createSkill(name);
   }
 
   @Post('interests')
+  @Roles('admin')
   async createInterest(@Body('name') name: string): Promise<Interest> {
     return await this.volunteersService.createInterest(name);
   }
@@ -63,6 +73,7 @@ export class VolunteersController {
    * Placed above dynamic ':id' wildcard to prevent NestJS route collision issues.
    */
   @Get('programme/:programmeId')
+  @Roles('admin', 'volunteer', 'organization')
   async findVolunteersByProgramme(
     @Param('programmeId') programmeId: string,
   ): Promise<Volunteer[]> {
@@ -72,6 +83,7 @@ export class VolunteersController {
   // --- 3. DYNAMIC ROUTES ---
 
   @Get(':id/history')
+  @Roles('admin', 'volunteer', 'organization')
   async getHistory(@Param('id') id: string): Promise<any> {
     const historyData = await this.volunteersService.getHistory(id);
     return (
@@ -85,11 +97,13 @@ export class VolunteersController {
   }
 
   @Get(':id')
+  @Roles('admin', 'volunteer', 'organization')
   async findOne(@Param('id') id: string): Promise<Volunteer | null> {
     return await this.volunteersService.findOne(id);
   }
 
   @Get()
+  @Roles('admin')
   async findAll(): Promise<Volunteer[]> {
     return await this.volunteersService.findAll();
   }
@@ -99,6 +113,7 @@ export class VolunteersController {
    * Fixed "any" error by using UpdateProfileDto and explicit Promise return.
    */
   @Patch(':id')
+  @Roles('admin', 'volunteer')
   @UseInterceptors(
     FileFieldsInterceptor(
       [
@@ -139,6 +154,7 @@ export class VolunteersController {
   }
 
   @Delete(':id')
+  @Roles('admin')
   async remove(@Param('id') id: string): Promise<{ deleted: boolean }> {
     return await this.volunteersService.remove(id);
   }

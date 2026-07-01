@@ -47,14 +47,26 @@ describe("Real-Time Chat E2E Tests", () => {
     cy.wrap(alertStub).should("have.been.calledWith", "Verification documents uploaded successfully! Your application is currently under administrative evaluation.");
 
     // 3. Programmatically approve organization via REST API
-    cy.window().then((win) => {
-      const token = win.localStorage.getItem("token");
+    const adminEmail = `admin_chat_${uniqueId}@example.com`;
+    cy.request("POST", "http://localhost:3000/auth/register", {
+      email: adminEmail,
+      username: `admin_chat_${uniqueId}`,
+      password: password,
+      role: "admin"
+    });
+
+    cy.request("POST", "http://localhost:3000/auth/login", {
+      email: adminEmail,
+      password: password,
+      role: "admin"
+    }).then((loginResponse) => {
+      const adminToken = loginResponse.body.access_token;
 
       // Fetch the registration record ID (starts with REGxxx)
       cy.request({
         method: "GET",
         url: `http://localhost:3000/organizations/registration/${orgId}`,
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${adminToken}` }
       }).then((regResponse) => {
         const regId = regResponse.body.id;
 
@@ -62,7 +74,7 @@ describe("Real-Time Chat E2E Tests", () => {
         cy.request({
           method: "PATCH",
           url: `http://localhost:3000/organizations/registration/${regId}`,
-          headers: { Authorization: `Bearer ${token}` },
+          headers: { Authorization: `Bearer ${adminToken}` },
           body: { status: "approved" }
         }).then((patchResponse) => {
           expect(patchResponse.body.status).to.eq("approved");

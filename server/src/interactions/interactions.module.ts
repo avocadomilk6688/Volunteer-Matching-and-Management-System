@@ -15,8 +15,11 @@ import { User } from '../users/entities/user.entity'; // --- ADDED IMPORT ---
 import { Volunteer } from '../volunteers/entities/volunteer.entity';
 import { Organization } from '../organizations/entities/organization.entity';
 
+import { VolunteersModule } from '../volunteers/volunteers.module';
+
 @Module({
   imports: [
+    VolunteersModule,
     TypeOrmModule.forFeature([
       Message,
       Notification,

@@ -23,10 +23,13 @@ export interface User {
     points?: number;
   };
   organization?: {
-    id: string,
+    id: string;
     profile_picture_url?: string;
     description?: string;
     rating?: number;
+    registrationRecord?: {
+      status?: string;
+    };
   };
 }
 

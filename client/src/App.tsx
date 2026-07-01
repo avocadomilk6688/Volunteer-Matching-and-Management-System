@@ -19,6 +19,7 @@ import { OrganizationVerificationPage } from './pages/OrganizationVerificationPa
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
 import { ResetPasswordPage } from './pages/ResetPasswordPage';
 import { PendingApprovalPage } from './pages/PendingApprovalPage';
+import { ProtectedRoute } from './context/auth/ProtectedRoute';
 
 function App() {
   return (
@@ -27,23 +28,33 @@ function App() {
         <Route path="/" element={<LoginPage />} />
         <Route path="login" index element={<LoginPage />}></Route>
         <Route path="sign-up" element={<SignUpPage />}></Route>
-        <Route path="volunteer-home" element={<VolunteerHomePage />}></Route>
-        <Route path="programme-details/:id" element={<ProgrammeDetailsPage />}></Route>
-        <Route path="leaderboard" element={<LeaderboardPage />}></Route>
-        <Route path="qa" element={<QAPage />}></Route>
-        <Route path="volunteering-history" element={<VolunteeringHistoryPage />}></Route>
-        <Route path="manage-profile" element={<ManageProfilePage />}></Route>
-        <Route path="manage-listing" element={<ManageListingPage />}></Route>
-        <Route path="manage-applications" element={<ManageVolunteerApplicationPage />} />
-        <Route path="manage-user-account" element={<ManageUserAccountPage />} />
-        <Route path="verify-organization-registration" element={<VerifyOrganizationRegistrationPage />} />
-        <Route path="admin-manage-listing" element={<AdminManageListingPage />} />
-        <Route path="manage-qa" element={<AdminManageQAPage />} />
-        <Route path="manage-tickets" element={<AdminManageTicketsPage />} />
-        <Route path="organization-verification" element={<OrganizationVerificationPage />} />
+        
+        {/* Volunteer Routes */}
+        <Route path="volunteer-home" element={<ProtectedRoute allowedRoles={['volunteer']}><VolunteerHomePage /></ProtectedRoute>} />
+        <Route path="programme-details/:id" element={<ProtectedRoute allowedRoles={['volunteer']}><ProgrammeDetailsPage /></ProtectedRoute>} />
+        <Route path="leaderboard" element={<ProtectedRoute allowedRoles={['volunteer']}><LeaderboardPage /></ProtectedRoute>} />
+        <Route path="volunteering-history" element={<ProtectedRoute allowedRoles={['volunteer']}><VolunteeringHistoryPage /></ProtectedRoute>} />
+        
+        {/* Organization Routes */}
+        <Route path="manage-listing" element={<ProtectedRoute allowedRoles={['organization']}><ManageListingPage /></ProtectedRoute>} />
+        <Route path="manage-applications" element={<ProtectedRoute allowedRoles={['organization']}><ManageVolunteerApplicationPage /></ProtectedRoute>} />
+        <Route path="organization-verification" element={<ProtectedRoute allowedRoles={['organization']}><OrganizationVerificationPage /></ProtectedRoute>} />
+        <Route path="pending-approval" element={<ProtectedRoute allowedRoles={['organization']}><PendingApprovalPage /></ProtectedRoute>} />
+
+        {/* Shared Routes */}
+        <Route path="qa" element={<ProtectedRoute allowedRoles={['volunteer', 'organization']}><QAPage /></ProtectedRoute>} />
+        <Route path="manage-profile" element={<ProtectedRoute allowedRoles={['volunteer', 'organization']}><ManageProfilePage /></ProtectedRoute>} />
+
+        {/* Admin Routes */}
+        <Route path="manage-user-account" element={<ProtectedRoute allowedRoles={['admin']}><ManageUserAccountPage /></ProtectedRoute>} />
+        <Route path="verify-organization-registration" element={<ProtectedRoute allowedRoles={['admin']}><VerifyOrganizationRegistrationPage /></ProtectedRoute>} />
+        <Route path="admin-manage-listing" element={<ProtectedRoute allowedRoles={['admin']}><AdminManageListingPage /></ProtectedRoute>} />
+        <Route path="manage-qa" element={<ProtectedRoute allowedRoles={['admin']}><AdminManageQAPage /></ProtectedRoute>} />
+        <Route path="manage-tickets" element={<ProtectedRoute allowedRoles={['admin']}><AdminManageTicketsPage /></ProtectedRoute>} />
+        
+        {/* Public Utility Routes */}
         <Route path="forgot-password" element={<ForgotPasswordPage />} />
         <Route path="reset-password" element={<ResetPasswordPage />} />
-        <Route path="pending-approval" element={<PendingApprovalPage />} />
       </Routes>
     </AuthProvider>
   )

@@ -8,15 +8,20 @@ import {
   Patch,
   NotFoundException,
   InternalServerErrorException,
+  UseGuards,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
 
 // Import the separated services to track down relationship profiles safely
 import { OrganizationsService } from '../organizations/organizations.service';
 import { VolunteersService } from '../volunteers/volunteers.service';
 
 @Controller('users')
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class UsersController {
   constructor(
     private readonly usersService: UsersService,
@@ -25,6 +30,7 @@ export class UsersController {
   ) {}
 
   @Post('volunteer')
+  @Roles('admin')
   async createVolunteer(@Body() createUserDto: CreateUserDto) {
     try {
       return await this.usersService.createVolunteer(createUserDto);
@@ -39,16 +45,19 @@ export class UsersController {
   }
 
   @Get('volunteer')
+  @Roles('admin')
   async findAllVolunteers() {
     return await this.usersService.findAll();
   }
 
   @Get()
+  @Roles('admin')
   async findAll() {
     return await this.usersService.findAll();
   }
 
   @Get(':id')
+  @Roles('admin', 'volunteer', 'organization')
   async findOne(@Param('id') id: string) {
     return await this.usersService.findOne(id);
   }
@@ -58,6 +67,7 @@ export class UsersController {
    * Clears child-relation rows from separated profile tables before executing core table cleanups.
    */
   @Delete(':id')
+  @Roles('admin')
   async remove(@Param('id') id: string) {
     // 1. Fetch the user details to ascertain the context role mapping constraint
     const user = await this.usersService.findOne(id);
@@ -91,6 +101,7 @@ export class UsersController {
   }
 
   @Patch(':id')
+  @Roles('admin', 'volunteer', 'organization')
   async update(
     @Param('id') id: string,
     @Body() updateDto: Record<string, unknown>,

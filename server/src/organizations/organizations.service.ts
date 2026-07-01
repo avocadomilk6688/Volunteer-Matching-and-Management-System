@@ -187,6 +187,13 @@ export class OrganizationsService {
           console.log(
             `[SEED SKIPPED ⚠️] Profile row configuration already exists for user link ID: ${targetUserId}`,
           );
+          existingOrg.registrationRecord = {
+            id: updatedReg.id,
+          } as OrganizationRegistration;
+          await this.orgRepo.save(existingOrg);
+          console.log(
+            `[LINK PROFILE SUCCESS ✅] Linked existing Organization profile to registration record! ID: ${existingOrg.id}`,
+          );
         }
       } else {
         console.error(

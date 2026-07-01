@@ -72,16 +72,17 @@ export function LoginPage() {
                 } : undefined
             };
 
-            login(data.access_token, unifiedAuthUserContext);
 
             if (role === 'volunteer') {
+                login(data.access_token, unifiedAuthUserContext);
                 navigate('/volunteer-home');
             } else if (role === 'admin') {
+                login(data.access_token, unifiedAuthUserContext);
                 navigate('/manage-user-account');
             } else if (role === 'organization') {
-
                 const registrationRecord = data.organization?.registrationRecord;
                 if (registrationRecord) {
+                    login(data.access_token, unifiedAuthUserContext);
                     const rawStatus = registrationRecord.status || 'approved';
                     if (rawStatus.trim().toLowerCase() === 'approved') {
                         navigate('/manage-listing');
@@ -101,6 +102,15 @@ export function LoginPage() {
 
                             console.log("DEBUG: Isolated pending row verification check status state:", currentStatus);
 
+                            // Update user context with the fetched registration record
+                            unifiedAuthUserContext.organization = {
+                                ...(unifiedAuthUserContext.organization || {}),
+                                id: data.organization?.id || data.id,
+                                registrationRecord: remoteRecord,
+                            };
+
+                            login(data.access_token, unifiedAuthUserContext);
+
                             if (currentStatus === 'pending') {
                                 console.log("REDIRECT: Active unapproved record matched. Moving to pending route.");
                                 navigate('/pending-approval');
@@ -112,14 +122,17 @@ export function LoginPage() {
                         } else {
                             // If the individual row returns a 404 or fails, it means they never submitted a form
                             console.log("REDIRECT: Registration instance lookup failed. Prompting form layout entry.");
+                            login(data.access_token, unifiedAuthUserContext);
                             navigate('/organization-verification');
                         }
                     } catch (checkError) {
                         console.error("Failed to query localized tracking indices:", checkError);
+                        login(data.access_token, unifiedAuthUserContext);
                         navigate('/organization-verification');
                     }
                 }
             } else {
+                login(data.access_token, unifiedAuthUserContext);
                 navigate('/manage-listing');
             }
         } catch (error: unknown) {

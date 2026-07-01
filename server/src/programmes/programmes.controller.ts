@@ -9,6 +9,7 @@ import {
   Query,
   UseInterceptors,
   UploadedFile,
+  UseGuards,
 } from '@nestjs/common';
 import {
   ProgrammesService,
@@ -20,6 +21,9 @@ import { UpdateProgrammeDto } from './dto/update-programme.dto';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
 
 // ─── EXPLICIT LINT-SAFE INTERFACES ───
 interface SkillEntity {
@@ -62,10 +66,12 @@ interface WrappedBackendResponse {
 }
 
 @Controller('programmes')
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class ProgrammesController {
   constructor(private readonly programmesService: ProgrammesService) {}
 
   @Post()
+  @Roles('admin', 'organization')
   @UseInterceptors(
     FileInterceptor('file', {
       storage: diskStorage({
@@ -90,6 +96,7 @@ export class ProgrammesController {
   }
 
   @Patch(':id')
+  @Roles('admin', 'organization')
   @UseInterceptors(
     FileInterceptor('file', {
       storage: diskStorage({
@@ -120,6 +127,7 @@ export class ProgrammesController {
   }
 
   @Get()
+  @Roles('admin', 'volunteer', 'organization')
   async findAll(
     @Query() filterDto: FilterProgrammeParams,
   ): Promise<WrappedBackendResponse> {
@@ -162,6 +170,7 @@ export class ProgrammesController {
   }
 
   @Post(':id/save')
+  @Roles('admin', 'volunteer')
   async toggleSave(
     @Param('id') programmeId: string,
     @Body('userId') userId: string,
@@ -170,6 +179,7 @@ export class ProgrammesController {
   }
 
   @Get(':id/is-saved/:userId')
+  @Roles('admin', 'volunteer')
   async checkSavedStatus(
     @Param('id') programmeId: string,
     @Param('userId') userId: string,
@@ -187,16 +197,19 @@ export class ProgrammesController {
   }
 
   @Get(':id')
+  @Roles('admin', 'volunteer', 'organization')
   async findOne(@Param('id') id: string) {
     return await this.programmesService.findOne(id);
   }
 
   @Delete(':id')
+  @Roles('admin', 'organization')
   async remove(@Param('id') id: string) {
     return await this.programmesService.remove(id);
   }
 
   @Get('recommendations/:userId')
+  @Roles('admin', 'volunteer')
   async getRecommendations(
     @Param('userId') userId: string,
     @Query() filterDto: FilterProgrammeParams,

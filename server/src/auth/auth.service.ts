@@ -15,6 +15,7 @@ import { Organization } from '../organizations/entities/organization.entity';
 import { CreateUserDto } from '../users/dto/create-user.dto';
 import { LoginDto } from './dto/login.dto';
 import { MailService } from '../mail/mail.service';
+import { JwtService } from '@nestjs/jwt';
 
 interface RawRatingRow {
   id: string;
@@ -46,6 +47,8 @@ export class AuthService {
     private organizationRepository: Repository<Organization>,
 
     private readonly mailService: MailService,
+
+    private readonly jwtService: JwtService,
   ) {}
 
   async register(createUserDto: CreateUserDto): Promise<User> {
@@ -262,8 +265,11 @@ export class AuthService {
         }
       : undefined;
 
+    const payload = { id: user.id, email: user.email, role: user.role };
+    const access_token = this.jwtService.sign(payload);
+
     return {
-      access_token: 'session_active_token',
+      access_token,
       id: user.id,
       email: user.email,
       role: user.role,

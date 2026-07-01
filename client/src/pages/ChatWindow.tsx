@@ -311,7 +311,9 @@ export function ChatWindow({
 
     // --- Helpers ---
     const getImgUrl = (url?: string | null) => {
-        if (!url) return '';
+        const defaultPic = '/images/default_profile_pic.png';
+        if (!url) return defaultPic;
+        if (url === defaultPic) return defaultPic;
         return url.startsWith('http') ? url : `${API_BASE_URL}${url}`;
     };
 

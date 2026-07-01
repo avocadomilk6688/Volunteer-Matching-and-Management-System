@@ -63,11 +63,12 @@ export function ManageVolunteerApplicationPage() {
     const fetchData = async () => {
         if (!user?.id) return;
         const token = localStorage.getItem('token');
+        const orgId = user.organization?.id || user.id;
 
         try {
             setLoading(true);
             const [appRes, progRes] = await Promise.all([
-                fetch(`${API_BASE_URL}/applications/organization/${user.id}`, {
+                fetch(`${API_BASE_URL}/applications/organization/${orgId}`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 }),
                 fetch(`${API_BASE_URL}/programmes?limit=100`, {
@@ -81,7 +82,7 @@ export function ManageVolunteerApplicationPage() {
             let orgProgrammes: ProgrammeEntity[] = [];
             if (progData && Array.isArray(progData.items)) {
                 orgProgrammes = progData.items.filter(
-                    (p: ProgrammeEntity) => p.organization?.id === user.id
+                    (p: ProgrammeEntity) => p.organization?.id === orgId
                 );
                 setAllProgrammes(orgProgrammes);
             }

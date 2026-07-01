@@ -8,7 +8,12 @@ import './header.css';
 const API_BASE_URL = "http://localhost:3000";
 
 // --- Interfaces ---
-interface ProfileRelation { profile_picture_url?: string; }
+interface ProfileRelation {
+    profile_picture_url?: string;
+    registrationRecord?: {
+        status?: string;
+    };
+}
 
 interface Notification {
     id: string;
@@ -50,7 +55,7 @@ export function Header() {
 
     const isUnverifiedOrg = isOrganization && (
         !user?.organization ||
-        Object.keys(user.organization).length === 0
+        user?.organization?.registrationRecord?.status !== 'approved'
     );
 
     // Safe debug logging context
@@ -105,11 +110,7 @@ export function Header() {
             localStorage.setItem(key, timestampArchive[key]);
         });
 
-        // Wipe component states to prevent cross-account display bleed passing passes
-        setNotifications([]);
-        isShowProfileOptions(false);
-        setShowNotifications(false);
-        navigate('/');
+        window.location.href = '/';
     };
 
     const toggleNotifications = () => {
