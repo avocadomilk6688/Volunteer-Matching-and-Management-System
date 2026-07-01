@@ -164,8 +164,8 @@ describe('VolunteersService', () => {
         { programmeId: 'P001' },
       );
       expect(queryBuilder.andWhere).toHaveBeenCalledWith(
-        'LOWER(application.status) = :status',
-        { status: 'completed' },
+        'LOWER(application.status) IN (:...statuses)',
+        { statuses: ['completed', 'upcoming'] },
       );
     });
   });
