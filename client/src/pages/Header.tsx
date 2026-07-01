@@ -53,9 +53,10 @@ export function Header() {
     const isOrganization = role === 'organization';
     const isAdmin = role === 'admin';
 
+    const registrationStatus = user?.organization?.registrationRecord?.status?.trim().toLowerCase();
     const isUnverifiedOrg = isOrganization && (
         !user?.organization ||
-        user?.organization?.registrationRecord?.status !== 'approved'
+        registrationStatus !== 'approved'
     );
 
     // Safe debug logging context

@@ -28,7 +28,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowe
 
     // Organization Verification Guard
     if (user.role === 'organization') {
-        const registrationStatus = user.organization?.registrationRecord?.status;
+        const registrationStatus = user.organization?.registrationRecord?.status?.trim().toLowerCase();
         const isApproved = registrationStatus === 'approved';
 
         const isUnverifiedPath = location.pathname === '/organization-verification' || location.pathname === '/pending-approval';
